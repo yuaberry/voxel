@@ -881,3 +881,80 @@ mod e2e_tests {
         let _ = std::fs::remove_dir_all(&inst);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Launcher overview (the Play tab)
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LauncherInstance {
+    pub slug: String,
+    pub mods: Vec<String>,
+    pub shader_packs: Vec<String>,
+    pub last_build_jar: Option<String>,
+}
+
+fn list_names(dir: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            if entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if !name.starts_with('.') {
+                    out.push(name);
+                }
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+#[tauri::command]
+pub fn launcher_overview(base_path: String) -> Result<Vec<LauncherInstance>, String> {
+    let base = std::path::PathBuf::from(&base_path)
+        .canonicalize()
+        .map_err(|e| format!("Storage base not accessible: {e}"))?;
+    let instances = base.join("instances");
+    let mut list = Vec::new();
+    let entries = match std::fs::read_dir(&instances) {
+        Ok(entries) => entries,
+        Err(_) => return Ok(list),
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let slug = entry.file_name().to_string_lossy().to_string();
+        let dir = entry.path();
+        if !dir.is_dir() {
+            continue;
+        }
+        // latest compiled jar of the matching project, if any
+        let libs = base.join("projects").join(&slug).join("build/libs");
+        let mut last_build_jar = None;
+        if let Ok(jars) = std::fs::read_dir(&libs) {
+            let mut best: Option<(std::time::SystemTime, String)> = None;
+            for jar in jars.filter_map(|j| j.ok()) {
+                let name = jar.file_name().to_string_lossy().to_string();
+                if !name.ends_with(".jar") || name.contains("sources") {
+                    continue;
+                }
+                let modified = jar
+                    .metadata()
+                    .and_then(|m| m.modified())
+                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                if best.as_ref().map(|(t, _)| modified > *t).unwrap_or(true) {
+                    best = Some((modified, name));
+                }
+            }
+            last_build_jar = best.map(|(_, name)| name);
+        }
+        list.push(LauncherInstance {
+            slug,
+            mods: list_names(&dir.join("mods")),
+            shader_packs: list_names(&dir.join("shaderpacks")),
+            last_build_jar,
+        });
+    }
+    list.sort_by(|a, b| a.slug.cmp(&b.slug));
+    Ok(list)
+}

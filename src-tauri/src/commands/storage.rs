@@ -82,14 +82,47 @@ fn validate_base_path(raw: &str) -> Result<PathBuf, String> {
 #[tauri::command]
 pub fn get_default_storage_base() -> Result<String, String> {
     let home = home_dir()?;
-    // Legacy workspace from the previous brand era — keep pointing to it
-    // when it exists so no user data goes missing after the rename.
-    let legacy = home.join("NexusCraft");
-    if legacy.is_dir() {
-        return Ok(legacy.to_string_lossy().to_string());
-    }
-    let base = home.join("VOXEL");
+    // VOXEL workspace by default (~/Voxel). The legacy NexusCraft folder,
+    // if present, can be moved here in one click (see Storage settings).
+    let base = home.join("Voxel");
     Ok(base.to_string_lossy().to_string())
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyWorkspaceStatus {
+    pub exists: bool,
+    pub path: String,
+}
+
+#[tauri::command]
+pub fn workspace_legacy_status() -> LegacyWorkspaceStatus {
+    let legacy = match home_dir() {
+        Ok(home) => home.join("NexusCraft"),
+        Err(_) => std::path::PathBuf::from(""),
+    };
+    LegacyWorkspaceStatus {
+        exists: legacy.is_dir(),
+        path: legacy.to_string_lossy().to_string(),
+    }
+}
+
+/// One-click move of the legacy ~/NexusCraft workspace to ~/Voxel.
+/// Safe: refuses if the target already exists or the source is missing.
+#[tauri::command]
+pub fn workspace_migrate_legacy() -> Result<String, String> {
+    let home = home_dir()?;
+    let legacy = home.join("NexusCraft");
+    let target = home.join("Voxel");
+    if !legacy.is_dir() {
+        return Err("Legacy ~/NexusCraft folder not found — nothing to migrate".to_string());
+    }
+    if target.exists() {
+        return Err("~/Voxel already exists — move your data manually to be safe".to_string());
+    }
+    std::fs::rename(&legacy, &target)
+        .map_err(|e| format!("Move failed: {e} — nothing was changed"))?;
+    Ok(target.to_string_lossy().to_string())
 }
 
 #[tauri::command]

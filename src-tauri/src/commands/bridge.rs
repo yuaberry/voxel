@@ -362,6 +362,8 @@ async fn auth(
     if ok {
         next.run(request).await
     } else {
+        // slow down token guessing on the local network
+        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
         (StatusCode::UNAUTHORIZED, "invalid token").into_response()
     }
 }

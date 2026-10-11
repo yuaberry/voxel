@@ -12,8 +12,45 @@ use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::time::{Duration, Instant};
 
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
-const IO_TIMEOUT: Duration = Duration::from_secs(6);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
+const IO_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Minecraft clients resolve `_minecraft._tcp.<host>` SRV records before
+/// falling back to `<host>:25565`. DDoS shields/proxies often only accept
+/// connections on the SRV target — without this, importing such servers
+/// pings a black hole (verified live: minemen.club).
+fn resolve_srv(host: &str) -> Option<(String, u16)> {
+    if host.parse::<std::net::IpAddr>().is_ok() {
+        return None; // raw IP — nothing to resolve
+    }
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .ok()?;
+    runtime.block_on(async {
+        let (config, _opts) = hickory_resolver::system_conf::read_system_conf().ok()?;
+        let resolver = hickory_resolver::TokioResolver::builder_with_config(
+            config,
+            hickory_resolver::name_server::TokioConnectionProvider::default(),
+        )
+        .build();
+        let name = hickory_resolver::Name::from_utf8(format!("_minecraft._tcp.{host}")).ok()?;
+        let response = resolver
+            .lookup(name, hickory_resolver::proto::rr::RecordType::SRV)
+            .await
+            .ok()?;
+        for record in response.records() {
+            if let Some(srv) = record.data().as_srv() {
+                let target = srv.target().to_string();
+                let target = target.trim_end_matches('.').to_string();
+                if !target.is_empty() {
+                    return Some((target, srv.port()));
+                }
+            }
+        }
+        None
+    })
+}
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -188,13 +225,24 @@ pub fn server_ping(host: String, port: Option<u16>) -> Result<ServerPing, String
     if port == 0 {
         return Err("Invalid port".to_string());
     }
+    // Vanilla client behavior: SRV lookup before the default-port fallback.
+    // The display host stays as the user typed it; the connection goes to
+    // the SRV target when one exists.
+    let mut connect_host = host.to_string();
+    let mut port = port;
+    if port == 25565 {
+        if let Some((target, srv_port)) = resolve_srv(host) {
+            connect_host = target;
+            port = srv_port;
+        }
+    }
 
     let started = Instant::now();
     // Resolve first (accepts hostnames and IPs), then connect with a hard
     // timeout so dead addresses fail in seconds instead of hanging.
-    let addrs = (host, port)
+    let addrs = (connect_host.as_str(), port)
         .to_socket_addrs()
-        .map_err(|e| format!("Could not resolve {host}:{port}: {e}"))?;
+        .map_err(|e| format!("Could not resolve {connect_host}:{port}: {e}"))?;
     let mut last_err: Option<std::io::Error> = None;
     let mut stream: Option<TcpStream> = None;
     for addr in addrs {
@@ -208,14 +256,16 @@ pub fn server_ping(host: String, port: Option<u16>) -> Result<ServerPing, String
     }
     let mut stream = stream.ok_or_else(|| {
         format!(
-            "Could not reach {host}:{port} — {} (is the address right and the server online?)",
+            "Could not reach {connect_host}:{port} — {} (is the address right and the server online?)",
             last_err.map(|e| e.to_string()).unwrap_or_default()
         )
     })?;
     stream.set_read_timeout(Some(IO_TIMEOUT)).ok();
     stream.set_write_timeout(Some(IO_TIMEOUT)).ok();
 
-    stream.write_all(&build_handshake(host, port)).map_err(|e| format!("send handshake: {e}"))?;
+    stream
+        .write_all(&build_handshake(&connect_host, port))
+        .map_err(|e| format!("send handshake: {e}"))?;
     stream.write_all(&build_status_request()).map_err(|e| format!("send status request: {e}"))?;
     stream.flush().map_err(|e| format!("flush: {e}"))?;
 
@@ -315,12 +365,22 @@ mod tests {
         assert!(parse_status("x", 1, 5, b"not json").is_err());
     }
 
-    #[ignore = "e2e: pings a real public server (network)"]
+    #[ignore = "e2e: pings real public servers (network)"]
     #[test]
     fn e2e_ping_public_server() {
-        let ping = server_ping("mc.hypixel.net".into(), None).unwrap();
-        assert!(ping.players_max > 0, "public servers report capacity");
-        assert!(!ping.version.is_empty());
-        println!("hypixel: {} players, version {}", ping.players_online, ping.version);
+        for host in ["mc.hypixel.net", "play.cubecraft.net", "minemen.club"] {
+            let ping = server_ping(host.into(), None)
+                .unwrap_or_else(|e| panic!("{host} failed: {e}"));
+            println!(
+                "{} → {} players v{} [{}]",
+                host, ping.players_online, ping.version, ping.motd
+            );
+            // Some proxies (BungeeCord) report max=0 while online is live —
+            // capacity is best-effort, liveness is the real assertion.
+            assert!(
+                !ping.version.is_empty() || ping.players_online > 0,
+                "{host} must answer with version or players"
+            );
+        }
     }
 }
