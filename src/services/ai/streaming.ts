@@ -311,6 +311,7 @@ export async function* streamChat(
     switch (settings.provider) {
       case "openrouter":
       case "openai":
+      case "nvidia-nim":
         yield* streamOpenAiCompatible(settings, apiKey ?? "", messages);
         break;
       case "anthropic":

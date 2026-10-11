@@ -268,6 +268,7 @@ export async function agentTurn(
   switch (settings.provider) {
     case "openrouter":
     case "openai":
+    case "nvidia-nim":
       return turnOpenAiCompatible(settings, apiKey ?? "", messages, tools);
     case "anthropic":
       return turnAnthropic(settings, apiKey ?? "", messages, tools);

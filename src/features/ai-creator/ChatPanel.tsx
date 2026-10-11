@@ -45,7 +45,33 @@ export interface SnapshotActivity {
   label: string;
 }
 
-export type TimelineEntry = DisplayMessage | ToolActivity | SnapshotActivity;
+export interface PhaseActivity {
+  kind: "phase";
+  agent: "architect" | "developer" | "reviewer";
+}
+
+export type TimelineEntry = DisplayMessage | ToolActivity | SnapshotActivity | PhaseActivity;
+
+export const AGENT_PHASE_META: Record<
+  PhaseActivity["agent"],
+  { label: string; color: string; description: string }
+> = {
+  architect: {
+    label: "Architect",
+    color: "text-cyan-300 border-cyan-400/40 bg-cyan-400/10",
+    description: "Analyzing the request and planning — read-only",
+  },
+  developer: {
+    label: "Developer",
+    color: "text-violet-300 border-violet-400/40 bg-violet-400/10",
+    description: "Applying the plan with the sandboxed tools",
+  },
+  reviewer: {
+    label: "Reviewer",
+    color: "text-amber-300 border-amber-400/40 bg-amber-400/10",
+    description: "Auditing the diff — read-only",
+  },
+};
 
 interface Props {
   messages: TimelineEntry[];
@@ -53,6 +79,9 @@ interface Props {
   thinking: boolean;
   agentMode: boolean;
   onToggleAgentMode: (enabled: boolean) => void;
+  /** Task-force pipeline: Architect → Developer → Reviewer */
+  multiAgent: boolean;
+  onToggleMultiAgent: (enabled: boolean) => void;
   attachedCount: number;
   hasProject: boolean;
   onSend: (text: string) => Promise<void>;
@@ -68,6 +97,8 @@ export function ChatPanel({
   thinking,
   agentMode,
   onToggleAgentMode,
+  multiAgent,
+  onToggleMultiAgent,
   attachedCount,
   hasProject,
   onSend,
@@ -131,6 +162,23 @@ export function ChatPanel({
                 if (entry.kind === "tool") {
                   return <ToolCard key={`${entry.callId}-${index}`} activity={entry} />;
                 }
+                if (entry.kind === "phase") {
+                  const meta = AGENT_PHASE_META[entry.agent];
+                  return (
+                    <div key={`phase-${index}`} className="flex justify-center animate-card-rise">
+                      <span
+                        className={
+                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold " +
+                          meta.color
+                        }
+                        title={meta.description}
+                      >
+                        <Bot className="h-3 w-3" />
+                        {meta.label} agent {meta.description}
+                      </span>
+                    </div>
+                  );
+                }
                 return (
                   <div key={`snap-${index}`} className="flex justify-center">
                     <Badge variant="secondary" className="gap-1 py-1">
@@ -189,6 +237,19 @@ export function ChatPanel({
               <Wrench className="h-3 w-3" /> 12 sandboxed tools active
             </Badge>
             <Badge variant="outline">auto-snapshot before writes</Badge>
+            <button
+              type="button"
+              onClick={() => onToggleMultiAgent(!multiAgent)}
+              className={cn(
+                "rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors",
+                multiAgent
+                  ? "border-primary/50 bg-primary/10 text-primary"
+                  : "border-border/60 text-muted-foreground hover:border-primary/30",
+              )}
+              title="Task force: Architect plans, Developer applies, Reviewer audits — same sandboxed tools"
+            >
+              {multiAgent ? "✦ Task force: 3 agents ON" : "✦ Task force OFF (single agent)"}
+            </button>
           </div>
         )}
         <div className={attachedCount > 0 ? "pb-2" : "pb-0"}>

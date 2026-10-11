@@ -23,7 +23,7 @@ import {
   loadProjectContext,
   type ProjectContext,
 } from "@/services/ai/contextService";
-import { runAgent } from "@/services/ai/agent/orchestrator";
+import { runAgent, runAgentTaskForce } from "@/services/ai/agent/orchestrator";
 import {
   setReferenceStorageBase,
   listReferences,
@@ -87,6 +87,7 @@ export function AiCreatorPage() {
   const [busy, setBusy] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [agentMode, setAgentMode] = useState(true);
+  const [multiAgent, setMultiAgent] = useState(true);
   const [specProposal, setSpecProposal] = useState<string | null>(null);
   const [references, setReferences] = useState<ReferenceImage[]>([]);
   const [attached, setAttached] = useState<Set<string>>(new Set());
@@ -325,7 +326,45 @@ export function AiCreatorPage() {
       };
 
       try {
-        const result = await runAgent({
+        const onAgentEvent = (event: Parameters<
+          NonNullable<Parameters<typeof runAgent>[0]["onEvent"]>
+        >[0]) => {
+          switch (event.type) {
+            case "phase":
+              setTimeline((prev) => [...prev, { kind: "phase", agent: event.agent }]);
+              break;
+            case "snapshot":
+              setTimeline((prev) => [...prev, { kind: "snapshot", label: event.label }]);
+              break;
+            case "tool_start":
+              setTimeline((prev) => [
+                ...prev,
+                {
+                  kind: "tool",
+                  callId: event.callId,
+                  tool: event.tool,
+                  summary: event.summary,
+                  status: "running" as ToolStatus,
+                  requiresConfirmation: event.requiresConfirmation,
+                },
+              ]);
+              break;
+            case "tool_result":
+              upsertTool(event.callId, {
+                status: event.ok ? ("ok" as ToolStatus) : ("error" as ToolStatus),
+                output: event.output,
+              });
+              break;
+            case "text":
+              setTimeline((prev) => [...prev, { role: "assistant", content: event.text }]);
+              break;
+            case "thinking":
+              break;
+          }
+        };
+
+        const runner = multiAgent ? runAgentTaskForce : runAgent;
+        const result = await runner({
           settings: aiSettings,
           project,
           context,
@@ -334,37 +373,7 @@ export function AiCreatorPage() {
           history: textHistory(),
           userText: text,
           shouldAbort: () => abortRef.current,
-          onEvent: (event) => {
-            switch (event.type) {
-              case "snapshot":
-                setTimeline((prev) => [...prev, { kind: "snapshot", label: event.label }]);
-                break;
-              case "tool_start":
-                setTimeline((prev) => [
-                  ...prev,
-                  {
-                    kind: "tool",
-                    callId: event.callId,
-                    tool: event.tool,
-                    summary: event.summary,
-                    status: "running" as ToolStatus,
-                    requiresConfirmation: event.requiresConfirmation,
-                  },
-                ]);
-                break;
-              case "tool_result":
-                upsertTool(event.callId, {
-                  status: event.ok ? ("ok" as ToolStatus) : ("error" as ToolStatus),
-                  output: event.output,
-                });
-                break;
-              case "text":
-                setTimeline((prev) => [...prev, { role: "assistant", content: event.text }]);
-                break;
-              case "thinking":
-                break;
-            }
-          },
+          onEvent: onAgentEvent,
           confirm: (tool, summary) =>
             new Promise<boolean>((resolve) => {
               setConfirmRequest({ tool, summary, resolve });
@@ -507,6 +516,8 @@ export function AiCreatorPage() {
           thinking={thinking}
           agentMode={agentMode}
           onToggleAgentMode={setAgentMode}
+          multiAgent={multiAgent}
+          onToggleMultiAgent={setMultiAgent}
           attachedCount={attached.size}
           hasProject={project !== null}
           onSend={handleSend}

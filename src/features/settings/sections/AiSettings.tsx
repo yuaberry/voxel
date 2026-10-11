@@ -1,11 +1,37 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, KeyRound, Loader2, Plug, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  Plug,
+  RefreshCw,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { AI_PROVIDERS, getProviderMeta } from "@/services/ai/providers";
 import {
@@ -32,6 +58,8 @@ export function AiSettings() {
   const [hasKey, setHasKey] = useState(false);
   const [backend, setBackend] = useState<SecretBackendInfo | null>(null);
   const [models, setModels] = useState<string[]>([]);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+
   const [testing, setTesting] = useState(false);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [testResult, setTestResult] = useState<AiConnectionTestResult | null>(null);
@@ -101,24 +129,34 @@ export function AiSettings() {
     }
   };
 
-  const handleFetchModels = async () => {
+  const handleFetchModels = async (silent = false) => {
     setFetchingModels(true);
     try {
       const { secretsGet } = await import("@/services/secrets/secretsService");
       const key = await secretsGet(AI_API_KEY_ID);
       const list = await fetchAvailableModels(ai, key);
       setModels(list);
-      toast.success(`Fetched ${list.length} models`, {
-        description: "Pick one from the model field dropdown.",
-      });
+      if (!silent) {
+        toast.success(`Fetched ${list.length} models`, {
+          description: "Pick one from the model field dropdown.",
+        });
+      }
     } catch (error) {
-      toast.error("Could not fetch models", {
-        description: error instanceof Error ? error.message : String(error),
-      });
+      if (!silent) {
+        toast.error("Could not fetch models", {
+          description: error instanceof Error ? error.message : String(error),
+        });
+      }
     } finally {
       setFetchingModels(false);
     }
   };
+
+  // Live list as soon as credentials allow it — picking beats typing
+  useEffect(() => {
+    void handleFetchModels(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ai.provider, ai.baseUrl]);
 
   return (
     <section>
@@ -160,34 +198,90 @@ export function AiSettings() {
       {/* Model */}
       <Field
         label="Model"
-        hint="Fetch the live list from your provider, or type an ID manually."
+        hint="The live list loads automatically — just pick one. You can still type a custom ID."
       >
-        <div className="flex max-w-md items-center gap-2">
+        <div className="flex max-w-md flex-col gap-2">
+          <Button
+            variant="secondary"
+            className="justify-between"
+            onClick={() => {
+              if (models.length === 0) void handleFetchModels();
+              setModelPickerOpen(true);
+            }}
+          >
+            <span className="truncate font-mono text-xs">
+              {ai.model || "Choose a model…"}
+            </span>
+            <span className="flex items-center gap-1 text-muted-foreground">
+              {fetchingModels ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ChevronsUpDown className="h-3.5 w-3.5" />
+              )}
+            </span>
+          </Button>
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+            <span>{models.length} models available</span>
+            <button
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-accent hover:text-foreground"
+              onClick={() => void handleFetchModels()}
+              disabled={fetchingModels}
+            >
+              <RefreshCw className={"h-3 w-3 " + (fetchingModels ? "animate-spin" : "")} />
+              Refresh
+            </button>
+          </div>
           <Input
-            list="ai-model-list"
-            placeholder={meta.modelPlaceholder}
+            placeholder={`…or type an ID (${meta.modelPlaceholder})`}
             value={ai.model}
             onChange={(e) => void update("ai", { model: e.target.value }).catch(() => {})}
+            className="font-mono text-xs"
           />
-          <datalist id="ai-model-list">
-            {models.slice(0, 500).map((id) => (
-              <option key={id} value={id} />
-            ))}
-          </datalist>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => void handleFetchModels()}
-            disabled={fetchingModels}
-            title="Fetch available models"
-          >
-            {fetchingModels ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-          </Button>
         </div>
+
+        <Dialog open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
+          <DialogContent className="flex max-w-md flex-col gap-0 p-0">
+            <DialogHeader className="border-b border-border/70 px-4 py-3">
+              <DialogTitle className="text-sm">Choose a model</DialogTitle>
+              <DialogDescription className="text-[11px]">
+                {meta.label} live list — search and click to use it.
+              </DialogDescription>
+            </DialogHeader>
+            <Command shouldFilter={true} className="pt-0">
+              <div className="flex items-center gap-2 border-b border-border/70 px-3">
+                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <CommandInput
+                  placeholder="Search models…"
+                  className="border-0 ring-0 focus-visible:ring-0"
+                />
+              </div>
+              <CommandList className="max-h-72">
+                <CommandEmpty>No model matches.</CommandEmpty>
+                <CommandGroup>
+                  {models.map((id) => (
+                    <CommandItem
+                      key={id}
+                      value={id}
+                      onSelect={() => {
+                        void update("ai", { model: id }).catch(() => {});
+                        setModelPickerOpen(false);
+                      }}
+                      className="font-mono text-xs"
+                    >
+                      <Check
+                        className={
+                          "mr-2 h-3.5 w-3.5 " +
+                          (ai.model === id ? "opacity-100" : "opacity-0")
+                        }
+                      />
+                      {id}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </DialogContent>
+        </Dialog>
       </Field>
 
       {/* API key */}

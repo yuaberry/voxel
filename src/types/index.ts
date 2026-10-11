@@ -1,6 +1,11 @@
-export type AiProviderId = "openrouter" | "openai" | "anthropic" | "ollama";
+export type AiProviderId =
+  | "openrouter"
+  | "openai"
+  | "anthropic"
+  | "ollama"
+  | "nvidia-nim";
 
-export type AccentColor = "purple" | "cyan" | "blue";
+export type AccentColor = "purple" | "cyan" | "blue" | "emerald" | "amber" | "rose" | "teal";
 
 export interface GeneralSettings {
   authorName: string;

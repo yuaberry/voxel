@@ -151,7 +151,8 @@ export async function fetchAvailableModels(
       return (body.data ?? []).map((m) => m.id).sort();
     }
 
-    case "openai": {
+    case "openai":
+    case "nvidia-nim": {
       const res = await withTimeout(
         fetch(`${resolveBaseUrl(settings)}/models`, {
           headers: { Authorization: `Bearer ${apiKey}` },

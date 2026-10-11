@@ -13,6 +13,17 @@ export interface AiProviderMeta {
 
 export const AI_PROVIDERS: AiProviderMeta[] = [
   {
+    id: "nvidia-nim",
+    label: "NVIDIA NIM",
+    description:
+      "NVIDIA NIM APIs (integrate.api.nvidia.com) or a self-hosted NIM microservice — OpenAI-compatible.",
+    requiresKey: true,
+    keyHint: "nvapi-…",
+    modelPlaceholder: "e.g. meta/llama-3.1-405b-instruct — fetch the live list",
+    defaultBaseUrl: "https://integrate.api.nvidia.com/v1",
+    supportsBaseUrl: true,
+  },
+  {
     id: "openrouter",
     label: "OpenRouter",
     description: "Aggregate access to hundreds of models with a single key.",

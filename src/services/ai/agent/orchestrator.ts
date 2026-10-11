@@ -6,7 +6,11 @@ import { createSnapshot } from "@/services/projects/projectsService";
 import { agentTurn, appendToolResult, type ToolSchema } from "./toolCallFormat";
 import { buildTools, type ToolContext, type ToolExecutor } from "./tools";
 import { logToolCall } from "./audit";
-import { buildAgentSystemPrompt } from "./promptBuilder";
+import {
+  architectSystemPrompt,
+  buildAgentSystemPrompt,
+  reviewerSystemPrompt,
+} from "./promptBuilder";
 
 /**
  * VOXEL Agent Orchestrator — the tool-calling loop.
@@ -25,7 +29,10 @@ import { buildAgentSystemPrompt } from "./promptBuilder";
 const MAX_STEPS = 8;
 const MAX_WRITES = 30;
 
+export type AgentPhase = "architect" | "developer" | "reviewer";
+
 export type AgentEvent =
+  | { type: "phase"; agent: AgentPhase }
   | { type: "thinking" }
   | {
       type: "tool_start";
@@ -61,24 +68,39 @@ export interface RunAgentOptions {
 
 const WRITE_TOOLS = new Set(["write_file", "edit_file", "delete_file", "rename_file"]);
 
-export async function runAgent(options: RunAgentOptions): Promise<AgentRunResult> {
+interface LoopOptions extends RunAgentOptions {
+  phase: AgentPhase;
+  system: string;
+  /** tools available in this phase (read-only phases get a filtered set) */
+  tools: ToolExecutor[];
+  maxSteps: number;
+  maxWrites: number;
+  /** replaces options.userText — used to hand the plan to the Developer */
+  effectiveUserText?: string;
+}
+
+async function agentLoop(loop: LoopOptions): Promise<AgentRunResult> {
   const {
     settings,
     project,
-    context,
     basePath,
     sessionId,
     history,
     userText,
+    effectiveUserText,
     onEvent,
     confirm,
     shouldAbort,
-  } = options;
+    phase,
+    system,
+    tools,
+    maxSteps,
+    maxWrites,
+  } = loop;
 
   const meta = getProviderMeta(settings.provider);
   const apiKey = meta.requiresKey ? await secretsGet(AI_API_KEY_ID) : null;
 
-  const tools: ToolExecutor[] = buildTools();
   const schemas: ToolSchema[] = tools.map((tool) => tool.schema);
   const toolByName = new Map(tools.map((tool) => [tool.schema.name, tool]));
 
@@ -88,16 +110,16 @@ export async function runAgent(options: RunAgentOptions): Promise<AgentRunResult
     projectRel: `projects/${project.slug}`,
   };
 
-  const system = buildAgentSystemPrompt(context, tools);
   const messages: unknown[] = [
     { role: "system", content: system },
     ...history.map((m) => ({ role: m.role, content: m.content })),
-    { role: "user", content: userText },
+    { role: "user", content: effectiveUserText ?? userText },
   ];
 
   let totalCalls = 0;
   let writes = 0;
   let snapshotTaken = false;
+  onEvent({ type: "phase", agent: phase });
 
   const takeSnapshot = async () => {
     if (snapshotTaken) return;
@@ -114,7 +136,7 @@ export async function runAgent(options: RunAgentOptions): Promise<AgentRunResult
     snapshotTaken = true;
   };
 
-  for (let step = 0; step < MAX_STEPS; step++) {
+  for (let step = 0; step < maxSteps; step++) {
     if (shouldAbort?.()) {
       const text = "Run stopped by the user.";
       onEvent({ type: "text", text });
@@ -184,10 +206,19 @@ export async function runAgent(options: RunAgentOptions): Promise<AgentRunResult
         }
       }
 
+      // Read-only phases (architect/reviewer) — enforced here, in code
+      if (WRITE_TOOLS.has(call.name) && maxWrites === 0) {
+        const output = `The ${phase} phase is read-only — the Developer applies changes.`;
+        results.push({ id: call.id, content: output });
+        await logToolCall({ sessionId, tool: call.name, args: call.args, status: "denied", resultSummary: output });
+        onEvent({ type: "tool_result", callId: call.id, tool: call.name, ok: false, output });
+        continue;
+      }
+
       // Write budget + pre-first-write snapshot
       if (WRITE_TOOLS.has(call.name)) {
-        if (writes >= MAX_WRITES) {
-          const output = `Write budget exhausted (${MAX_WRITES} operations) — stopping writes for this run.`;
+        if (writes >= maxWrites) {
+          const output = `Write budget exhausted (${maxWrites} operations) — stopping writes for this run.`;
           results.push({ id: call.id, content: output });
           await logToolCall({ sessionId, tool: call.name, args: call.args, status: "denied", resultSummary: output });
           onEvent({ type: "tool_result", callId: call.id, tool: call.name, ok: false, output });
@@ -217,4 +248,99 @@ export async function runAgent(options: RunAgentOptions): Promise<AgentRunResult
     "The run hit the step budget — check the file tree and continue with a new request if needed.";
   onEvent({ type: "text", text });
   return { text, toolCalls: totalCalls, writes, aborted: true };
+}
+
+/** Single-agent run (the classic flow) — Developer persona only. */
+export async function runAgent(options: RunAgentOptions): Promise<AgentRunResult> {
+  const tools: ToolExecutor[] = buildTools();
+  return agentLoop({
+    ...options,
+    phase: "developer",
+    system: buildAgentSystemPrompt(options.context, tools),
+    tools,
+    maxSteps: MAX_STEPS,
+    maxWrites: MAX_WRITES,
+  });
+}
+
+export interface TaskForceResult extends AgentRunResult {
+  plan: string;
+  review: string;
+}
+
+export const READ_ONLY_TOOLS = new Set([
+  "read_file",
+  "list_files",
+  "search_project",
+  "git_status",
+  "git_diff",
+  "inspect_dependencies",
+  "create_snapshot",
+  "list_snapshots",
+]);
+
+/**
+ * Real-time task force (briefing §26-27): the SAME sandboxed tools, three
+ * focused agents over the SAME audit trail:
+ *   Architect (read-only) → plans the exact request
+ *   Developer             → applies the plan (budgets + snapshots + confirm)
+ *   Reviewer (read-only)   → audits the diff against the request
+ * Nothing is invented: the Developer executes the user's request only,
+ * and both read-only phases are enforced by the loop, not by prompts.
+ */
+export async function runAgentTaskForce(options: RunAgentOptions): Promise<TaskForceResult> {
+  const tools: ToolExecutor[] = buildTools();
+  const readOnly = tools.filter((tool) => READ_ONLY_TOOLS.has(tool.schema.name));
+
+  // Phase 1 — Architect
+  const architect = await agentLoop({
+    ...options,
+    phase: "architect",
+    system: architectSystemPrompt(options.context),
+    tools: readOnly,
+    maxSteps: 4,
+    maxWrites: 0,
+  });
+  if (architect.aborted) {
+    return { ...architect, plan: architect.text, review: "" };
+  }
+
+  // Phase 2 — Developer, executing the user's request WITH the plan
+  const plan = architect.text.trim();
+  const developer = await agentLoop({
+    ...options,
+    phase: "developer",
+    system: buildAgentSystemPrompt(options.context, tools),
+    tools,
+    maxSteps: MAX_STEPS,
+    maxWrites: MAX_WRITES,
+    effectiveUserText: plan
+      ? `${options.userText}\n\n[Architect plan — follow it, stay inside the request scope]\n${plan}`
+      : options.userText,
+  });
+  if (developer.aborted) {
+    return { ...developer, plan, review: "" };
+  }
+
+  // Phase 3 — Reviewer (only makes sense if something changed)
+  if (developer.writes === 0) {
+    const review = "No files were changed — nothing to review.";
+    options.onEvent({ type: "phase", agent: "reviewer" });
+    options.onEvent({ type: "text", text: review });
+    return { ...developer, plan, review };
+  }
+  const reviewer = await agentLoop({
+    ...options,
+    phase: "reviewer",
+    system: reviewerSystemPrompt(options.context),
+    tools: readOnly,
+    maxSteps: 3,
+    maxWrites: 0,
+    effectiveUserText: `Original request: ${options.userText}\n\n[Architect plan]\n${plan}\n\nAudit what the Developer actually changed.`,
+  });
+
+  const combined =
+    `${developer.text}\n\n---\n**Reviewer report**\n${reviewer.text}`
+      .trim();
+  return { ...reviewer, text: combined, toolCalls: architect.toolCalls + developer.toolCalls + reviewer.toolCalls, writes: developer.writes, plan, review: reviewer.text };
 }
