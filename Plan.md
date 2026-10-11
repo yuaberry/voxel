@@ -393,7 +393,7 @@ git log --oneline                   # 25+ commits
 
 ---
 
-*Última atualização: Sessão 20 — Imagem no chat de IA em todas as superfícies (desktop clip, mobile 📎, bridge multimodal 3 dialetos) + iOS instalável HOJE via PWA servida pelo Bridge (Add to Home Screen, sem App Store) + APK Android 0.2.0 publicado. Release v0.3.2. Próximo: keystore release, TestFlight, push notifications.
+*Última atualização: Sessão 21 — NVIDIA NIM + model picker por seleção, SRV fix do live import (reproduzido: minemen 49s→2s), Launcher page, 7 temas, micro-motion, ~/Voxel + migration, CSP real, live server preview no console e Task force multi-agent (Architect→Developer→Reviewer, read-only garantido em código). 47/47+33/33. Release v0.3.3.
 
 ---
 
@@ -524,3 +524,25 @@ git log --oneline                   # 25+ commits
 **Verificação**: typecheck ✓ · lint 0 errors ✓ · vitest 44/44 ✓ · cargo **33/33** ✓ · mobile tsc ✓ · `expo export` web ✓ · APK 0.2.0 apksigner/aapt ✓ · CI/Mobile/Pages verdes no push.
 
 **Estado pós-sessão**: todas as plataformas com executável real — Windows/Linux/macOS (.exe/.msi/.deb/.AppImage/.dmg), **Android (.apk 0.2.0)**, **iOS (PWA instalável hoje; xcarchive nativo quando houver conta Apple)**. Chat com imagem no desktop e no celular. Próximo natural: keystore release própria p/ Play Store, TestFlight, push notifications.
+
+---
+
+## 21. Sessão 21 — NIM + Model Picker + SRV fix + Launcher + Temas/Animações + ~/Voxel + CSP + Live Preview + Multi-Agent
+
+**Pedidos do dono**: NIM como provider; seleção de modelo sem digitar; "live server" que não importava (verificar erro); mais temas; função de Launcher visível no app; workspace → Voxel; mais efeitos/animações; mais segurança; live preview de mods/servers; multi-agentes em tempo real sem inventar.
+
+**Entregues**:
+1. **NVIDIA NIM** first-class (provider layer, streaming, tool-call format, bridge dialects, /models). 
+2. **Model picker**: auto-fetch da lista + dialog de busca (cmdk) — só selecionar; IDs manuais continuam possíveis. TDZ do ESLint corrigido (família sessão 9).
+3. **Live server import — bug do dono REPRODUZIDO E CORRIGIDO**: minemen.club dava timeout de 49s porque DDoS shields só aceitam o alvo do SRV; implementado **SRV lookup** (hickory-resolver, sistema DNS) como o cliente vanilla faz. E2E real: Hypixel + CubeCraft + **Minemen 3.578 players em ~2s**. Timeouts 8/10s. Proxy Bungee com max=0 documentado (liveness é o assert).
+4. **Launcher page** (sidebar): instâncias preparadas com mods/shaderpacks instalados, jar da última build do projeto, Play (LaunchDialog) e Reveal — `launcher_overview` command novo.
+5. **Temas**: 7 accents (violet/blue/cyan + **emerald/amber/rose/teal**) com swatches glow.
+6. **Animações**: card-rise staggered no grid de shaders, hover-lift+glow nos cards, press-scale em todos os botões.
+7. **Workspace ~/Voxel**: default novo + migration one-click do legado (mesmo disco, recusa se destino existe) + banner no Storage.
+8. **Segurança**: CSP real (tudo self-hosted — @fontsource, sem CDN; data: só para favicons do SLP; boot verificado com 0 violações) + throttle 400ms em tokens inválidos do bridge.
+9. **Live preview do servidor**: no Console, header vivo com SLP self-ping (MOTD colorido real + players a cada 15s enquanto roda).
+10. **Multi-Agent v1 (Task force)**: Architect (read-only; PLAN:/RISKS:) → Developer (aplica o plano; orçamentos/snapshot/confirm) → Reviewer (read-only; REVIEW: com verdict PASS/ISSUES). **Fases read-only são garantidas pelo loop, não pelo prompt**; mesmo sandbox/auditoria; nada fora do escopo pedido. Timeline com badges por agente + toggle (default ON). 3 testes novos (personas + pureza do toolset).
+
+**Verificação**: typecheck ✓ · lint 0 errors ✓ · **vitest 47/47** ✓ · **cargo 33/33** ✓ (+E2E SLP 3 servidores reais) · vite build ✓ · **boot vivo com CSP e 0 violações** ✓. Release v0.3.3.
+
+**Estado pós-sessão**: ver relatório feito/falta. Próximos: Forge/NeoForge templates (§22), push notifications (§62), keystore release Play Store, TestFlight, Model Router por fase (§66).
