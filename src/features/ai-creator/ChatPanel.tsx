@@ -58,6 +58,8 @@ interface Props {
   onSend: (text: string) => Promise<void>;
   onStop: () => void;
   onNewChat: () => void;
+  /** Attach an image to the next message (composer clip button) */
+  onAttachImage: () => Promise<void>;
 }
 
 export function ChatPanel({
@@ -71,6 +73,7 @@ export function ChatPanel({
   onSend,
   onStop,
   onNewChat,
+  onAttachImage,
 }: Props) {
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -188,14 +191,29 @@ export function ChatPanel({
             <Badge variant="outline">auto-snapshot before writes</Badge>
           </div>
         )}
-        {attachedCount > 0 && (
-          <div className="pb-2">
+        <div className={attachedCount > 0 ? "pb-2" : "pb-0"}>
+          {attachedCount > 0 && (
             <Badge variant="secondary">
               <ImagePlus className="h-3 w-3" />
-              {attachedCount} reference{attachedCount === 1 ? "" : "s"} attached
+              {attachedCount} reference{attachedCount === 1 ? "" : "s"} attached — will be sent with your next message
             </Badge>
-          </div>
-        )}
+          )}
+          <button
+            type="button"
+            disabled={!hasProject}
+            onClick={() => void onAttachImage()}
+            title="Attach an image to your next message (vision)"
+            className={
+              "mt-1.5 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors " +
+              (hasProject
+                ? "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                : "text-muted-foreground/40")
+            }
+          >
+            <ImagePlus className="h-3.5 w-3.5" />
+            Attach image
+          </button>
+        </div>
         <div className="relative">
           <textarea
             value={draft}

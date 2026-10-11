@@ -1,0 +1,17 @@
+{
+  "name": "VOXEL",
+  "short_name": "VOXEL",
+  "description": "AI-Powered Creation Platform — mobile companion of the VOXEL desktop studio.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050609",
+  "theme_color": "#050609",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

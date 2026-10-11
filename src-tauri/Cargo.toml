@@ -1,6 +1,6 @@
 [package]
 name = "nexuscraft-studio"
-version = "0.3.1"
+version = "0.3.2"
 description = "NexusCraft Studio - AI Minecraft Creation Studio"
 authors = ["Yua Devs"]
 edition = "2021"
@@ -21,6 +21,7 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 futures-util = "0.3"
 rusqlite = { version = "0.32", features = ["bundled"] }
 local-ip-address = "0.6"
+include_dir = "0.7"
 tower-http = { version = "0.6", features = ["cors"] }
 reqwest = { version = "0.13", features = ["blocking", "json", "stream"] }
 keyring = { version = "3", features = ["sync-secret-service", "apple-native", "windows-native"] }

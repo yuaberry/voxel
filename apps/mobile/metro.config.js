@@ -12,4 +12,13 @@ config.resolver.nodeModulesPaths = [
 ];
 config.resolver.unstable_enableSymlinks = true;
 
+// pnpm hoisting leaves nested `react` copies that Metro would bundle as
+// duplicate modules (breaks the web SSR interop). Pin every `react`
+// resolution to a single physical path.
+config.resolver.extraNodeModules = {
+  react: path.resolve(__dirname, "../../node_modules/react"),
+  "react-dom": path.resolve(__dirname, "../../node_modules/react-dom"),
+  "react/jsx-runtime": path.resolve(__dirname, "../../node_modules/react/jsx-runtime"),
+};
+
 module.exports = config;

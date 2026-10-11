@@ -3,7 +3,7 @@
     "name": "VOXEL",
     "slug": "voxel",
     "scheme": "voxel",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#050609",
@@ -25,6 +25,11 @@
     "experiments": {
       "typedRoutes": true
     },
-    "icon": "./assets/icon.png"
+    "icon": "./assets/icon.png",
+    "web": {
+      "output": "static",
+      "bundler": "metro",
+      "favicon": "./assets/icon.png"
+    }
   }
 }

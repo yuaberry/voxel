@@ -48,14 +48,16 @@ export async function listReferences(projectSlug: string): Promise<ReferenceImag
 export async function importReference(
   projectSlug: string,
   sourcePath: string,
-): Promise<void> {
+): Promise<string> {
   const fileName = sourcePath.split(/[\\/]/).pop() ?? "reference";
+  const destRel = `${REF_DIR}/${fileName}`;
   await invoke("import_project_file", {
     basePath: base(),
     projectRel: `projects/${projectSlug}`,
-    destRel: `${REF_DIR}/${fileName}`,
+    destRel,
     sourcePath,
   });
+  return destRel;
 }
 
 export async function readReferenceBase64(

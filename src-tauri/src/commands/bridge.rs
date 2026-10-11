@@ -31,6 +31,56 @@ use super::{process, servers};
 
 const BRIDGE_PORT: u16 = 3717;
 
+/// The VOXEL mobile companion web app (PWA) compiled into the binary.
+/// Install path on iOS: open http://<this-pc>:3717 in Safari → Share →
+/// Add to Home Screen — a full-screen, standalone app with no App Store.
+static MOBILE_WEB: include_dir::Dir<'_> =
+    include_dir::include_dir!("$CARGO_MANIFEST_DIR/../apps/mobile/dist-web");
+
+fn web_content_type(path: &str) -> &'static str {
+    let ext = path.rsplit('.').next().unwrap_or("");
+    match ext {
+        "html" => "text/html; charset=utf-8",
+        "js" | "mjs" => "text/javascript; charset=utf-8",
+        "css" => "text/css; charset=utf-8",
+        "png" => "image/png",
+        "svg" => "image/svg+xml",
+        "ico" => "image/x-icon",
+        "json" | "map" | "webmanifest" => "application/json",
+        "txt" => "text/plain; charset=utf-8",
+        "woff2" => "font/woff2",
+        "wasm" => "application/wasm",
+        _ => "application/octet-stream",
+    }
+}
+
+/// Serves the embedded mobile PWA (public on the LAN; the API itself
+/// still requires the pairing token).
+async fn serve_web(axum::extract::Path(path): axum::extract::Path<String>) -> impl IntoResponse {
+    let clean = path.trim_start_matches('/');
+    if clean.is_empty()
+        || !clean.starts_with("api")
+    {
+        let file = if clean.is_empty() {
+            MOBILE_WEB.get_file("index.html")
+        } else {
+            MOBILE_WEB.get_file(clean).or_else(|| MOBILE_WEB.get_file("index.html"))
+        };
+        if let Some(file) = file {
+            return (
+                StatusCode::OK,
+                [
+                    ("content-type", web_content_type(file.path().to_str().unwrap_or("html"))),
+                    ("cache-control", "public, max-age=3600"),
+                ],
+                file.contents().to_vec(),
+            )
+                .into_response();
+        }
+    }
+    (StatusCode::NOT_FOUND, "not found").into_response()
+}
+
 // ---------------------------------------------------------------------------
 // Shared state (set by commands, read by handlers — both in this process)
 // ---------------------------------------------------------------------------
@@ -277,7 +327,8 @@ pub fn bridge_set_ai_config(provider: String, base_url: String, model: String) -
 // ---------------------------------------------------------------------------
 
 fn build_router(ctx: BridgeCtx) -> Router {
-    Router::new()
+    // Token-gated API surface
+    let api = Router::new()
         .route("/api/status", get(status))
         .route("/api/projects", get(projects))
         .route("/api/projects/{slug}/build", post(build_project))
@@ -288,7 +339,12 @@ fn build_router(ctx: BridgeCtx) -> Router {
         .route("/api/ping", post(ping_server))
         .route("/api/ai/chat", post(ai_chat))
         .route("/api/ai/ask", post(ai_ask))
-        .layer(axum::middleware::from_fn_with_state(ctx.clone(), auth))
+        .layer(axum::middleware::from_fn_with_state(ctx.clone(), auth));
+
+    // Public: the embedded mobile PWA (LAN) — API stays token-gated
+    Router::new()
+        .merge(api)
+        .fallback(get(serve_web))
         .with_state(ctx)
 }
 
@@ -439,10 +495,24 @@ async fn ping_server(Json(body): Json<PingBody>) -> Result<Json<Value>, String> 
     Ok(Json(serde_json::to_value(ping).map_err(|e| format!("{e}"))?))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
+#[serde(untagged)]
+enum ChatContentIn {
+    Text(String),
+    Parts(Vec<ChatPartIn>),
+}
+
+#[derive(Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum ChatPartIn {
+    Text { text: String },
+    Image { media_type: String, base64: String },
+}
+
+#[derive(Deserialize, Clone)]
 struct ChatMessageIn {
     role: String,
-    content: String,
+    content: ChatContentIn,
 }
 
 #[derive(Deserialize)]
@@ -537,10 +607,25 @@ async fn ai_stream(
                 ai.base_url.trim_end_matches('/').to_string()
             };
             url.push_str("/v1/messages");
-            let system = messages
+            let system: Option<String> = messages
                 .iter()
                 .find(|m| m.role == "system")
-                .map(|m| m.content.clone());
+                .map(|m| match &m.content {
+                    ChatContentIn::Text(text) => text.clone(),
+                    ChatContentIn::Parts(parts) => parts
+                        .iter()
+                        .filter_map(|p| match p {
+                            ChatPartIn::Text { text } => Some(text.clone()),
+                            ChatPartIn::Image { .. } => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                });
+            let non_system: Vec<ChatMessageIn> = messages
+                .iter()
+                .filter(|m| m.role != "system")
+                .cloned()
+                .collect();
             (
                 url,
                 json!({
@@ -548,11 +633,7 @@ async fn ai_stream(
                     "max_tokens": 4096,
                     "stream": true,
                     "system": system,
-                    "messages": messages
-                        .iter()
-                        .filter(|m| m.role != "system")
-                        .map(|m| json!({ "role": m.role, "content": m.content }))
-                        .collect::<Vec<_>>(),
+                    "messages": build_provider_messages("anthropic", &non_system),
                 }),
             )
         }
@@ -568,10 +649,7 @@ async fn ai_stream(
                 json!({
                     "model": ai.model,
                     "stream": true,
-                    "messages": messages
-                        .iter()
-                        .map(|m| json!({ "role": m.role, "content": m.content }))
-                        .collect::<Vec<_>>(),
+                    "messages": build_provider_messages("ollama", &messages),
                 }),
             )
         }
@@ -591,10 +669,7 @@ async fn ai_stream(
                 json!({
                     "model": ai.model,
                     "stream": true,
-                    "messages": messages
-                        .iter()
-                        .map(|m| json!({ "role": m.role, "content": m.content }))
-                        .collect::<Vec<_>>(),
+                    "messages": build_provider_messages("openai", &messages),
                 }),
             )
         }
@@ -644,6 +719,66 @@ async fn ai_stream(
     Ok(())
 }
 
+/** Builds the provider-specific `messages` array, translating text and
+ * base64 image parts into each provider dialect. Pure — unit tested. */
+pub fn build_provider_messages(
+    provider: &str,
+    messages: &[ChatMessageIn],
+) -> Value {
+    let mut out: Vec<Value> = Vec::new();
+    for message in messages {
+        let entry = match (&message.content, provider) {
+            (ChatContentIn::Text(text), _) => json!({ "role": message.role, "content": text }),
+            (ChatContentIn::Parts(parts), "anthropic") => {
+                let content: Vec<Value> = parts
+                    .iter()
+                    .map(|part| match part {
+                        ChatPartIn::Text { text } => json!({ "type": "text", "text": text }),
+                        ChatPartIn::Image { media_type, base64 } => json!({
+                            "type": "image",
+                            "source": { "type": "base64", "media_type": media_type, "data": base64 }
+                        }),
+                    })
+                    .collect();
+                json!({ "role": message.role, "content": content })
+            }
+            (ChatContentIn::Parts(parts), "ollama") => {
+                let text: Vec<String> = parts
+                    .iter()
+                    .filter_map(|p| match p {
+                        ChatPartIn::Text { text } => Some(text.clone()),
+                        ChatPartIn::Image { .. } => None,
+                    })
+                    .collect();
+                let images: Vec<String> = parts
+                    .iter()
+                    .filter_map(|p| match p {
+                        ChatPartIn::Image { base64, .. } => Some(base64.clone()),
+                        ChatPartIn::Text { .. } => None,
+                    })
+                    .collect();
+                json!({ "role": message.role, "content": text.join("\n"), "images": images })
+            }
+            (ChatContentIn::Parts(parts), _) => {
+                // OpenAI-compatible dialect
+                let content: Vec<Value> = parts
+                    .iter()
+                    .map(|part| match part {
+                        ChatPartIn::Text { text } => json!({ "type": "text", "text": text }),
+                        ChatPartIn::Image { media_type, base64 } => json!({
+                            "type": "image_url",
+                            "image_url": { "url": format!("data:{media_type};base64,{base64}") }
+                        }),
+                    })
+                    .collect();
+                json!({ "role": message.role, "content": content })
+            }
+        };
+        out.push(entry);
+    }
+    Value::Array(out)
+}
+
 /** SSE event carrying a JSON payload (json_data is fallible — pre-serialize). */
 fn sse_data(payload: Value) -> axum::response::sse::Event {
     axum::response::sse::Event::default()
@@ -672,5 +807,95 @@ fn extract_delta(provider: &str, line: &str) -> Option<String> {
             .pointer("/choices/0/delta/content")
             .and_then(|t| t.as_str())
             .map(|s| s.to_string()),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests — multimodal dialect translation (pure)
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn text_user(text: &str) -> ChatMessageIn {
+        ChatMessageIn {
+            role: "user".into(),
+            content: ChatContentIn::Text(text.into()),
+        }
+    }
+
+    fn image_user(text: &str, mime: &str, b64: &str) -> ChatMessageIn {
+        ChatMessageIn {
+            role: "user".into(),
+            content: ChatContentIn::Parts(vec![
+                ChatPartIn::Text { text: text.into() },
+                ChatPartIn::Image {
+                    media_type: mime.into(),
+                    base64: b64.into(),
+                },
+            ]),
+        }
+    }
+
+    #[test]
+    fn openai_dialect_uses_image_url_data_uri() {
+        let messages = [image_user("look", "image/png", "AAAA")];
+        let value = build_provider_messages("openrouter", &messages);
+        assert_eq!(value[0]["content"][0]["type"], "text");
+        assert_eq!(value[0]["content"][1]["type"], "image_url");
+        assert_eq!(
+            value[0]["content"][1]["image_url"]["url"],
+            "data:image/png;base64,AAAA"
+        );
+    }
+
+    #[test]
+    fn anthropic_dialect_uses_base64_source() {
+        let messages = [image_user("look", "image/png", "AAAA")];
+        let value = build_provider_messages("anthropic", &messages);
+        assert_eq!(value[0]["content"][1]["type"], "image");
+        assert_eq!(value[0]["content"][1]["source"]["type"], "base64");
+        assert_eq!(value[0]["content"][1]["source"]["media_type"], "image/png");
+        assert_eq!(value[0]["content"][1]["source"]["data"], "AAAA");
+    }
+
+    #[test]
+    fn ollama_dialect_uses_images_array() {
+        let messages = [image_user("look\nand this", "image/jpeg", "BBBB")];
+        let value = build_provider_messages("ollama", &messages);
+        assert_eq!(value[0]["content"], "look\nand this");
+        assert_eq!(value[0]["images"][0], "BBBB");
+    }
+
+    #[test]
+    fn mobile_pwa_is_embedded_and_ios_installable() {
+        let index = std::str::from_utf8(
+            MOBILE_WEB.get_file("index.html").expect("index.html").contents(),
+        )
+        .expect("utf8");
+        assert!(index.contains("apple-mobile-web-app-capable"), "iOS add-to-homescreen meta missing");
+        assert!(index.contains("manifest.webmanifest"));
+        assert!(MOBILE_WEB.get_file("manifest.webmanifest").is_some());
+        assert!(MOBILE_WEB.get_file("apple-touch-icon.png").is_some());
+        assert!(MOBILE_WEB.files().count() > 10, "the bundle should carry all static pages");
+    }
+
+    #[test]
+    fn web_content_types_map_correctly() {
+        assert_eq!(web_content_type("x.html"), "text/html; charset=utf-8");
+        assert_eq!(web_content_type("app.js"), "text/javascript; charset=utf-8");
+        assert_eq!(web_content_type("manifest.webmanifest"), "application/json");
+        assert_eq!(web_content_type("icon.png"), "image/png");
+    }
+
+    #[test]
+    fn plain_text_messages_pass_through_every_dialect() {
+        let messages = [text_user("hello")];
+        for provider in ["openai", "anthropic", "ollama"] {
+            let value = build_provider_messages(provider, &messages);
+            assert_eq!(value[0]["content"], "hello", "provider {provider}");
+            assert_eq!(value[0]["role"], "user");
+        }
     }
 }

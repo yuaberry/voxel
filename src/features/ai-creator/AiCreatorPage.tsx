@@ -27,9 +27,11 @@ import { runAgent } from "@/services/ai/agent/orchestrator";
 import {
   setReferenceStorageBase,
   listReferences,
+  importReference,
   readReferenceBase64,
   type ReferenceImage,
 } from "@/services/ai/references";
+import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import {
   streamChat,
   type ChatMessage,
@@ -180,6 +182,30 @@ export function AiCreatorPage() {
     }
     return true;
   }, [aiSettings.provider, aiSettings.model, navigate]);
+
+/** Composer clip — pick an image, store it as a project reference and
+  * attach it to the next chat message as a vision part. */
+  const handleAttachImageFromChat = useCallback(async () => {
+    if (!project) return;
+    const selected = await openFileDialog({
+      multiple: false,
+      title: "Attach an image to your next message",
+      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
+    }).catch(() => null);
+    if (!selected) return;
+    try {
+      const relPath = await importReference(project.slug, selected);
+      setReferences(await listReferences(project.slug));
+      setAttached((prev) => new Set(prev).add(relPath));
+      toast.success("Image attached", {
+        description: "It will be sent with your next message (vision-capable models).",
+      });
+    } catch (error) {
+      toast.error("Could not attach image", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, [project]);
 
   // -------------------------------------------------------------------------
   // Design chat (streaming, no tools)
@@ -484,6 +510,7 @@ export function AiCreatorPage() {
           attachedCount={attached.size}
           hasProject={project !== null}
           onSend={handleSend}
+          onAttachImage={handleAttachImageFromChat}
           onStop={handleStop}
           onNewChat={handleNewChat}
         />

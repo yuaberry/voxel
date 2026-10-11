@@ -78,6 +78,14 @@ export interface BridgeServer {
   running: boolean;
 }
 
+/** Chat content — plain text or multimodal parts (vision). */
+export type AskContent =
+  | string
+  | Array<
+      | { type: "text"; text: string }
+      | { type: "image"; media_type: string; base64: string }
+    >;
+
 export interface ConsoleTail {
   lines: string[];
   total: number;
@@ -103,7 +111,7 @@ export const bridge = {
       method: "POST",
       body: JSON.stringify({ address }),
     }),
-  ask: (messages: Array<{ role: string; content: string }>) =>
+  ask: (messages: Array<{ role: string; content: AskContent }>) =>
     api<{ text: string }>("/api/ai/ask", {
       method: "POST",
       body: JSON.stringify({ messages }),
