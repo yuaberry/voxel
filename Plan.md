@@ -393,7 +393,7 @@ git log --oneline                   # 25+ commits
 
 ---
 
-*Última atualização: Sessão 19 — Executáveis: APK Android REAL publicado na release v0.3.1 (64MB, sideload ok, label VOXEL) + pipeline iOS (xcarchive unsigned no CI, assinável com conta Apple). Guerra do build documentada (pnpm hoisted, Metro exports, patches). Site com seção mobile. Próximo: testes em device, keystore release, TestFlight.
+*Última atualização: Sessão 20 — Imagem no chat de IA em todas as superfícies (desktop clip, mobile 📎, bridge multimodal 3 dialetos) + iOS instalável HOJE via PWA servida pelo Bridge (Add to Home Screen, sem App Store) + APK Android 0.2.0 publicado. Release v0.3.2. Próximo: keystore release, TestFlight, push notifications.
 
 ---
 
@@ -500,3 +500,27 @@ git log --oneline                   # 25+ commits
 **CI mobile-builds VERDE (ambos os jobs)**: `android-apk` 5m42s (APK artifact no CI — SDK auto-instalado pois as imagens hosted não trazem mais; alinhamento ANDROID_HOME/ANDROID_SDK_ROOT obrigatório) e `ios-archive` 11m47s (xcarchive unsigned). Bugs CI caçados: sdkmanager removido das imagens runner, conflito ANDROID_SDK_ROOT legado, xcworkspace nasce do pod install (não do prebuild), xcodebuild não expande globs.
 
 **Estado pós-sessão**: Android FUNCIONA hoje (baixa o APK, instala, pareia com o PC); iOS compila de verdade no CI e espera a conta Apple para assinar. Próximo: emulador/device test real, keystore de release própria (assinar pra distribuição séria), TestFlight quando houver conta.
+
+---
+
+## 20. Sessão 20 — Imagem no chat de IA (todas as superfícies) + PWA instalável no iPhone
+
+**Pedido do dono**: "faça o arquivo executável para os mobile… também quero que adicione a função de Imagem no Prompt do chat de IA ou do chat mesmo" → dois entregáveis.
+
+**1. Imagem no chat de IA (visão, de verdade)**:
+- **Desktop (AI Creator)**: botão "Attach image" no composer → file dialog (plugin-dialog) → imagem importada como referência do projeto (`.voxel/references/`, reuso do pipeline vision existente) → vai como ImagePart na próxima mensagem; `importReference` agora retorna o relPath.
+- **Bridge multimodal**: `ChatContentIn` untagged (text | parts[{text}|{image: media_type+base64}]) e `build_provider_messages()` puro traduz para os 3 dialetos — OpenAI-compat `image_url` data-URI, Anthropic `source base64`, Ollama `images[]`. +6 testes unit (3 dialetos, pass-through, **PWA embutida**, content-types) → cargo **33/33**.
+- **Mobile 0.2.0**: 📎 no composer do Create (expo-image-picker, até 3 imagens, chips), permissões ok, `AskContent` multimodal no bridge.ts.
+
+**2. "Executável iOS" REAL sem App Store — a PWA**:
+- `expo export -p web` (static, 14 páginas) + `scripts/prepare-web.cjs` (metas apple-mobile-web-app, manifest.webmanifest, apple-touch-icon; script `pnpm build:web`) → **dist-web commitado** (1.3MB — é o firmware do companion).
+- **Bridge embute e serve a PWA** (`include_dir` crate): rota fallback pública na LAN; API continua token-gated (router split: layer de auth SÓ em /api). **No iPhone: `http://seu-pc:3717` no Safari → Add to Home Screen → app standalone completo.** Sem conta Apple. O xcarchive nativo continua disponível no CI para o dia em que houver conta.
+- **Bug caçado (web)**: pnpm deixou cópias aninhadas de `react` (mesma 18.2.0, paths distintos) → Metro bundlava instâncias duplicadas e o SSR do expo-router explodia (`React.useEffect null`); fix: `extraNodeModules` pinando react/react-dom/jsx-runtime a um path único.
+
+**3. Android APK 0.2.0**: rebuild (6m17s incremental após pnpm dedupe ter invalidado o build do composite plugin — clean + `pnpm install --force` + re-run) → **publicado na release v0.3.2** como `VOXEL-mobile-0.2.0-android.apk` (65MB, apksigner/aapt verificados, versionName 0.2.0).
+
+**Publicações**: desktop **v0.3.2** (bridge multimodal + PWA embutida) + mobile **0.2.0**; site atualizado (card Android→APK 0.2.0, card iOS com o passo-a-passo PWA + xcarchive nativo).
+
+**Verificação**: typecheck ✓ · lint 0 errors ✓ · vitest 44/44 ✓ · cargo **33/33** ✓ · mobile tsc ✓ · `expo export` web ✓ · APK 0.2.0 apksigner/aapt ✓ · CI/Mobile/Pages verdes no push.
+
+**Estado pós-sessão**: todas as plataformas com executável real — Windows/Linux/macOS (.exe/.msi/.deb/.AppImage/.dmg), **Android (.apk 0.2.0)**, **iOS (PWA instalável hoje; xcarchive nativo quando houver conta Apple)**. Chat com imagem no desktop e no celular. Próximo natural: keystore release própria p/ Play Store, TestFlight, push notifications.
