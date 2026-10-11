@@ -241,13 +241,14 @@ export function ShadersPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            {visibleStyles.map((s) => {
+            {visibleStyles.map((s, index) => {
               const selected = s.id === selectedId;
               return (
                 <button
                   key={s.id}
+                  style={{ animationDelay: `${Math.min(index * 24, 320)}ms` }}
                   className={cn(
-                    "overflow-hidden rounded-xl border text-left transition-all",
+                    "animate-card-rise overflow-hidden rounded-xl border text-left transition-all hover:-translate-y-1 hover:shadow-[0_14px_36px_rgba(116,47,255,0.16)]",
                     selected
                       ? "border-primary/60 shadow-[0_0_0_1px_rgba(139,92,246,0.35)]"
                       : "border-border/70 hover:border-primary/40",

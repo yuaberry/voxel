@@ -13,6 +13,7 @@ import { ProjectWorkspacePage } from "@/features/projects/workspace/ProjectWorks
 import { AiCreatorPage } from "@/features/ai-creator/AiCreatorPage";
 import { ServersPage } from "@/features/servers/ServersPage";
 import { ShadersPage } from "@/features/shaders/ShadersPage";
+import { LauncherPage } from "@/features/launcher/LauncherPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 
 export default function App() {
@@ -143,6 +144,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route index element={<HomePage />} />
               <Route path="projects" element={<ProjectsPage />} />
+              <Route path="launcher" element={<LauncherPage />} />
               <Route path="projects/:projectId" element={<ProjectWorkspacePage />} />
               <Route path="ai-creator" element={<AiCreatorPage />} />
               <Route path="servers" element={<ServersPage />} />

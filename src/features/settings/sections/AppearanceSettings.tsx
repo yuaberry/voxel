@@ -5,10 +5,14 @@ import { Field, SectionHeader } from "../SettingsBits";
 import { cn } from "@/lib/utils";
 import type { AccentColor } from "@/types";
 
-const ACCENTS: Array<{ id: AccentColor; label: string; className: string }> = [
-  { id: "purple", label: "Violet", className: "bg-nexus-purple" },
-  { id: "blue", label: "Electric Blue", className: "bg-nexus-blue" },
-  { id: "cyan", label: "Cyan", className: "bg-nexus-cyan" },
+const ACCENTS: Array<{ id: AccentColor; label: string; dot: string }> = [
+  { id: "purple", label: "Violet", dot: "#9155ff" },
+  { id: "blue", label: "Electric Blue", dot: "#3580f7" },
+  { id: "cyan", label: "Cyan", dot: "#17d9f0" },
+  { id: "emerald", label: "Emerald", dot: "#2fd6a3" },
+  { id: "amber", label: "Amber", dot: "#fbb133" },
+  { id: "rose", label: "Rose", dot: "#f4518f" },
+  { id: "teal", label: "Teal", dot: "#1bbfc4" },
 ];
 
 export function AppearanceSettings() {
@@ -24,7 +28,7 @@ export function AppearanceSettings() {
       />
 
       <Field label="Accent color" hint="Applies to buttons, highlights and the logo glow.">
-        <div className="flex gap-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {ACCENTS.map((option) => (
             <button
               key={option.id}
@@ -41,10 +45,11 @@ export function AppearanceSettings() {
               )}
             >
               <span
-                className={cn(
-                  "h-3.5 w-3.5 rounded-full transition-transform group-hover:scale-110",
-                  option.className,
-                )}
+                className="h-3.5 w-3.5 rounded-full transition-transform group-hover:scale-110"
+                style={{
+                  backgroundColor: option.dot,
+                  boxShadow: `0 0 10px ${option.dot}88`,
+                }}
               />
               {option.label}
             </button>

@@ -415,7 +415,7 @@ function StatTile({
   return (
     <button
       onClick={onClick}
-      className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card/50 px-4 py-3 text-left transition-all hover:border-primary/40 hover:bg-card/80"
+      className="group flex animate-card-rise items-center gap-3 rounded-xl border border-border/70 bg-card/50 px-4 py-3 text-left transition-all hover:border-primary/40 hover:bg-card/80 hover:shadow-[0_8px_28px_rgba(116,47,255,0.14)]"
     >
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
         {icon}

@@ -56,6 +56,30 @@
     --ring: 217 94% 62%;
   }
 
+  :root[data-accent="emerald"] {
+    --primary: 160 84% 45%;             /* #2fd6a3 */
+    --primary-foreground: 160 40% 6%;
+    --ring: 160 84% 45%;
+  }
+
+  :root[data-accent="amber"] {
+    --primary: 38 95% 55%;              /* #fbb133 */
+    --primary-foreground: 30 40% 8%;
+    --ring: 38 95% 55%;
+  }
+
+  :root[data-accent="rose"] {
+    --primary: 343 90% 62%;             /* #f4518f */
+    --primary-foreground: 0 0% 100%;
+    --ring: 343 90% 62%;
+  }
+
+  :root[data-accent="teal"] {
+    --primary: 175 75% 42%;             /* #1bbfc4 */
+    --primary-foreground: 180 40% 6%;
+    --ring: 175 75% 42%;
+  }
+
   :root[data-reduce-motion="true"] * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -154,6 +178,22 @@
   /* Electric focus ring for interactive surfaces */
   .glow-ring {
     box-shadow: 0 0 0 1px hsl(var(--primary) / 0.35), 0 0 22px hsl(var(--primary) / 0.14);
+  }
+
+  /* Micro-motion — cards rise in with a gentle stagger (delay via inline style) */
+  @keyframes card-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .animate-card-rise {
+    animation: card-rise 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .kbd {

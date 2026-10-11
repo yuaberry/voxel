@@ -17,6 +17,7 @@ import {
   Palette,
   Plug,
   RefreshCw,
+  Rocket,
   Server,
   Settings,
   ShieldCheck,
@@ -38,6 +39,7 @@ import { getProviderMeta } from "@/services/ai/providers";
 const NAV_TARGETS = [
   { to: "/", label: "Go to Home", icon: Home, group: "Navigate" },
   { to: "/projects", label: "Go to Projects", icon: Boxes, group: "Navigate" },
+  { to: "/launcher", label: "Go to Launcher", icon: Rocket, group: "Navigate" },
   { to: "/ai-creator", label: "Go to AI Creator", icon: Sparkles, group: "Navigate" },
   { to: "/shaders", label: "Go to Shaders", icon: Palette, group: "Navigate" },
   { to: "/servers", label: "Go to Servers", icon: Server, group: "Navigate" },

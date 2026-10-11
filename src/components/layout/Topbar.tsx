@@ -11,6 +11,7 @@ import { secretsHas, AI_API_KEY_ID } from "@/services/secrets/secretsService";
 const ROUTE_LABELS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /^\/$/, label: "Home" },
   { pattern: /^\/projects\/[^/]+/, label: "Workspace / Project" },
+  { pattern: /^\/launcher/, label: "Workspace / Launcher" },
   { pattern: /^\/projects/, label: "Workspace / Projects" },
   { pattern: /^\/ai-creator/, label: "Workspace / AI Creator" },
   { pattern: /^\/shaders/, label: "Workspace / Shaders" },
