@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "{{MOD_ID}}:item/darksteel_sword"
+  }
+}

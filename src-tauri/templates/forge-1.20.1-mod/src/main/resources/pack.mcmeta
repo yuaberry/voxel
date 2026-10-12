@@ -1,0 +1,8 @@
+{
+  "pack": {
+    "description": {
+      "text": "{{MOD_ID}} resources"
+    },
+    "pack_format": {{PACK_FORMAT}}
+  }
+}

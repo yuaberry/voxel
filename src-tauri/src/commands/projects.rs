@@ -29,6 +29,10 @@ pub struct CreateProjectPayload {
     pub fabric_api_version: String,
     pub mc_depends: String,
     pub mappings_line: String,
+    // Loader identity — must agree with the template (fabric|forge|neoforge).
+    pub loader: String,
+    // Resource/data pack format for the template's pack.mcmeta (15 for 1.20.1).
+    pub pack_format: u32,
 }
 
 #[derive(Serialize)]
@@ -87,6 +91,21 @@ pub fn create_project(payload: CreateProjectPayload) -> Result<CreateProjectResu
     if !valid_java.contains(&payload.java_release) {
         return Err(format!("Unsupported Java release: {}", payload.java_release));
     }
+    // Template and loader must agree — defense in depth for a bug the
+    // frontend can never produce (but a stale client could).
+    let expected_prefix = match payload.loader.as_str() {
+        "fabric" | "forge" | "neoforge" => payload.loader.as_str(),
+        other => return Err(format!("Unsupported loader: {other}")),
+    };
+    if !payload.template.starts_with(expected_prefix) {
+        return Err(format!(
+            "Template \"{}\" does not match loader \"{}\"",
+            payload.template, payload.loader
+        ));
+    }
+    if payload.pack_format == 0 {
+        return Err("Pack format must be a positive number".to_string());
+    }
 
     // Resolve and lock the workspace root
     let base = PathBuf::from(&payload.storage_base)
@@ -142,6 +161,8 @@ pub fn create_project(payload: CreateProjectPayload) -> Result<CreateProjectResu
         fabric_api_version: payload.fabric_api_version.trim().to_string(),
         mc_depends: payload.mc_depends.trim().to_string(),
         mappings_line: payload.mappings_line.trim().to_string(),
+        loader_id: payload.loader.clone(),
+        pack_format: payload.pack_format,
     };
 
     let files = templates::write_template(&payload.template, &tokens, &project_dir)?;
@@ -190,6 +211,8 @@ mod tests {
             fabric_api_version: "0.92.2+1.20.1".to_string(),
             mc_depends: "~1.20.1".to_string(),
             mappings_line: "mappings \"net.fabricmc:yarn:1.20.1+build.10:v2\"".to_string(),
+            loader: "fabric".to_string(),
+            pack_format: 15,
         }
     }
 
@@ -204,6 +227,26 @@ mod tests {
         p.storage_base = std::env::temp_dir().to_string_lossy().to_string();
         p.package = "Invalid.Package".to_string();
         assert!(create_project(p).is_err());
+
+        // Template and loader must agree (stale client defense)
+        let mut p = payload("valid-slug");
+        p.storage_base = std::env::temp_dir().to_string_lossy().to_string();
+        p.loader = "forge".to_string();
+        assert!(create_project(p).is_err(), "fabric template with forge loader must be refused");
+        let mut p = payload("valid-slug");
+        p.storage_base = std::env::temp_dir().to_string_lossy().to_string();
+        p.template = "forge-1.20.1-mod".to_string();
+        p.loader = "fabric".to_string();
+        assert!(create_project(p).is_err(), "forge template with fabric loader must be refused");
+        let mut p = payload("valid-slug");
+        p.storage_base = std::env::temp_dir().to_string_lossy().to_string();
+        p.loader = "quilt".to_string();
+        assert!(create_project(p).is_err(), "unknown loader must be refused");
+
+        let mut p = payload("valid-slug");
+        p.storage_base = std::env::temp_dir().to_string_lossy().to_string();
+        p.pack_format = 0;
+        assert!(create_project(p).is_err(), "pack_format=0 must be refused");
     }
 
     #[test]
@@ -237,40 +280,45 @@ mod e2e_tests {
     use super::*;
     use std::process::Command;
 
-    /// Full end-to-end proof: creates a real project from the embedded
-    /// template and compiles it with the real Gradle wrapper.
-    /// This is the MVP acceptance criterion ("the project compiles").
-    #[test]
-    #[ignore = "e2e: downloads Gradle + Loom + deps (network; ~10 min on first run)"]
-    fn e2e_gradle_build_compiles_template() {
+    /// Full end-to-end proof shared by every loader template: creates a real
+    /// project from the embedded template and compiles it with the real
+    /// Gradle wrapper. This is the acceptance criterion ("the project compiles").
+    fn e2e_gradle_build(
+        slug: &str,
+        template: &str,
+        loader: &str,
+        loader_version: &str,
+        mc_depends: &str,
+        loader_min: &str,
+    ) {
         let home = std::env::var("HOME").expect("HOME is set");
         let base = std::path::PathBuf::from(&home).join("VOXEL");
         std::fs::create_dir_all(&base).unwrap();
-        let base_str = base.to_string_lossy().to_string();
 
         // Clean slate for the e2e project only
-        let slug = "e2e-dark-kingdom";
         let _ = std::fs::remove_dir_all(base.join("projects").join(slug));
 
         let payload = CreateProjectPayload {
-            storage_base: base_str.clone(),
+            storage_base: base.to_string_lossy().to_string(),
             slug: slug.to_string(),
-            name: "Dark Kingdom E2E".to_string(),
-            template: "fabric-1.20.1-mod".to_string(),
+            name: format!("{} E2E", loader),
+            template: template.to_string(),
             mod_id: "dark_kingdom".to_string(),
             mod_id_class: "DarkKingdom".to_string(),
             package: "com.voxel.darkkingdom".to_string(),
             description: "E2E acceptance build".to_string(),
             license: "MIT".to_string(),
-            author: "NexusCraft E2E".to_string(),
+            author: "VOXEL E2E".to_string(),
             minecraft_version: "1.20.1".to_string(),
             java_release: 17,
             yarn_mappings: "1.20.1+build.10".to_string(),
-            loader_version: "0.16.9".to_string(),
-            loader_min: ">=0.16.0".to_string(),
+            loader_version: loader_version.to_string(),
+            loader_min: loader_min.to_string(),
             fabric_api_version: "0.92.12+1.20.1".to_string(),
-            mc_depends: "~1.20.1".to_string(),
+            mc_depends: mc_depends.to_string(),
             mappings_line: "mappings \"net.fabricmc:yarn:1.20.1+build.10:v2\"".to_string(),
+            loader: loader.to_string(),
+            pack_format: 15,
         };
 
         let result = create_project(payload).expect("project creation must succeed");
@@ -292,11 +340,15 @@ mod e2e_tests {
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         if !output.status.success() {
+            let tail = |s: &str| {
+                s.chars().rev().take(4000).collect::<String>()
+                    .chars().rev().collect::<String>()
+            };
             panic!(
-                "GRADLE BUILD FAILED (exit {:?})\n--- stdout tail ---\n{}\n--- stderr tail ---\n{}",
+                "GRADLE BUILD FAILED ({loader}, exit {:?})\n--- stdout tail ---\n{}\n--- stderr tail ---\n{}",
                 output.status.code(),
-                stdout.chars().rev().collect::<String>().chars().take(4000).collect::<String>().chars().rev().collect::<String>(),
-                stderr
+                tail(&stdout),
+                tail(&stderr)
             );
         }
 
@@ -308,6 +360,45 @@ mod e2e_tests {
             .filter(|name| name.ends_with(".jar") && !name.contains("sources"))
             .collect();
         assert!(!jars.is_empty(), "compiled jar missing in build/libs: {jars:?}");
-        eprintln!("E2E OK — jar: {jars:?}");
+        eprintln!("E2E OK ({loader}) — jar: {jars:?}");
+    }
+
+    #[test]
+    #[ignore = "e2e: downloads Gradle + Loom + deps (network; ~10 min on first run)"]
+    fn e2e_gradle_build_compiles_template() {
+        e2e_gradle_build(
+            "e2e-dark-kingdom",
+            "fabric-1.20.1-mod",
+            "fabric",
+            "0.16.9",
+            "~1.20.1",
+            ">=0.16.0",
+        );
+    }
+
+    #[test]
+    #[ignore = "e2e: downloads ForgeGradle + Forge userdev + decompiles MC (network; ~15 min on first run)"]
+    fn e2e_gradle_build_compiles_forge() {
+        e2e_gradle_build(
+            "e2e-forge-kingdom",
+            "forge-1.20.1-mod",
+            "forge",
+            "47.4.10",
+            "[1.20.1,1.21)",
+            "[47,)",
+        );
+    }
+
+    #[test]
+    #[ignore = "e2e: downloads ForgeGradle + NeoForge userdev from the NeoForged maven (network)"]
+    fn e2e_gradle_build_compiles_neoforge() {
+        e2e_gradle_build(
+            "e2e-neoforge-kingdom",
+            "neoforge-1.20.1-mod",
+            "neoforge",
+            "47.1.104",
+            "[1.20.1,1.21)",
+            "[47,)",
+        );
     }
 }

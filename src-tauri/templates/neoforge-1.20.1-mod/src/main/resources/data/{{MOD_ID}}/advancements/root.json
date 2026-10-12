@@ -1,0 +1,23 @@
+{
+  "parent": "minecraft:story/root",
+  "display": {
+    "icon": {
+      "item": "{{MOD_ID}}:darksteel_sword"
+    },
+    "title": "{{MOD_NAME}}",
+    "description": "The journey begins",
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true
+  },
+  "criteria": {
+    "has_sword": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          { "items": ["{{MOD_ID}}:darksteel_sword"] }
+        ]
+      }
+    }
+  }
+}

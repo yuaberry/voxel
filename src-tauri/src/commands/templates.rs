@@ -32,6 +32,10 @@ pub struct TemplateTokens {
     pub fabric_api_version: String,
     pub mc_depends: String,
     pub mappings_line: String,
+    // Loader identity (fabric | forge | neoforge) and the pack format the
+    // resource/data packs of the template must declare (pack.mcmeta).
+    pub loader_id: String,
+    pub pack_format: u32,
 }
 
 impl TemplateTokens {
@@ -59,6 +63,8 @@ impl TemplateTokens {
             ("{{JAVA_RELEASE}}".to_string(), self.java_release.to_string()),
             ("{{JAVA_ENUM}}".to_string(), self.java_enum.clone()),
             ("{{JAVA_MIN}}".to_string(), self.java_min.clone()),
+            ("{{LOADER_ID}}".to_string(), self.loader_id.clone()),
+            ("{{PACK_FORMAT}}".to_string(), self.pack_format.to_string()),
         ]
     }
 }
@@ -181,6 +187,8 @@ mod tests {
             fabric_api_version: "0.92.2+1.20.1".to_string(),
             mc_depends: "~1.20.1".to_string(),
             mappings_line: "mappings \"net.fabricmc:yarn:1.20.1+build.10:v2\"".to_string(),
+            loader_id: "fabric".to_string(),
+            pack_format: 15,
         }
     }
 
@@ -262,6 +270,99 @@ mod tests {
         // No token leftovers anywhere in the tree
         assert_no_tokens(&dst);
 
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn writes_forge_template_with_maven_ranges() {
+        let mut tokens = sample_tokens();
+        tokens.loader_id = "forge".to_string();
+        tokens.loader_version = "47.4.10".to_string();
+        tokens.loader_min = "[47,)".to_string();
+        tokens.mc_depends = "[1.20.1,1.21)".to_string();
+
+        let base = std::env::temp_dir().join(format!("nexuscraft-fge-{}", std::process::id()));
+        let dst = base.join("forge-mod");
+        let count = write_template("forge-1.20.1-mod", &tokens, &dst).unwrap();
+        assert!(count >= 30, "expected >= 30 files, wrote {count}");
+
+        // ForgeGradle 6 + official mappings + the Forge userdev artifact
+        let gradle = fs::read_to_string(dst.join("build.gradle")).unwrap();
+        assert!(gradle.contains("net.minecraftforge.gradle' version '[6.0,6.2)'"));
+        assert!(gradle.contains("minecraft \"net.minecraftforge:forge:${minecraft_version}-${forge_version}\""));
+        assert!(gradle.contains("it.options.release") || gradle.contains("JavaLanguageVersion.of(17)"));
+
+        // Properties rendered with Maven-style ranges (loader_min doubles as
+        // both forge_version_range and loader_version_range)
+        let props = fs::read_to_string(dst.join("gradle.properties")).unwrap();
+        assert!(props.contains("minecraft_version=1.20.1"));
+        assert!(props.contains("forge_version=47.4.10"));
+        assert!(props.contains("forge_version_range=[47,)"));
+        assert!(props.contains("minecraft_version_range=[1.20.1,1.21)"));
+        assert!(props.contains("mod_id=dark_kingdom"));
+
+        // mods.toml is valid-ish TOML with the rendered id + ranges
+        let toml = fs::read_to_string(dst.join("src/main/resources/META-INF/mods.toml")).unwrap();
+        assert!(toml.contains("modLoader=\"javafml\""));
+        assert!(toml.contains("loaderVersion=\"${loader_version_range}\""));
+        assert!(toml.contains("modId=\"${mod_id}\""));
+
+        // pack.mcmeta declares the pack format for this MC version
+        let mcmeta = fs::read_to_string(dst.join("src/main/resources/pack.mcmeta")).unwrap();
+        assert!(mcmeta.contains("\"pack_format\": 15"));
+
+        // @Mod entrypoint + DeferredRegister items at the package path
+        let java = fs::read_to_string(dst
+            .join("src/main/java/com/nexuscraft/darkkingdom/DarkKingdom.java"))
+            .unwrap();
+        assert!(java.contains("@Mod(DarkKingdom.MOD_ID)"));
+        assert!(java.contains("MOD_ID = \"dark_kingdom\""));
+        let items = fs::read_to_string(dst
+            .join("src/main/java/com/nexuscraft/darkkingdom/ModItems.java"))
+            .unwrap();
+        assert!(items.contains("DeferredRegister.create(ForgeRegistries.ITEMS"));
+        assert!(items.contains("\"darksteel_sword\""));
+
+        // .voxel spec says forge + the right template, no fabric-api
+        let spec_raw = fs::read_to_string(dst.join(".voxel/project-spec.json")).unwrap();
+        let spec: serde_json::Value = serde_json::from_str(&spec_raw).unwrap();
+        assert_eq!(spec["loader"], "forge");
+        assert_eq!(spec["build_configuration"]["template"], "forge-1.20.1-mod");
+        assert!(spec["dependencies"].as_array().unwrap().is_empty());
+
+        assert_no_tokens(&dst);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn writes_neoforge_template_with_neoforged_maven() {
+        let mut tokens = sample_tokens();
+        tokens.loader_id = "neoforge".to_string();
+        tokens.loader_version = "47.1.104".to_string();
+        tokens.loader_min = "[47,)".to_string();
+        tokens.mc_depends = "[1.20.1,1.21)".to_string();
+
+        let base = std::env::temp_dir().join(format!("nexuscraft-nfr-{}", std::process::id()));
+        let dst = base.join("neoforge-mod");
+        let count = write_template("neoforge-1.20.1-mod", &tokens, &dst).unwrap();
+        assert!(count >= 30, "expected >= 30 files, wrote {count}");
+
+        // The 1.20.1 lineage: the loader artifact is net.neoforged:forge and
+        // the repository is the NeoForged maven (verified against the real
+        // maven — userdev/universal both resolve).
+        let gradle = fs::read_to_string(dst.join("build.gradle")).unwrap();
+        assert!(gradle.contains("minecraft \"net.neoforged:forge:${minecraft_version}-${forge_version}\""));
+        assert!(gradle.contains("https://maven.neoforged.net/releases"));
+
+        let props = fs::read_to_string(dst.join("gradle.properties")).unwrap();
+        assert!(props.contains("forge_version=47.1.104"));
+
+        let spec_raw = fs::read_to_string(dst.join(".voxel/project-spec.json")).unwrap();
+        let spec: serde_json::Value = serde_json::from_str(&spec_raw).unwrap();
+        assert_eq!(spec["loader"], "neoforge");
+        assert_eq!(spec["build_configuration"]["template"], "neoforge-1.20.1-mod");
+
+        assert_no_tokens(&dst);
         let _ = fs::remove_dir_all(&base);
     }
 
