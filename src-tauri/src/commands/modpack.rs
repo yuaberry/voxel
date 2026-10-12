@@ -445,6 +445,298 @@ pub fn modpack_exportable_assets(storage_base: String) -> Result<ExportableAsset
     Ok(ExportableAssets { jars, shader_packs })
 }
 
+// ---------------------------------------------------------------------------
+// Compatibility Score v2 — REAL checks by reading the manifests INSIDE the
+// selected jars (local, no network): mod id duplicates, Minecraft version
+// range intersections, and mixed-loader conflicts.
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
+pub struct CompatCheck {
+    pub id: String,
+    pub label: String,
+    pub passed: bool,
+    pub detail: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackCompatibility {
+    pub checks: Vec<CompatCheck>,
+    /// 0-100: weighted share of passed checks.
+    pub score: u8,
+    pub mod_count: usize,
+}
+
+#[derive(Clone)]
+struct JarFacts {
+    mod_id: Option<String>,
+    mc_range: Option<String>,
+    is_fabric: bool,
+    is_java_loader: bool,
+    jar_name: String,
+}
+
+/// Parses the version range formats both ecosystems use into (min, max)
+/// inclusive-exclusive over dot segments: Maven `[a,b)` / `[a,)` / `[a]`,
+/// SemVer-ish `>=a`, `~a` (upper = next minor), exact `a`, and `*`.
+fn parse_range(range: &str) -> ((Vec<u32>, bool), (Vec<u32>, bool)) {
+    let zero = (vec![0], true);
+    let inf = (vec![u32::MAX], false);
+    let r = range.trim();
+    if r == "*" || r.is_empty() {
+        return (zero, inf);
+    }
+    if let Some(rest) = r.strip_prefix('[').or_else(|| r.strip_prefix('(')) {
+        let inclusive = r.starts_with('[');
+        let close_inf = rest.ends_with(')');
+        let body = rest.trim_end_matches([')', ']']);
+        let mut parts = body.splitn(2, ',');
+        let lo = parts.next().unwrap_or("*").trim();
+        let hi = parts.next().unwrap_or("*").trim();
+        let lo_v = if lo == "*" { zero.clone() } else { (parse_version(lo), inclusive) };
+        let hi_v = if hi == "*" {
+            inf
+        } else {
+            (parse_version(hi), rest.ends_with(']'))
+        };
+        return (lo_v, hi_v);
+    }
+    if let Some(v) = r.strip_prefix(">=") {
+        return ((parse_version(v), true), inf);
+    }
+    if let Some(v) = r.strip_prefix('~') {
+        let mut segs = parse_version(v);
+        while segs.len() < 2 {
+            segs.push(0);
+        }
+        let mut upper = segs.clone();
+        *upper.last_mut().unwrap() += 0;
+        let minor = upper.get(1).copied().unwrap_or(0) + 1;
+        upper[1] = minor;
+        for i in 2..upper.len() {
+            upper[i] = 0;
+        }
+        return ((segs, true), (upper, false));
+    }
+    // exact version
+    let v = parse_version(r);
+    ((v.clone(), true), (v, true))
+}
+
+fn parse_version(v: &str) -> Vec<u32> {
+    v.split('.')
+        .map(|s| s.trim().split(['-', '+']).next().unwrap_or("0").parse::<u32>().unwrap_or(0))
+        .collect()
+}
+
+fn cmp_versions(a: &[u32], b: &[u32]) -> std::cmp::Ordering {
+    let n = a.len().max(b.len());
+    for i in 0..n {
+        let av = a.get(i).copied().unwrap_or(0);
+        let bv = b.get(i).copied().unwrap_or(0);
+        match av.cmp(&bv) {
+            std::cmp::Ordering::Equal => continue,
+            other => return other,
+        }
+    }
+    std::cmp::Ordering::Equal
+}
+
+/// Two ranges intersect when lower <= upper on both sides.
+fn ranges_intersect(
+    (lo1, inc1): (&[u32], bool),
+    (hi1, inc1h): (&[u32], bool),
+    (lo2, inc2): (&[u32], bool),
+    (hi2, inc2h): (&[u32], bool),
+) -> bool {
+    // lower bound of the intersection must not pass its upper bound
+    let (max_lo, lo_incl) = if cmp_versions(lo1, lo2) == std::cmp::Ordering::Greater {
+        (lo1, inc1)
+    } else if cmp_versions(lo1, lo2) == std::cmp::Ordering::Less {
+        (lo2, inc2)
+    } else {
+        (lo1, inc1 && inc2)
+    };
+    let (min_hi, hi_incl) = if cmp_versions(hi1, hi2) == std::cmp::Ordering::Less {
+        (hi1, inc1h)
+    } else if cmp_versions(hi1, hi2) == std::cmp::Ordering::Greater {
+        (hi2, inc2h)
+    } else {
+        (hi1, inc1h && inc2h)
+    };
+    let ord = cmp_versions(max_lo, min_hi);
+    match ord {
+        std::cmp::Ordering::Less => true,
+        std::cmp::Ordering::Greater => false,
+        std::cmp::Ordering::Equal => lo_incl && hi_incl,
+    }
+}
+
+fn read_jar_facts(jar_path: &Path, jar_name: &str) -> JarFacts {
+    let mut facts = JarFacts {
+        mod_id: None,
+        mc_range: None,
+        is_fabric: false,
+        is_java_loader: false,
+        jar_name: jar_name.to_string(),
+    };
+    let Ok(file) = fs::File::open(jar_path) else { return facts };
+    let Ok(mut archive) = zip::ZipArchive::new(file) else { return facts };
+
+    if let Ok(mut entry) = archive.by_name("fabric.mod.json") {
+        let mut buf = String::new();
+        if std::io::Read::read_to_string(&mut entry, &mut buf).is_ok() {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&buf) {
+                facts.is_fabric = true;
+                facts.mod_id = v.get("id").and_then(|i| i.as_str()).map(String::from);
+                if let Some(depends) = v.get("depends").and_then(|d| d.as_object()) {
+                    if let Some(mc) = depends.get("minecraft") {
+                        facts.mc_range = mc.as_str().map(String::from);
+                    }
+                }
+            }
+        }
+    }
+    if let Ok(mut entry) = archive.by_name("META-INF/mods.toml") {
+        let mut buf = String::new();
+        if std::io::Read::read_to_string(&mut entry, &mut buf).is_ok() {
+            if let Ok(v) = toml::from_str::<toml::Value>(&buf) {
+                facts.is_java_loader = true;
+                if let Some(mods) = v.get("mods").and_then(|m| m.as_array()) {
+                    if let Some(first) = mods.first() {
+                        facts.mod_id = first
+                            .get("modId")
+                            .and_then(|m| m.as_str())
+                            .map(String::from);
+                    }
+                }
+                if let Some(deps) = v.get("dependencies").and_then(|d| d.as_table()) {
+                    for list in deps.values() {
+                        if let Some(arr) = list.as_array() {
+                            for dep in arr {
+                                if dep.get("modId").and_then(|m| m.as_str()) == Some("minecraft") {
+                                    facts.mc_range = dep
+                                        .get("versionRange")
+                                        .and_then(|r| r.as_str())
+                                        .map(String::from);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    facts
+}
+
+#[tauri::command]
+pub fn modpack_check_compatibility(
+    storage_base: String,
+    mods: Vec<ModpackModIn>,
+) -> Result<ModpackCompatibility, String> {
+    let base = workspace_base(&storage_base)?;
+    let mut facts = Vec::new();
+    for m in &mods {
+        let slug = safe_file_name(&m.project_slug)?;
+        let jar = safe_file_name(&m.jar_file)?;
+        let src = base.join("projects").join(slug).join("build/libs").join(jar);
+        if !src.is_file() {
+            return Err(format!("Jar not found: projects/{slug}/build/libs/{jar}"));
+        }
+        facts.push(read_jar_facts(&src, &jar));
+    }
+
+    let mut checks = Vec::new();
+
+    // 1. Duplicate mod ids across jars — would shadow/crash on load
+    let mut seen: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    for f in &facts {
+        if let Some(id) = &f.mod_id {
+            seen.entry(id.clone()).or_default().push(f.jar_name.clone());
+        }
+    }
+    let dups: Vec<String> = seen
+        .iter()
+        .filter(|(_, jars)| jars.len() > 1)
+        .map(|(id, jars)| format!("{id} ×{} ({})", jars.len(), jars.join(", ")))
+        .collect();
+    checks.push(CompatCheck {
+        id: "unique_mod_ids".into(),
+        label: "No duplicate mod ids".into(),
+        passed: dups.is_empty(),
+        detail: if dups.is_empty() {
+            "every jar declares a distinct mod id".into()
+        } else {
+            dups.join("; ")
+        },
+    });
+
+    // 2. Minecraft version ranges share at least one common version
+    let ranged: Vec<&JarFacts> = facts.iter().filter(|f| f.mc_range.is_some()).collect();
+    let mut conflicts: Vec<String> = Vec::new();
+    for i in 0..ranged.len() {
+        for j in (i + 1)..ranged.len() {
+            let (lo1, hi1) = parse_range(ranged[i].mc_range.as_deref().unwrap());
+            let (lo2, hi2) = parse_range(ranged[j].mc_range.as_deref().unwrap());
+            if !ranges_intersect(
+                (&lo1.0, lo1.1), (&hi1.0, hi1.1),
+                (&lo2.0, lo2.1), (&hi2.0, hi2.1),
+            ) {
+                conflicts.push(format!(
+                    "{} [{:?}] vs {} [{:?}]",
+                    ranged[i].jar_name, ranged[i].mc_range,
+                    ranged[j].jar_name, ranged[j].mc_range,
+                ));
+            }
+        }
+    }
+    checks.push(CompatCheck {
+        id: "minecraft_ranges".into(),
+        label: "Minecraft version ranges overlap".into(),
+        passed: conflicts.is_empty(),
+        detail: if conflicts.is_empty() {
+            if ranged.is_empty() {
+                "no jar declares an explicit range".into()
+            } else {
+                format!("{} jar(s) share at least one MC version", ranged.len())
+            }
+        } else {
+            conflicts.join("; ")
+        },
+    });
+
+    // 3. One loader family — fabric.jar mixed with forge/neoforge.jar never boots
+    let has_fabric = facts.iter().any(|f| f.is_fabric);
+    let has_java = facts.iter().any(|f| f.is_java_loader);
+    let mixed = has_fabric && has_java;
+    checks.push(CompatCheck {
+        id: "single_loader".into(),
+        label: "Single loader family".into(),
+        passed: !mixed,
+        detail: if mixed {
+            "fabric.mod.json and META-INF/mods.toml jars cannot load together".into()
+        } else if has_fabric {
+            "all fabric".into()
+        } else if has_java {
+            "all forge/neoforge".into()
+        } else {
+            "no loader manifest detected in these jars".into()
+        },
+    });
+
+    let passed = checks.iter().filter(|c| c.passed).count();
+    let score = if checks.is_empty() {
+        100
+    } else {
+        (passed * 100 / checks.len()) as u8
+    };
+    Ok(ModpackCompatibility { checks, score, mod_count: facts.len() })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -541,6 +833,118 @@ mod tests {
         assert_eq!(fs::read(&jar).unwrap(), b"PK-fake-jar-bytes");
         assert!(base.join("instances/dest/shaderpacks/complementary-ish/shaders/composite.fsh").is_file());
         let _ = fs::remove_dir_all(&base);
+    }
+
+    fn fake_jar(path: &Path, manifest: &str, manifest_path: &str) {
+        let file = fs::File::create(path).unwrap();
+        let mut w = zip::ZipWriter::new(file);
+        w.start_file(manifest_path, zip::write::SimpleFileOptions::default()).unwrap();
+        w.write_all(manifest.as_bytes()).unwrap();
+        w.finish().unwrap();
+    }
+
+    #[test]
+    fn compatibility_catches_duplicates_ranges_and_mixed_loaders() {
+        let base = fake_workspace("compat");
+        let libs = base.join("projects/dark-kingdom/build/libs");
+        fake_jar(
+            &libs.join("dark_kingdom-0.1.0.jar"),
+            r#"{"id":"dark_kingdom","depends":{"minecraft":"~1.20.1"}}"#,
+            "fabric.mod.json",
+        );
+        // second project: duplicate id + disjoint MC range + java loader
+        fs::create_dir_all(base.join("projects/other-mod/build/libs")).unwrap();
+        fake_jar(
+            &base.join("projects/other-mod/build/libs/other-1.0.jar"),
+            r#"
+modLoader="javafml"
+[[mods]]
+modId="dark_kingdom"
+[[dependencies.dark_kingdom]]
+modId="minecraft"
+versionRange="[1.21,1.22)"
+"#,
+            "META-INF/mods.toml",
+        );
+        // third: overlapping fabric jar
+        fs::create_dir_all(base.join("projects/third/build/libs")).unwrap();
+        fake_jar(
+            &base.join("projects/third/build/libs/third-1.0.jar"),
+            r#"{"id":"third_mod","depends":{"minecraft":"[1.20,1.21)"}}"#,
+            "fabric.mod.json",
+        );
+
+        let result = modpack_check_compatibility(
+            base.to_string_lossy().to_string(),
+            vec![
+                ModpackModIn { project_slug: "dark-kingdom".into(), jar_file: "dark_kingdom-0.1.0.jar".into() },
+                ModpackModIn { project_slug: "other-mod".into(), jar_file: "other-1.0.jar".into() },
+                ModpackModIn { project_slug: "third".into(), jar_file: "third-1.0.jar".into() },
+            ],
+        )
+        .unwrap();
+        assert_eq!(result.mod_count, 3);
+
+        let by_id = |id: &str| result.checks.iter().find(|c| c.id == id).unwrap();
+        assert!(!by_id("unique_mod_ids").passed, "duplicate dark_kingdom must fail: {}", by_id("unique_mod_ids").detail);
+        assert!(!by_id("minecraft_ranges").passed, "disjoint ranges must fail: {}", by_id("minecraft_ranges").detail);
+        assert!(!by_id("single_loader").passed, "fabric+forge mix must fail");
+        assert_eq!(result.score, 0);
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn compatibility_passes_a_clean_fabric_pair() {
+        let base = fake_workspace("clean");
+        let libs = base.join("projects/dark-kingdom/build/libs");
+        fs::create_dir_all(base.join("projects/ally/build/libs")).unwrap();
+        fake_jar(
+            &base.join("projects/ally/build/libs/ally-1.0.jar"),
+            r#"{"id":"ally_mod","depends":{"minecraft":"[1.20.1,1.21)"}}"#,
+            "fabric.mod.json",
+        );
+
+        let result = modpack_check_compatibility(
+            base.to_string_lossy().to_string(),
+            vec![
+                ModpackModIn { project_slug: "dark-kingdom".into(), jar_file: "dark_kingdom-0.1.0.jar".into() },
+                ModpackModIn { project_slug: "ally".into(), jar_file: "ally-1.0.jar".into() },
+            ],
+        )
+        .unwrap();
+        // the fake workspace jar has no manifest — counts as "no range" (neutral)
+        assert!(result.checks.iter().all(|c| c.passed), "{:?}", result.checks);
+        assert_eq!(result.score, 100);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn range_parser_handles_both_ecosystems() {
+        // fabric tilde
+        let (lo, hi) = parse_range("~1.20.1");
+        assert_eq!(lo.0, vec![1, 20, 1]);
+        assert_eq!(hi.0, vec![1, 21, 0]);
+        // maven half-open
+        let (lo, hi) = parse_range("[1.20.1,1.21)");
+        assert_eq!(lo.0, vec![1, 20, 1]);
+        assert_eq!(hi.0, vec![1, 21]);
+        assert!(hi.1 == false);
+        // lower bound only
+        let (_, hi) = parse_range(">=47");
+        assert_eq!(hi.0, vec![u32::MAX]);
+        // wildcards
+        let (lo, hi) = parse_range("*");
+        assert_eq!(lo.0, vec![0]);
+        assert_eq!(hi.0, vec![u32::MAX]);
+        // intersect sanity: [1.20.1,1.21) vs [1.20.5,1.20.9)
+        let (lo1, hi1) = parse_range("[1.20.1,1.21)");
+        let (lo2, hi2) = parse_range("[1.20.5,1.20.9)");
+        assert!(ranges_intersect((&lo1.0, lo1.1), (&hi1.0, hi1.1), (&lo2.0, lo2.1), (&hi2.0, hi2.1)));
+        // disjoint: [1.20,1.20.1) vs [1.21,1.22)
+        let (lo1, hi1) = parse_range("[1.20,1.20.1)");
+        let (lo2, hi2) = parse_range("[1.21,1.22)");
+        assert!(!ranges_intersect((&lo1.0, lo1.1), (&hi1.0, hi1.1), (&lo2.0, lo2.1), (&hi2.0, hi2.1)));
     }
 
     #[test]

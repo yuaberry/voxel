@@ -27,10 +27,12 @@ import { Label } from "@/components/ui/label";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useProjectsStore } from "@/stores/projectsStore";
 import {
+  checkModpackCompatibility,
   exportModpack,
   getExportableAssets,
   importModpackInto,
   type ExportableAssets,
+  type ModpackCompatibility,
 } from "@/services/modpacks/modpackService";
 import { openInFileManager } from "@/services/storage/storageService";
 import { cn } from "@/lib/utils";
@@ -56,6 +58,9 @@ export function ModpacksPage() {
   const [version, setVersion] = useState("1.0.0");
   const [selectedJars, setSelectedJars] = useState<Set<string>>(new Set());
   const [selectedPacks, setSelectedPacks] = useState<Set<string>>(new Set());
+
+  // compatibility (live, computed from the jars' own manifests)
+  const [compat, setCompat] = useState<ModpackCompatibility | null>(null);
 
   // import form
   const [importZip, setImportZip] = useState<string | null>(null);
@@ -87,6 +92,30 @@ export function ModpacksPage() {
   }, [basePath]);
 
   const canExport = name.trim().length >= 2 && (selectedJars.size > 0 || selectedPacks.size > 0);
+
+  // Re-run compatibility whenever the mod selection changes
+  useEffect(() => {
+    if (!basePath || selectedJars.size === 0) {
+      setCompat(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const mods = assets.jars
+          .filter((j) => selectedJars.has(`${j.projectSlug}/${j.jarFile}`))
+          .map((j) => ({ projectSlug: j.projectSlug, jarFile: j.jarFile }));
+        const result = await checkModpackCompatibility(basePath, mods);
+        if (!cancelled) setCompat(result);
+      } catch {
+        if (!cancelled) setCompat(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [basePath, selectedJars, assets.jars]);
 
   // Manifest facts come from the real project records — never invented.
   const manifestFacts = useMemo(() => {
@@ -305,9 +334,43 @@ export function ModpacksPage() {
               )}
             </div>
 
+            {compat && (
+              <div className="space-y-1.5 rounded-lg border border-border/70 bg-card/40 p-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Compatibility — read from the jars' own manifests
+                  </Label>
+                  <Badge
+                    variant={compat.score === 100 ? "default" : "destructive"}
+                    className="font-mono"
+                  >
+                    {compat.score}/100
+                  </Badge>
+                </div>
+                {compat.checks.map((c) => (
+                  <div key={c.id} className="flex items-start gap-2 text-[11px]">
+                    <span
+                      className={cn(
+                        "mt-0.5 font-mono",
+                        c.passed ? "text-primary" : "text-destructive",
+                      )}
+                    >
+                      {c.passed ? "PASS" : "FAIL"}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="font-medium">{c.label}</span>
+                      <span className="block truncate text-muted-foreground" title={c.detail}>
+                        {c.detail}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <Button
               className="w-full"
-              disabled={!canExport || busy === "export"}
+              disabled={!canExport || busy === "export" || (compat?.score ?? 100) < 100}
               onClick={() => void handleExport()}
             >
               <Download className="mr-2 h-4 w-4" />

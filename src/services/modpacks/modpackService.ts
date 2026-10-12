@@ -58,3 +58,26 @@ export function importModpackInto(
     instanceSlug,
   });
 }
+
+export interface CompatCheck {
+  id: string;
+  label: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface ModpackCompatibility {
+  checks: CompatCheck[];
+  score: number;
+  modCount: number;
+}
+
+export function checkModpackCompatibility(
+  storageBase: string,
+  mods: Array<{ projectSlug: string; jarFile: string }>,
+): Promise<ModpackCompatibility> {
+  return invoke<ModpackCompatibility>("modpack_check_compatibility", {
+    storageBase,
+    mods,
+  });
+}
