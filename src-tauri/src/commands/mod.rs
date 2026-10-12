@@ -1,3 +1,4 @@
+pub mod assets;
 pub mod bridge;
 pub mod environment;
 pub mod fs;

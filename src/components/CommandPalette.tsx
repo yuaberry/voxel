@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/command";
 import {
   Boxes,
+  Brush,
   FolderOpen,
   Home,
   Info,
@@ -42,6 +43,7 @@ const NAV_TARGETS = [
   { to: "/projects", label: "Go to Projects", icon: Boxes, group: "Navigate" },
   { to: "/launcher", label: "Go to Launcher", icon: Rocket, group: "Navigate" },
   { to: "/modpacks", label: "Go to Modpacks", icon: Package, group: "Navigate" },
+  { to: "/studio", label: "Go to Asset Studio", icon: Brush, group: "Navigate" },
   { to: "/ai-creator", label: "Go to AI Creator", icon: Sparkles, group: "Navigate" },
   { to: "/shaders", label: "Go to Shaders", icon: Palette, group: "Navigate" },
   { to: "/servers", label: "Go to Servers", icon: Server, group: "Navigate" },

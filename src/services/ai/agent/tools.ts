@@ -1,5 +1,6 @@
 import type { ProjectRecord } from "@/types";
 import type { ToolSchema } from "./toolCallFormat";
+import { generateItemTexture, type TextureGenRequest } from "@/services/assets/assetStudioService";
 import {
   createProjectDirectory,
   deleteProjectEntry,
@@ -346,6 +347,59 @@ export function buildTools(): ToolExecutor[] {
         return snapshots
           .map((s) => `${s.label} | ${s.reason || s.shortSha} | ${s.date}`)
           .join("\n");
+      },
+    },
+    {
+      schema: {
+        name: "generate_item_texture",
+        description:
+          "Generate a REAL 16x16 pixel-art texture for an item and write it into the project at src/main/resources/assets/<mod_id>/textures/item/<item_id>.png. Styles: sword, gem, ingot, orb, apple, book, wand. Colors are #rrggbb. Use this whenever a new item needs a texture instead of leaving it blank.",
+        parameters: {
+          type: "object",
+          properties: {
+            item_id: {
+              type: "string",
+              description: "snake_case item id, e.g. darksteel_ingot",
+            },
+            style: {
+              type: "string",
+              description: "One of: sword, gem, ingot, orb, apple, book, wand",
+            },
+            primary: {
+              type: "string",
+              description: "Primary color #rrggbb (the item's main body)",
+            },
+            secondary: {
+              type: "string",
+              description: "Secondary color #rrggbb (grip, glints, accents)",
+            },
+            mod_id: {
+              type: "string",
+              description:
+                "The mod id of this project (only when unsure — the project's mod id is the default)",
+            },
+          },
+          required: ["item_id", "style", "primary", "secondary"],
+        },
+      },
+      summarize: (args) =>
+        `generate texture ${String(args.item_id)} (${String(args.style)}, ${String(args.primary)}/${String(args.secondary)})`,
+      execute: async (args, ctx) => {
+        const modId =
+          typeof args.mod_id === "string" && args.mod_id.trim().length > 0
+            ? args.mod_id.trim()
+            : ctx.project.slug.replace(/-/g, "_");
+        const result = await generateItemTexture({
+          storageBase: ctx.basePath,
+          projectRel: ctx.projectRel,
+          modId,
+          itemId: str(args, "item_id"),
+          style: str(args, "style") as TextureGenRequest["style"],
+          primary: str(args, "primary"),
+          secondary: str(args, "secondary"),
+          previewOnly: false,
+        });
+        return `Texture written: ${result.wrotePath ?? "unknown"} (16x16 pixel art, style ${String(args.style)})`;
       },
     },
   ];

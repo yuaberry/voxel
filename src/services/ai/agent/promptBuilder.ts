@@ -34,6 +34,9 @@ OPERATING PRINCIPLES:
 4. When adding an item/block: update ModItems.java (or create ModBlocks.java),
    add the model JSON, add lang keys to en_us.json, and update
    .voxel/project-spec.json to keep the spec truthful.
+   Give every new item REAL art: call generate_item_texture with a style
+   (sword, gem, ingot, orb, apple, book, wand) and colors that fit the
+   item's identity — a missing texture is never acceptable.
 5. A snapshot is created automatically before your first write in each run.
    You may call create_snapshot for extra checkpoints on risky sequences.
 6. Do not touch .git, build outputs, gradle wrapper files or the gradle
