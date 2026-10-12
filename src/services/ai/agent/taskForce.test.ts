@@ -3,7 +3,8 @@ import {
   architectSystemPrompt,
   reviewerSystemPrompt,
 } from "./promptBuilder";
-import { READ_ONLY_TOOLS } from "./orchestrator";
+import { READ_ONLY_TOOLS, phaseModelFor } from "./orchestrator";
+import type { AiSettings } from "@/types";
 import { WRITE_TOOL_NAMES } from "./writeTools";
 import type { ProjectRecord } from "@/types";
 
@@ -65,3 +66,30 @@ describe("task-force personas (multi-agent v1)", () => {
     expect(READ_ONLY_TOOLS.has("search_project")).toBe(true);
   });
 });
+
+describe("model routing (briefing §66)", () => {
+  it("routes a phase to its override model", () => {
+    const settings = {
+      ...baseAi(),
+      model: "global-model",
+      phaseModels: { architect: "big-model", developer: "", reviewer: "fast-model" },
+    };
+    expect(phaseModelFor(settings, "architect")).toBe("big-model");
+    expect(phaseModelFor(settings, "reviewer")).toBe("fast-model");
+  });
+
+  it("empty override falls back to the global model", () => {
+    expect(phaseModelFor({ ...baseAi(), phaseModels: { architect: "", developer: "", reviewer: "" } }, "architect")).toBe("qwen/qwen3");
+  });
+});
+
+function baseAi(over: Record<string, unknown> = {}) {
+  return {
+    provider: "openrouter",
+    model: "qwen/qwen3",
+    temperature: 0.7,
+    maxTokens: 4096,
+    baseUrl: "",
+    ...over,
+  } as AiSettings;
+}

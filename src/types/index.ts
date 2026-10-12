@@ -23,6 +23,18 @@ export interface AiSettings {
   temperature: number;
   maxTokens: number;
   baseUrl: string;
+  /**
+   * Model routing per task-force phase (briefing §66): the Architect can run
+   * on a stronger model while the Reviewer stays fast/cheap. Empty string
+   * falls back to the global `model`. Same provider & key as the main one.
+   */
+  phaseModels: AiPhaseModels;
+}
+
+export interface AiPhaseModels {
+  architect: string;
+  developer: string;
+  reviewer: string;
 }
 
 export interface MinecraftSettings {

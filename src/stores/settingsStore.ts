@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     temperature: 0.7,
     maxTokens: 4096,
     baseUrl: "",
+    phaseModels: { architect: "", developer: "", reviewer: "" },
   },
   minecraft: {
     defaultVersion: "1.20.1",

@@ -101,6 +101,13 @@ async function agentLoop(loop: LoopOptions): Promise<AgentRunResult> {
   const meta = getProviderMeta(settings.provider);
   const apiKey = meta.requiresKey ? await secretsGet(AI_API_KEY_ID) : null;
 
+  // Model router: a phase override (if any) only swaps the model id;
+  // provider, key and sampling stay with the global configuration.
+  const phaseSettings: AiSettings = {
+    ...settings,
+    model: phaseModelFor(settings, phase),
+  };
+
   const schemas: ToolSchema[] = tools.map((tool) => tool.schema);
   const toolByName = new Map(tools.map((tool) => [tool.schema.name, tool]));
 
@@ -144,7 +151,7 @@ async function agentLoop(loop: LoopOptions): Promise<AgentRunResult> {
     }
     onEvent({ type: "thinking" });
 
-    const turn = await agentTurn(settings, apiKey, messages, schemas);
+    const turn = await agentTurn(phaseSettings, apiKey, messages, schemas);
 
     if (turn.toolCalls.length === 0) {
       const text = turn.text.trim();
@@ -266,6 +273,14 @@ export async function runAgent(options: RunAgentOptions): Promise<AgentRunResult
 export interface TaskForceResult extends AgentRunResult {
   plan: string;
   review: string;
+}
+
+/**
+ * Model routing (briefing §66): which model a task-force phase runs on.
+ * An empty override falls back to the global model — routing is opt-in.
+ */
+export function phaseModelFor(settings: AiSettings, phase: AgentPhase): string {
+  return settings.phaseModels?.[phase]?.trim() || settings.model;
 }
 
 export const READ_ONLY_TOOLS = new Set([

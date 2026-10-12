@@ -234,7 +234,8 @@ export function AiSettings() {
           <Input
             placeholder={`…or type an ID (${meta.modelPlaceholder})`}
             value={ai.model}
-            onChange={(e) => void update("ai", { model: e.target.value }).catch(() => {})}
+            list="voxel-models-list"
+                onChange={(e) => void update("ai", { model: e.target.value }).catch(() => {})}
             className="font-mono text-xs"
           />
         </div>
@@ -282,6 +283,46 @@ export function AiSettings() {
             </Command>
           </DialogContent>
         </Dialog>
+      </Field>
+
+      {/* Model suggestions shared by the main input and the phase router */}
+      <datalist id="voxel-models-list">
+        {models.map((id) => (
+          <option key={id} value={id} />
+        ))}
+      </datalist>
+
+      {/* Model routing — task force (briefing §66) */}
+      <Field
+        label="Task force model routing"
+        hint="Optional per-phase models — e.g. a stronger Architect with a fast Reviewer. Empty uses the main model above (same provider & key)."
+      >
+        <div className="grid gap-2 sm:grid-cols-3">
+          {(
+            [
+              { key: "architect", label: "Architect" },
+              { key: "developer", label: "Developer" },
+              { key: "reviewer", label: "Reviewer" },
+            ] as const
+          ).map(({ key, label }) => (
+            <label key={key} className="block space-y-1">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                {label}
+              </span>
+              <input
+                list="voxel-models-list"
+                className="h-9 w-full rounded-md border border-border bg-card/60 px-2.5 text-sm outline-none transition-colors focus:border-primary"
+                placeholder={ai.model || "uses main model"}
+                value={ai.phaseModels?.[key] ?? ""}
+                onChange={(e) =>
+                  void update("ai", {
+                    phaseModels: { ...ai.phaseModels, [key]: e.target.value },
+                  }).catch(() => {})
+                }
+              />
+            </label>
+          ))}
+        </div>
       </Field>
 
       {/* API key */}
