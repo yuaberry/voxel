@@ -27,10 +27,20 @@ describe("loader availability (live catalog truth)", () => {
     expect(isLoaderAvailable({ ...base, forge: null }, "forge")).toBe(false);
   });
 
-  it("neoforge is honest: template covers the 1.20.1 lineage only", () => {
-    expect(isLoaderAvailable(base, "neoforge")).toBe(true);
-    const modern = { ...base, version: "1.21.1", neoforge: { latest: "21.1.209" } };
-    expect(isLoaderAvailable(modern, "neoforge")).toBe(false);
+  it("neoforge covers both embedded eras: 1.20.1 lineage and 1.20.2-1.21.1 modern", () => {
+    expect(isLoaderAvailable(base, "neoforge")).toBe(true); // 1.20.1 lineage
+    const modern = { ...base, version: "1.20.2", neoforge: { latest: "20.2.93" } };
+    expect(isLoaderAvailable(modern, "neoforge")).toBe(true);
+    const lts = { ...base, version: "1.21.1", neoforge: { latest: "21.1.259" } };
+    expect(isLoaderAvailable(lts, "neoforge")).toBe(true);
+    // Beyond 1.21.1 the embedded NeoGradle-7 template is not claimed
+    const tooNew = { ...base, version: "1.21.4", neoforge: { latest: "21.4.99" } };
+    expect(isLoaderAvailable(tooNew, "neoforge")).toBe(false);
+  });
+
+  it("forge is honest about the ForgeGradle-6 coverage (1.20.1-1.21.1)", () => {
+    const future = { ...base, version: "1.21.4" };
+    expect(isLoaderAvailable(future, "forge")).toBe(false);
   });
 });
 

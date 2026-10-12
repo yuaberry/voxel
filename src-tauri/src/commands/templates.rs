@@ -367,6 +367,53 @@ mod tests {
     }
 
     #[test]
+    fn writes_neoforge_modern_template() {
+        let mut tokens = sample_tokens();
+        tokens.loader_id = "neoforge".to_string();
+        tokens.mc_version = "1.20.2".to_string();
+        tokens.loader_version = "20.2.93".to_string();
+        tokens.loader_min = "[20.2,)".to_string();
+        tokens.mc_depends = "[1.20.2,1.21)".to_string();
+        tokens.pack_format = 18;
+
+        let base = std::env::temp_dir().join(format!("nexuscraft-nfm-{}", std::process::id()));
+        let dst = base.join("neoforge-modern");
+        let count = write_template("neoforge-1.20.2-mod", &tokens, &dst).unwrap();
+        assert!(count >= 28, "expected >= 28 files, wrote {count}");
+
+        // NeoGradle 7 userdev + the net.neoforged:neoforge artifact
+        let gradle = fs::read_to_string(dst.join("build.gradle")).unwrap();
+        assert!(gradle.contains("net.neoforged.gradle.userdev' version '7.0.116'"));
+        assert!(gradle.contains("implementation \"net.neoforged:neoforge:${neo_version}\""));
+
+        let props = fs::read_to_string(dst.join("gradle.properties")).unwrap();
+        assert!(props.contains("minecraft_version=1.20.2"));
+        assert!(props.contains("neo_version=20.2.93"));
+        assert!(props.contains("neo_version_range=[20.2,)"));
+        assert!(props.contains("pack_format_number=18"));
+
+        // mods.toml depends on modId "neoforge" (the modern loader identity)
+        let toml = fs::read_to_string(dst.join("src/main/resources/META-INF/mods.toml")).unwrap();
+        assert!(toml.contains("modId=\"neoforge\""));
+        assert!(toml.contains("versionRange=\"${neo_version_range}\""));
+
+        // NeoForge 20.2 API: DeferredRegister.createItems + DeferredItem
+        let items = fs::read_to_string(dst
+            .join("src/main/java/com/nexuscraft/darkkingdom/ModItems.java"))
+            .unwrap();
+        assert!(items.contains("DeferredRegister.createItems"));
+        assert!(items.contains("DeferredItem<Item>"));
+        assert!(items.contains("import net.neoforged.neoforge.registries.DeferredRegister;"));
+
+        let spec_raw = fs::read_to_string(dst.join(".voxel/project-spec.json")).unwrap();
+        let spec: serde_json::Value = serde_json::from_str(&spec_raw).unwrap();
+        assert_eq!(spec["build_configuration"]["template"], "neoforge-1.20.2-mod");
+
+        assert_no_tokens(&dst);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn renders_modern_mc_version_1_21() {
         let mut tokens = sample_tokens();
         tokens.mc_version = "1.21.1".to_string();

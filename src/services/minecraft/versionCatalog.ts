@@ -515,10 +515,22 @@ const PACK_FORMATS: Record<string, number> = {
   "1.21.1": 34,
 };
 
+/** Semantic segment comparison: 1 == equal, >0 == a is newer. */
+export function compareMcVersions(a: string, b: string): number {
+  const pa = a.split(".").map((n) => Number(n) || 0);
+  const pb = b.split(".").map((n) => Number(n) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 /**
- * The ForgeGradle-6 MDK (mods.toml + javafml) covers Forge 47-52, i.e.
- * 1.20.1-1.21.1. The NeoForge template covers the 1.20.1 lineage only
- * (net.neoforged:forge 47.1.x); 20.2+ switched to a different MDK.
+ * Loader coverage, honest to the embedded templates:
+ *  - forge: the ForgeGradle-6 MDK covers Forge 47-52 (MC 1.20.1-1.21.1)
+ *  - neoforge: the 1.20.1 lineage (net.neoforged:forge, FG6) OR the modern
+ *    era (net.neoforged:neoforge, NeoGradle 7) covering 1.20.2-1.21.1
  */
 function loaderAvailable(
   info: MinecraftVersionInfo,
@@ -528,9 +540,19 @@ function loaderAvailable(
     case "fabric":
       return info.loaders.includes("fabric");
     case "forge":
-      return info.loaders.includes("forge") && !!info.forge;
+      return (
+        info.loaders.includes("forge") &&
+        !!info.forge &&
+        compareMcVersions(info.version, "1.20.1") >= 0 &&
+        compareMcVersions(info.version, "1.21.1") <= 0
+      );
     case "neoforge":
-      return info.version === "1.20.1" && !!info.neoforge;
+      return (
+        !!info.neoforge &&
+        (info.version === "1.20.1" ||
+          (compareMcVersions(info.version, "1.20.2") >= 0 &&
+            compareMcVersions(info.version, "1.21.1") <= 0))
+      );
   }
 }
 
@@ -602,7 +624,11 @@ export async function resolveTemplateParams(
         : "",
     mcDepends,
     packFormat: PACK_FORMATS[info.version] ?? PACK_FORMATS["1.20.1"],
-    templateId: `${loader}-1.20.1-mod`,
+    // Two NeoForge eras: the 1.20.1 lineage vs the NeoGradle-7 modern one.
+    templateId:
+      loader === "neoforge" && info.version !== "1.20.1"
+        ? "neoforge-1.20.2-mod"
+        : `${loader}-1.20.1-mod`,
     experimental: isExperimental(info.version, kind),
   };
 }

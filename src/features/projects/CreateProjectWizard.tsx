@@ -48,7 +48,7 @@ import type { ProjectLoader, ProjectRecord } from "@/types";
 const LOADERS: { id: ProjectLoader; label: string; hint: string }[] = [
   { id: "fabric", label: "Fabric", hint: "Lightweight, fast updates — Fabric Loom template" },
   { id: "forge", label: "Forge", hint: "The classic ecosystem — ForgeGradle 6 template (1.20.1-1.21.1)" },
-  { id: "neoforge", label: "NeoForge", hint: "The modern Forge successor — 1.20.1 lineage template" },
+  { id: "neoforge", label: "NeoForge", hint: "The modern Forge successor — 1.20.1-1.21.1 templates" },
 ];
 
 const LICENSES = ["MIT", "Apache-2.0", "GPL-3.0", "LGPL-3.0", "Custom", "Proprietary"];
@@ -364,8 +364,9 @@ export function CreateProjectWizard() {
             </div>
             {activeLoader === "neoforge" && (
               <p className="text-[11px] text-muted-foreground">
-                NeoForge template covers the 1.20.1 lineage (net.neoforged:forge
-                47.1.x). The 20.2+ MDK is a different pipeline — arriving next.
+                Two embedded templates: the 1.20.1 lineage (Forge drop-in) and
+                the modern NeoGradle pipeline for 1.20.2-1.21.1 — picked
+                automatically from the version above.
               </p>
             )}
           </div>

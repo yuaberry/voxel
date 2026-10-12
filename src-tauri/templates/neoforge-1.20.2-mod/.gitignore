@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+out/
+classes/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+
+# Fabric/loom runtime
+run/
+remappedSrc/
+
+# Forge run directories (dev game instances)
+run/
+run-data/
+mcmodsrepo/

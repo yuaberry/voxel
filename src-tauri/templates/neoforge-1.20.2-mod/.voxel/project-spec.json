@@ -1,0 +1,39 @@
+{
+  "project_name": "{{MOD_NAME}}",
+  "mod_id": "{{MOD_ID}}",
+  "minecraft_version": "{{MC_VERSION}}",
+  "loader": "{{LOADER_ID}}",
+  "description": "{{DESCRIPTION}}",
+  "gameplay_features": [],
+  "blocks": [],
+  "items": [
+    {
+      "id": "example_item",
+      "name": "Example Item",
+      "category": "generic"
+    },
+    {
+      "id": "darksteel_sword",
+      "name": "Darksteel Sword",
+      "category": "combat"
+    }
+  ],
+  "entities": [],
+  "dimensions": [],
+  "structures": [],
+  "recipes": [],
+  "sounds": [],
+  "textures": [],
+  "shaders": [],
+  "dependencies": [],
+  "server_requirements": {
+    "minecraft_version": "{{MC_VERSION}}"
+  },
+  "compatibility": {
+    "minecraft": "{{MC_DEPENDS}}"
+  },
+  "build_configuration": {
+    "java_release": {{JAVA_RELEASE}},
+    "template": "neoforge-1.20.2-mod"
+  }
+}
