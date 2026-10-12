@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (12 sessões)
+## 5. Histórico de sessões (21 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -184,6 +184,12 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 13 | Wave 2: Shader Studio | 32 presets de estilo + gerador GLSL real + preview WebGL + editor Monaco + install em instância | race ledger (família temp-dir), bloomTaps com parênteses faltando |
 | 14 | Site + Release público | Causa raiz da release v0.1.0 (mismatch tauri) + cross-env (Windows) + site premium + GitHub Pages + repo PÚBLICO + executáveis multi-OS | mismatch npm↔crate fatal no build, `VAR=x` não existe em cmd.exe |
 | 15 | Wave 3: Server Styles + Ícone + Responsividade | Ícone premium v2 (51 variantes) + SLP real em Rust + 10 presets de servidor + import por endereço com MOTD colorido + IA design + referências públicas + sidebar colapsável + v0.1.2 | parser MOTD perdia texto na troca de estilo, keyword "friendly" genérica, § não-ASCII em byte-string, `online-mode` override bloqueado |
+| 16 | Wave 4: REBRAND VOXEL | Auditoria primeiro (PROJECT_AUDIT/VOXEL_ROADMAP/OPENCODE) + rename completo de 100 arquivos + `.voxel/` (8 arquivos) + repo → `yuaberry/voxel` + v0.2.0 | migration 001 tocada (revertida), `com.nexuscraft` lowercase fora dos patterns, PKG do site em cascata |
+| 17 | Skin "Next" | Reskin do app (tokens/aurora/voxel grid/sidebar glow/splash/Monaco voxel-dark/ícone v3) + site re-pelado + v0.3.0 | — |
+| 18 | Phase B: MOBILE | `@voxel/core` extraído + **VOXEL Bridge** (axum, token, console ring, SLP, AI relay — key nunca sai do PC) + Expo SDK 51 (5 abas, pairing) + Settings→Mobile + v0.3.1 | `expo/fetch` inexistente no SDK 51 → polling/ask one-shot; `sceneStyle` não existe no bottom-tabs |
+| 19 | Executáveis mobile | **APK Android real** (build completo 17m, apksigner/aapt, publicado) + pipeline iOS (xcarchive unsigned no CI) + workflow mobile-builds | settings.gradle pnpm paths-trick, nodeLinker hoisted, Metro subpath-exports, SDK removido das runners, ANDROID_SDK_ROOT conflito, xcworkspace nasce do pod install |
+| 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
+| 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 
 ## 6. Decisões-chave (respeitar SEMPRE)
 
@@ -231,49 +237,72 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 13)
+## 8. Estado atual (verificado — Sessão 21, v0.3.3)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (18) | ✅ incl. shaderpack guards, ledger chain, tamper detection |
-| Vitest (28) | ✅ incl. 32-presets íntegros, gerador GLSL sane, errorParser, serverModules |
-| E2E gradle | ✅ jar compilado (211s, Sessão 12) |
-| E2E launcher | ✅ 3.695 arquivos SHA-1 (59s cached, Sessão 12) |
-| E2E server | ✅ boot→stop→backup→restore (205s, Sessão 12) |
-| Typecheck | ✅ zero erros |
-| ESLint | ✅ 0 errors (warns set-state-in-effect = backlog família conhecida) |
-| Vite build | ✅ (1m50s) |
-| Boot smoke | ✅ app vivo, sem crash (tauri dev) |
-| **CI GitHub** | ✅ **SUCCESS** (Rust + Frontend, Sessão 12) |
+| Rust unit (33) | ✅ template, ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Vitest (47) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset** |
+| E2E gradle | ✅ jar compilado (Sessão 12) |
+| E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
+| E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
+| E2E SLP multi-server | ✅ Hypixel + CubeCraft + **Minemen via SRV** (reprodução do bug do dono) |
+| Typecheck / ESLint | ✅ 0 errors (warns set-state-in-effect = backlog família conhecida) |
+| Mobile typecheck | ✅ `pnpm --filter @voxel/mobile typecheck` (CI verde) |
+| Vite build | ✅ resolve @voxel/core via workspace |
+| Boot smoke | ✅ vivo com CSP ativa, 0 violações |
 
-### Release
-- **Tag `v0.1.0`** pushed → Release workflow queued (matrix: macOS arm64+x64, Ubuntu, Windows)
-- Output: `.exe` + `.msi` (Windows), `.dmg` (macOS), `.deb` + `.AppImage` + `.rpm` (Linux)
-- Verificar: `gh run list --workflow=release.yml`
+### Releases publicadas (tudo HTTP 206)
+| Tag | Conteúdo |
+|---|---|
+| v0.3.3 (latest) | Desktop: NIM, model picker, SRV, Launcher, temas, ~/Voxel, CSP, live preview, **Task force** + **APK mobile 0.2.0 replicado** |
+| v0.3.2 | Bridge multimodal + PWA iOS + APK 0.2.0 |
+| v0.3.1 / v0.3.0 / v0.2.0 / v0.1.x | histórico — desktop com Bridge, skin Next, rebrand, multi-OS original |
+
+**Assets por release**: `.exe`+`.msi` (Win) · `.deb`+`.AppImage` (Linux) · `.dmg` arm64+x64 (macOS) · `VOXEL-mobile-0.2.0-android.apk` · iOS via **PWA servida pelo Bridge** (`http://seu-pc:3717` → Add to Home Screen) + xcarchive unsigned no CI.
+
+### Workflows (todos verdes)
+`ci.yml` (desktop+core, com --filter) · `release.yml` (multi-OS, tags v*) · `pages.yml` (site) · `mobile.yml` (typecheck) · `mobile-builds.yml` (APK no CI + xcarchive iOS, dispatch + tags `mobile-v*`)
 
 ### Comandos de verificação
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 13 unit
-cargo test -- --ignored --nocapture # 3 E2E (rede/tempo)
-gh run list --limit 3               # CI status
-git log --oneline                   # 25+ commits
+cd src-tauri && cargo test          # 33 unit
+cargo test -- --ignored --nocapture # 4 E2E (gradle, launcher, server, SLP real)
+pnpm --filter @voxel/mobile typecheck
+gh run list --limit 4               # CI/Pages/Mobile/Release status
 ```
+
+### Observabilidade / estado de runtime
+- DB: `~/.config/dev.yuadevs.nexuscraft-studio/nexuscraft.db` (18 tabelas)
+- Workspace default: **~/Voxel** (legacy ~/NexusCraft → migration one-click em Settings→Storage)
+- Bridge: opt-in Settings→Mobile, token 8 chars, porta 3717, serve a PWA + API token-gated
 
 ## 9. Roadmap pós-MVP (priorizado — o que ainda pode ser construído)
 
-1. **Modpack Creator** — seleção de mods, resolução de dependências, incompatibilidades, export/import, Compatibility Score
-2. **Forge & NeoForge templates** — o Version Adapter já mapeia versões; faltam templates Java análogos
-3. ~~Shader Studio~~ → **ENTREGUE (Wave 2, Sessão 13)**: 32 presets + gerador real + preview WebGL + editor + install ✓ — próximos passos opcionais: passes extras (gbuffers water/waving), settings.glsl in-game (optiones Iris), screenshot preview com o jogo real
-4. **Resource Pack / World / Structure Studios** — texture workspace, geradores
-5. **Mais módulos de servidor** — SkyBlock, Factions, BedWars, Economy Engine
-6. **Marketplace** — categorias, licenciamento (author/license/source/version/deps)
-7. **Docker + Deployment Providers** — VPS/SSH/cloud (`DeploymentProvider` reservada)
-8. **Cloud opcional (Supabase)** — `cloudConfig.ts` + `.env` prontos
-9. **Chain externa real** — `ChainProvider` quando o dono completar o Compliance Checklist
-10. **Backlog de qualidade**: migrar warns `set-state-in-effect`, CSP no tauri.conf (null hoje), auto-refresh de sessão MSA/GitHub, alinhar `@tauri-apps/api` 2.9→2.12 (CLI de dev avisa mismatch e reescreve o Cargo.toml com `features = []` — neutro, mas reverter após `tauri dev`)
+1. **Forge & NeoForge templates** — o Version Adapter já mapeia versões; faltam templates Java análogos ao fabric-1.20.1 (próximo candidato natural)
+2. **Model Router por fase** (§66) — a Task force já existe; falta o setting para escolher modelo por agente (Architect forte, Reviewer rápido)
+3. **Push notifications** (§62) — desktop nativo + mobile; agora com a Task force, "AI terminou uma tarefa" ganhou sentido
+4. **Mobile polish** (§59) — secure-store do token, biometria, APK com keystore de release (Play Store), TestFlight quando houver conta Apple
+5. **Modpack Creator** — seleção de mods, resolução de dependências, export/import, Compatibility Score
+6. **Resource Pack / World / Structure Studios** — Asset Studio (§19), geradores
+7. **Mais módulos de servidor** — SkyBlock, Factions, BedWars (Economy/Prison/Token entregues)
+8. **Docker + Deployment Providers** (§44-45) — VPS/SSH/cloud (`DeploymentProvider` reservada)
+9. **Marketplace** (§48) e **Cloud opcional (Supabase)** (§85) — arquiteturas preparadas
+10. **Backlog de qualidade**: migrar warns `set-state-in-effect` (~20), auto-refresh de sessão MSA/GitHub, `@tauri-apps/api` mismatch (CLI de dev reescreve Cargo.toml com `features = []` — neutro; reverter após `tauri dev`)
+
+### Entregues nesta era (não refazer!)
+- ✅ Shader Studio (32 presets, gerador real, preview WebGL, editor, install) — Sessão 13
+- ✅ Multi-agent Task force (Architect→Developer→Reviewer, read-only em código) — Sessão 21
+- ✅ Launcher page (Play-first, mods/shaders por instância) + live preview de servidor no console — Sessão 21
+- ✅ Mobile completo: @voxel/core + Bridge + Expo (APK 0.2.0 publicado) + PWA iOS instalável + xcarchive no CI — Sessões 18-20
+- ✅ Visão no chat (desktop + mobile + bridge 3 dialetos) — Sessão 20
+- ✅ NVIDIA NIM + model picker por seleção — Sessão 21
+- ✅ SRV resolution no live import (bug do dono reproduzido e corrigido) — Sessão 21
+- ✅ 7 accents + micro-motion + ~/Voxel + migration + CSP real — Sessão 21
+- ✅ Site premium + GitHub Pages + repo público + releases multi-OS — Sessões 14/17
 
 ## 10. Regras de operação com o dono
 
@@ -393,7 +422,7 @@ git log --oneline                   # 25+ commits
 
 ---
 
-*Última atualização: Sessão 21 — NVIDIA NIM + model picker por seleção, SRV fix do live import (reproduzido: minemen 49s→2s), Launcher page, 7 temas, micro-motion, ~/Voxel + migration, CSP real, live server preview no console e Task force multi-agent (Architect→Developer→Reviewer, read-only garantido em código). 47/47+33/33. Release v0.3.3.
+*Última atualização: Sessão 21 (refresh de compactação) — 21 sessões na tabela §5, §8 espelhando v0.3.3 (47 vitest + 33 cargo + 4 E2E), roadmap §9 com os entregues riscados. Release v0.3.3 com 7/7 downloads 206 (desktop 6 + APK 0.2.0) + PWA iOS no Bridge. Task force multi-agent entregue. Próximos naturais: Forge/NeoForge templates, Model Router por fase, push notifications.*
 
 ---
 
