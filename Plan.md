@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (23 sessões)
+## 5. Histórico de sessões (24 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 24 | Assets + Modpacks v1 | **Sprites premium** (char-map pixel art: darksteel sword, Voxel Gem, mod icon 128) nos 4 templates + **Modpack Creator v1** (export/import real com manifest camelCase, workspace guards, zip-slip, fatos dos records) + rota /modpacks + v0.3.6 | en_us.json faltava no template 1.20.2 (cp silencioso); `<name>` literal engolido pelo parser JSX; manifest com fatos reais (não placeholders) |
 | 23 | Router + Notifications + NeoForge Moderno | **Model Router por fase** (phaseModels, provider/key global) + **desktop notifications** (plugin-notification 2.6.0 same-minor; build exit + fim da task force; no-op honesto sem permissão) + **template NeoGradle 7** (repo oficial neoforged/MDK@1.20.2; 1.20.2-1.21.1 incl. LTS; wizard escolhe a era) + **E2E 4/4** + v0.3.5 | permission é `notification:` (singular); `registerItem(String, Function<Props,Item>)` é a assinatura 20.2 (Supplier não existe); `register()` retorna DeferredHolder |
 
 ## 6. Decisões-chave (respeitar SEMPRE)
@@ -239,12 +240,12 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 23, v0.3.5)
+## 8. Estado atual (verificado — Sessão 24, v0.3.6)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (36) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Rust unit (40) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (55) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
@@ -259,7 +260,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.3.5 (latest)** | Desktop: **NeoForge moderno (1.20.2-1.21.1) + Model Router por fase + desktop notifications** + APK mobile 0.2.0 replicado |
+| **v0.3.6 (latest)** | Desktop: **sprites premium nos templates + Modpack Creator v1 (export/import)** + APK mobile 0.2.0 replicado |
+| v0.3.5 | Desktop: **NeoForge moderno (1.20.2-1.21.1) + Model Router por fase + desktop notifications** + APK mobile 0.2.0 replicado |
 | v0.3.4 | Desktop: templates Forge + NeoForge + wizard 3 loaders |
 | v0.3.3 | Desktop: NIM, model picker, SRV, Launcher, temas, ~/Voxel, CSP, live preview, **Task force** |
 | v0.3.2 | Bridge multimodal + PWA iOS + APK 0.2.0 |
@@ -274,7 +276,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 36 unit
+cd src-tauri && cargo test          # 40 unit
 cargo test -- --ignored --nocapture # 7 E2E (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -291,7 +293,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 2. ~~Model Router por fase~~ → **ENTREGUE (Sessão 23)**: phaseModels por fase, provider/key global (multi-key por provider = extensão futura honesta)
 3. ~~Push notifications (desktop)~~ → **ENTREGUE (Sessão 23)**: build exit + fim da task force, com permissão honesta. Mobile push = ainda futuro (precisa Expo notifications + backend)
 4. **Mobile polish** (§59) — secure-store do token, biometria, APK com keystore de release (Play Store), TestFlight quando houver conta Apple
-5. **Modpack Creator** — seleção de mods, resolução de dependências, export/import, Compatibility Score
+5. ~~Modpack Creator v1~~ → **ENTREGUE (Sessão 24)**: export/import real com manifest (workspace-only, zero fontes externas). Próxima fatia: resolução de dependências externas (Modrinth/CurseForge APIs) + Compatibility Score — o manifest já carrega os fatos
 6. **Resource Pack / World / Structure Studios** — Asset Studio (§19), geradores
 7. **Mais módulos de servidor** — SkyBlock, Factions, BedWars (Economy/Prison/Token entregues)
 8. **Docker + Deployment Providers** (§44-45) — VPS/SSH/cloud (`DeploymentProvider` reservada)
@@ -310,6 +312,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 - ✅ Site premium + GitHub Pages + repo público + releases multi-OS — Sessões 14/17
 - ✅ Templates Forge + NeoForge (MDKs oficiais, E2E 3/3) — Sessão 22
 - ✅ NeoForge Moderno NeoGradle 7 (repo oficial, E2E 4/4) + Model Router (§66) + Desktop notifications (§62) — Sessão 23
+- ✅ Sprites premium nos templates (pixel art artesanal) + Modpack Creator v1 (export/import) — Sessão 24
 
 ## 10. Regras de operação com o dono
 
@@ -429,7 +432,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 23 — Model Router por fase (§66), Push Notifications (§62) e o quarto template: NeoForge Moderno (NeoGradle 7, 1.20.2-1.21.1, derivado do repo oficial neoforged/MDK). E2E REAL 4/4 (fabric/forge/neo-legacy/neo-modern compilam jar). 55/55 vitest + 36/36 cargo. Release v0.3.5.*
+*Última atualização: Sessão 24 — sprites premium (darksteel_sword, Voxel Gem, icon 128 com glow da marca) em pixel art artesanal nos 4 templates + Modpack Creator v1 (export/import real com manifest, guards e fatos dos records). 55/55 + 40/40. Release v0.3.6.*
 
 ---
 
@@ -631,3 +634,27 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: typecheck 0 ✓ · lint 0 errors (23 warns família) · **vitest 55/55** (+3: router + eras NeoForge + cobertura forge) · **cargo 36/36** (+1 render) · **E2E REAL: neoforge-modern dark_kingdom jar com neoforge:20.2.93 (854s, NeoForm decompile completo)** — 4/4 templates E2E (fabric 158s, forge 339s, neo-legacy 170s, neo-modern 854s) · vite build 1m56s ✓ · boot vivo 0 panics ✓. Release v0.3.5.
 
 **Estado pós-sessão**: 4 templates de projeto, todos com prova de compilação real. Task force com model routing. Desktop notifications nos dois momentos que importam. Próximos naturais: Modpack Creator (§9.5), secure-store/biometria mobile (§59), ModDevGradle era (1.21.4+) quando for a hora, keys por provider no Router.
+
+---
+
+## 24. Sessão 24 — Assets premium + Modpack Creator v1
+
+**Pedido do dono**: "sim continue, sempre focando em qualidade. e bons assets/sprites etc.."
+
+**1. Sprite overhaul (a resposta direta ao "bons assets/sprites")**: os PNGs dos templates eram placeholders de **7 cores**. Agora são pixel art artesanal via `scripts/generate_mod_assets.py` (determinístico, mesmo padrão dos geradores de ícone; arte = char maps revisáveis em código; escrito nos 4 templates de uma vez):
+- **darksteel_sword.png**: espada diagonal vanilla-style, paleta darksteel (aço azul-cinza + outline + glint cyan), cabo de madeira com pomo. Prova estrutural: massa por quadrante (cabo LB→lâmina RT).
+- **example_item.png → Voxel Gem**: gema facetada nas cores da marca (violeta #9155ff + cyan), sparkle branco. O display name acompanhou a arte ("Voxel Gem" no lang + project-spec; o id didático `example_item` permanece — o Java continua ensinando).
+- **icon.png**: logo 128x128 do mod — a espada 6x sobre painel escuro com voxel grid da marca, glow radial violeta e a linguagem de borda dos cards do app (234 cores).
+- **Bug caçado no caminho**: o `en_us.json` faltava no template neoforge-1.20.2 (cp da sessão 23 que falhou silenciosamente com `{{MOD_ID}}` literal) — copiado e o rename aplicado nos 4.
+
+**2. Modpack Creator v1 (§9.5, a fatia honesta)**:
+- **Export**: valida cada fonte DENTRO do workspace (jar em `projects/<slug>/build/libs`, pack em `shaderpacks/`), escreve `modpack.json` (manifest camelCase com generator/createdAt — UTC math sem chrono, mesmo civil-from-days do git.rs) + `mods/*.jar` + árvores `shaderpacks/<pack>/` → `modpacks/<nome>-<versão>.zip`. **Fatos do manifest vêm dos records reais dos projetos** (MC version + loader), nunca inventados.
+- **Import**: aceita SÓ zips com manifest VOXEL, recusa traversal/entradas inesperadas (zip-slip), instala em `instances/<slug>/mods` + `shaderpacks/`.
+- **`modpack_exportable_assets`**: o catálogo verdadeiro para o wizard (jar mais novo por projeto que buildou de verdade, packs que existem).
+- **ModpacksPage** (`/modpacks`, sidebar Package, Topbar, Ctrl+K): export com checkboxes + chips e badge de fatos do manifest; import com file dialog + picker de instância. Badge "v1 scope" honesto: resolução de dependências externas (Modrinth/CurseForge) e Compatibility Score são a próxima fatia — o manifest já carrega os fatos.
+
+**Bugs caçados**: (1) syntax error de parede no teste (parêntese do vec!) — cargo pegou na hora; (2) `<name>-<version>` literal dentro de JSX (parser engoliu como tags) — escapado como string; (3) `openInFileManager` recebe 1 arg; (4) icon de lucide `Package` faltando no import do CommandPalette; (5) o manifesto "from-manifest/workspace" que eu mesmo escrevi era desonesto — substituído pelos fatos reais dos projetos ANTES de commitar.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (24 warns família) · **vitest 55/55** ✓ · **cargo 40/40** (+4 modpack) · vite build 2m06s ✓ · boot vivo 0 panics ✓. Release v0.3.6.
+
+**Estado pós-sessão**: templates com arte de verdade; modpacks exportam/importam de ponta a ponta com manifest. Próximos naturais: dependências externas + Compatibility Score no Modpack Creator, Asset Studio (§9.6) com o mesmo pipeline de sprites, secure-store/biometria mobile (§59).
