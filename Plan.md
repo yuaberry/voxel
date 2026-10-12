@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (22 sessões)
+## 5. Histórico de sessões (23 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 23 | Router + Notifications + NeoForge Moderno | **Model Router por fase** (phaseModels, provider/key global) + **desktop notifications** (plugin-notification 2.6.0 same-minor; build exit + fim da task force; no-op honesto sem permissão) + **template NeoGradle 7** (repo oficial neoforged/MDK@1.20.2; 1.20.2-1.21.1 incl. LTS; wizard escolhe a era) + **E2E 4/4** + v0.3.5 | permission é `notification:` (singular); `registerItem(String, Function<Props,Item>)` é a assinatura 20.2 (Supplier não existe); `register()` retorna DeferredHolder |
 
 ## 6. Decisões-chave (respeitar SEMPRE)
 
@@ -238,18 +239,18 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 22, v0.3.4)
+## 8. Estado atual (verificado — Sessão 23, v0.3.5)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (35) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (52) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Rust unit (36) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Vitest (55) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
 | E2E SLP multi-server | ✅ Hypixel + CubeCraft + **Minemen via SRV** (reprodução do bug do dono) |
-| **E2E compilação ×3 loaders** | ✅ **fabric 158s · forge 339s · neoforge 170s — todos produzem dark_kingdom-0.1.0.jar real** (Sessão 22) |
+| **E2E compilação ×4 templates** | ✅ **fabric 158s · forge 339s · neo-legacy 170s · neo-modern 854s — todos produzem dark_kingdom-0.1.0.jar real** (Sessões 22-23) |
 | Typecheck / ESLint | ✅ 0 errors (warns set-state-in-effect = backlog família conhecida) |
 | Mobile typecheck | ✅ `pnpm --filter @voxel/mobile typecheck` (CI verde) |
 | Vite build | ✅ resolve @voxel/core via workspace |
@@ -258,7 +259,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.3.4 (latest)** | Desktop: **templates Forge + NeoForge + wizard 3 loaders** + APK mobile 0.2.0 replicado |
+| **v0.3.5 (latest)** | Desktop: **NeoForge moderno (1.20.2-1.21.1) + Model Router por fase + desktop notifications** + APK mobile 0.2.0 replicado |
+| v0.3.4 | Desktop: templates Forge + NeoForge + wizard 3 loaders |
 | v0.3.3 | Desktop: NIM, model picker, SRV, Launcher, temas, ~/Voxel, CSP, live preview, **Task force** |
 | v0.3.2 | Bridge multimodal + PWA iOS + APK 0.2.0 |
 | v0.3.1 / v0.3.0 / v0.2.0 / v0.1.x | histórico — desktop com Bridge, skin Next, rebrand, multi-OS original |
@@ -272,8 +274,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 35 unit
-cargo test -- --ignored --nocapture # 6 E2E (compilação fabric/forge/neoforge, launcher, server, SLP real)
+cd src-tauri && cargo test          # 36 unit
+cargo test -- --ignored --nocapture # 7 E2E (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
 ```
@@ -285,9 +287,9 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ## 9. Roadmap pós-MVP (priorizado — o que ainda pode ser construído)
 
-1. ~~Forge & NeoForge templates~~ → **ENTREGUE (Sessão 22)**: os três loaders compilam jar real (E2E). Próximo natural do braço Java: MDK NeoForge 20.2+ (NeoGradle, neoforge.mods.toml) — pipeline diferente
-2. **Model Router por fase** (§66) — a Task force já existe; falta o setting para escolher modelo por agente (Architect forte, Reviewer rápido)
-3. **Push notifications** (§62) — desktop nativo + mobile; agora com a Task force, "AI terminou uma tarefa" ganhou sentido
+1. ~~Forge & NeoForge templates~~ → **ENTREGUE (Sessões 22-23)**: os quatro templates compilam jar real (E2E), incluindo a era NeoGradle 7 (1.20.2-1.21.1). Próximo natural do braço Java: era ModDevGradle (1.21.4+) quando for a hora
+2. ~~Model Router por fase~~ → **ENTREGUE (Sessão 23)**: phaseModels por fase, provider/key global (multi-key por provider = extensão futura honesta)
+3. ~~Push notifications (desktop)~~ → **ENTREGUE (Sessão 23)**: build exit + fim da task force, com permissão honesta. Mobile push = ainda futuro (precisa Expo notifications + backend)
 4. **Mobile polish** (§59) — secure-store do token, biometria, APK com keystore de release (Play Store), TestFlight quando houver conta Apple
 5. **Modpack Creator** — seleção de mods, resolução de dependências, export/import, Compatibility Score
 6. **Resource Pack / World / Structure Studios** — Asset Studio (§19), geradores
@@ -307,6 +309,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 - ✅ 7 accents + micro-motion + ~/Voxel + migration + CSP real — Sessão 21
 - ✅ Site premium + GitHub Pages + repo público + releases multi-OS — Sessões 14/17
 - ✅ Templates Forge + NeoForge (MDKs oficiais, E2E 3/3) — Sessão 22
+- ✅ NeoForge Moderno NeoGradle 7 (repo oficial, E2E 4/4) + Model Router (§66) + Desktop notifications (§62) — Sessão 23
 
 ## 10. Regras de operação com o dono
 
@@ -426,7 +429,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 22 — era dos três loaders: templates Forge e NeoForge derivados dos MDKs OFICIAIS (pesquisa empírica: NeoForge 1.20.1 = drop-in do Forge 47.x, artifact net.neoforged:forge userdev verificado 200). E2E REAL 3/3 (fabric 158s, forge 339s, neoforge 170s — todos compilam jar). Wizard com chips por loader + disponibilidade viva. 52/52 vitest + 35/35 cargo. Release v0.3.4.*
+*Última atualização: Sessão 23 — Model Router por fase (§66), Push Notifications (§62) e o quarto template: NeoForge Moderno (NeoGradle 7, 1.20.2-1.21.1, derivado do repo oficial neoforged/MDK). E2E REAL 4/4 (fabric/forge/neo-legacy/neo-modern compilam jar). 55/55 vitest + 36/36 cargo. Release v0.3.5.*
 
 ---
 
@@ -606,3 +609,25 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: typecheck ✓ · lint 0 errors (23 warns família) · **vitest 52/52** (+5: availability + maven ranges) · **cargo 35/35** (+2 renders) · **E2E 3/3 compilação real** ✓ · vite build 2m16s ✓ · boot vivo 0 panics ✓. Release v0.3.4.
 
 **Estado pós-sessão**: criar mod para Fabric, Forge ou NeoForge 1.20.1-1.21.1 funciona de ponta a ponta (wizard → template → gradle → jar). Próximos naturais: Model Router por fase (§66), push notifications (§62), NeoForge 20.2+ MDK (NeoGradle), Quilt?, Modpack Creator (§9.5).
+
+---
+
+## 23. Sessão 23 — Model Router + Push Notifications + NeoForge Moderno
+
+**Pedido do dono**: "sim continue com tudo. verifique erros e corrija." → os três próximos naturais do roadmap §9 em uma sessão, com bateria de erros.
+
+**1. Model Router por fase (§66)**: `AiSettings.phaseModels {architect,developer,reviewer}` (persistido, default vazio p/ installs existentes) + `phaseModelFor()` no orchestrator (troca SÓ o model id — provider/key/sampling ficam globais; o app guarda uma key só, e multi-provider-per-fase ficaria desonesto sem keys múltiplas). UI: grid de 3 campos em Settings→AI com datalist da lista viva de modelos (o model principal ganhou o mesmo datalist).
+
+**2. Push Notifications (§62)**: `tauri-plugin-notification` crate 2.6.0 = npm 2.6.0 (same-minor, lição sessão 14). Dois momentos honestos: build exit ("Build succeeded/failed" + exit code) e fim de run de agente/task force (writes ou preview). `notifyDesktop()` pede permissão uma vez e degrada para no-op silencioso se negada. Capability: `notification:default` (least privilege).
+
+**3. NeoForge Moderno — o quarto template**: derivado da branch oficial `neoforged/MDK@1.20.2` (o repo `neoforged/NeoForgeMDKs` NÃO existe; o `neoforge-*-mdk.zip` NÃO existe no maven — a fonte real é o repo MDK). NeoGradle 7.0.116 userdev + artifact `net.neoforged:neoforge` (20.2.93 = a versão exata do MDK) + NeoForm pipeline + mods.toml com dependency `modId="neoforge"` + API `DeferredRegister.Items`. Wizard escolhe a era certa: 1.20.1→template drop-in; **1.20.2-1.21.1 (incluindo a LTS 21.1)→moderno**; 1.21.4+ honestamente fora até embedar o MDK da era.
+
+**Bugs caçados (4)**:
+- `notifications:default` NÃO existe — o permission é `notification:` (singular). O erro do build do Tauri listou os válidos; fix na capability.
+- API 20.2: `DeferredRegister.Items.registerItem(String, Supplier)` não existe — a assinatura real é `(String, Function<Item.Properties, Item>)`. Pego pelo E2E (compileJava FAILED), corrigido no template, re-provado.
+- API 20.2: `DeferredRegister.register(...)` retorna `DeferredHolder`, não `DeferredRegister<T>`. Idem — E2E pescou, fix, re-run.
+- Teste de render usava `mc_version` do sample (1.20.1) mas esperava 1.20.2 — bug do teste, não do template.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (23 warns família) · **vitest 55/55** (+3: router + eras NeoForge + cobertura forge) · **cargo 36/36** (+1 render) · **E2E REAL: neoforge-modern dark_kingdom jar com neoforge:20.2.93 (854s, NeoForm decompile completo)** — 4/4 templates E2E (fabric 158s, forge 339s, neo-legacy 170s, neo-modern 854s) · vite build 1m56s ✓ · boot vivo 0 panics ✓. Release v0.3.5.
+
+**Estado pós-sessão**: 4 templates de projeto, todos com prova de compilação real. Task force com model routing. Desktop notifications nos dois momentos que importam. Próximos naturais: Modpack Creator (§9.5), secure-store/biometria mobile (§59), ModDevGradle era (1.21.4+) quando for a hora, keys por provider no Router.
