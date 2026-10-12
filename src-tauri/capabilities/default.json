@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "VOXEL default capabilities \u2014 least privilege set for Phase 0",
+  "description": "VOXEL default capabilities — least privilege set for Phase 0",
   "windows": [
     "main"
   ],
@@ -74,6 +74,7 @@
           "url": "https://api.github.com/*"
         }
       ]
-    }
+    },
+    "notification:default"
   ]
 }

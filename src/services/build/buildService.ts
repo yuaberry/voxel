@@ -4,6 +4,7 @@ import type { ProjectRecord } from "@/types";
 import { detectEnvironment } from "@/services/environment/environmentService";
 import { readProjectFile } from "@/services/projects/projectsService";
 import { updateProjectBuildStatus } from "@/services/db/repositories/projectsRepository";
+import { notifyDesktop } from "@/services/notifications/notificationService";
 
 /**
  * Build Service (Fase 4) — real gradle processes, streamed through Rust
@@ -147,6 +148,12 @@ export async function runBuild(
           run.exitCode = payload.code;
           run.status = payload.success ? "success" : "failed";
           onLine(run);
+          // Desktop ping (briefing §62) — the build ends while the user is
+          // elsewhere; a no-op without OS permission.
+          void notifyDesktop(
+            payload.success ? "Build succeeded" : "Build failed",
+            `${project.name} — exit code ${payload.code ?? "n/a"}`,
+          );
           resolveTop();
         },
       ).then((fn) => {

@@ -23,6 +23,7 @@ import {
   loadProjectContext,
   type ProjectContext,
 } from "@/services/ai/contextService";
+import { notifyDesktop } from "@/services/notifications/notificationService";
 import { runAgent, runAgentTaskForce } from "@/services/ai/agent/orchestrator";
 import {
   setReferenceStorageBase,
@@ -393,6 +394,14 @@ export function AiCreatorPage() {
               description: "Review the diff in the Changes tab.",
             });
           }
+          // Desktop ping (briefing §62) — long task-force runs end while
+          // the user is in another tab.
+          void notifyDesktop(
+            multiAgent ? "Task force finished" : "Agent finished",
+            result.writes > 0
+              ? `${result.writes} file operation(s) applied to ${project?.name ?? "your project"}`
+              : result.text.trim().slice(0, 120) || "Run complete",
+          );
         }
       } catch (error) {
         toast.error("Agent run failed", { description: String(error) });
