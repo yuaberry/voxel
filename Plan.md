@@ -422,7 +422,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 21 (refresh de compactação) — 21 sessões na tabela §5, §8 espelhando v0.3.3 (47 vitest + 33 cargo + 4 E2E), roadmap §9 com os entregues riscados. Release v0.3.3 com 7/7 downloads 206 (desktop 6 + APK 0.2.0) + PWA iOS no Bridge. Task force multi-agent entregue. Próximos naturais: Forge/NeoForge templates, Model Router por fase, push notifications.*
+*Última atualização: Sessão 22 — era dos três loaders: templates Forge e NeoForge derivados dos MDKs OFICIAIS (pesquisa empírica: NeoForge 1.20.1 = drop-in do Forge 47.x, artifact net.neoforged:forge userdev verificado 200). E2E REAL 3/3 (fabric 158s, forge 339s, neoforge 170s — todos compilam jar). Wizard com chips por loader + disponibilidade viva. 52/52 vitest + 35/35 cargo. Release v0.3.4.*
 
 ---
 
@@ -575,3 +575,30 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: typecheck ✓ · lint 0 errors ✓ · **vitest 47/47** ✓ · **cargo 33/33** ✓ (+E2E SLP 3 servidores reais) · vite build ✓ · **boot vivo com CSP e 0 violações** ✓. Release v0.3.3.
 
 **Estado pós-sessão**: ver relatório feito/falta. Próximos: Forge/NeoForge templates (§22), push notifications (§62), keystore release Play Store, TestFlight, Model Router por fase (§66).
+
+---
+
+## 22. Sessão 22 — Forge & NeoForge Templates: a era dos três loaders
+
+**Pedido do dono**: "Leia Plan.md e continue." → roadmap §9.1: "o Version Adapter já mapeia versões; faltam templates Java análogos ao fabric-1.20.1".
+
+**Pesquisa empírica (nada inventado)**:
+- **Forge 1.20.1 MDK** baixado do maven OFICIAL (`forge-1.20.1-47.4.10-mdk.zip`) e estudado: ForgeGradle 6, mappings official, wrapper Gradle 8.8 (igual ao fabric!), mods.toml com `${}` expand via processResources.
+- **NeoForge 1.20.1**: o MDK deles NÃO existe como mdk.zip; descoberta empírica — a linha 1.20.1 é um **drop-in do Forge 47.x**: `net.neoforged:forge:1.20.1-47.1.104` com classifier `userdev` e `universal` resolve HTTP 200 no maven NeoForged (o `neoforge:47.1.104` NÃO existe), e o universal.jar real declara `modId="forge"` → dependency `[47,)` nos dois loaders. NeoForge 20.2+ (MC 1.20.2+) é outro MDK — honestamente fora do escopo deste template.
+
+**Entregue**:
+1. **`forge-1.20.1-mod`** (35 arquivos embedded): build.gradle FG6 completo (runs client/server/gameTestServer/data, reobfJar, publishing), settings.gradle com pluginManagement do maven do Forge + foojay, `@Mod` + `ModItems` com `DeferredRegister`/`ForgeRegistries`/`SwordItem Tiers.NETHERITE` + CreativeModeTab própria, mods.toml Maven ranges, pack.mcmeta factual, assets/data reusados (darksteel_sword), `.voxel/` completo sem fabric-api.
+2. **`neoforge-1.20.1-mod`**: mesmo pipeline FG6 + `repositories { maven.neoforged.net/releases }` + `minecraft "net.neoforged:forge:${mc}-${loader}"`.
+3. **Engine**: tokens `{{LOADER_ID}}` + `{{PACK_FORMAT}}`; payload `loader` + `packFormat`; **create_project recusa template↔loader inconsistente** (defense in depth p/ client stale) e packFormat=0.
+4. **Catalog/wizard**: `resolveTemplateParams(version, loader)` — loaderVersion do braço certo, SemVer (fabric) vs Maven ranges (Java), pack formats factuais (15→34 p/ 1.20.1→1.21.1), `isLoaderAvailable` com honestidade (NeoForge só 1.20.1), templateId por loader; **wizard com chips Fabric/Forge/NeoForge** + badges loader/mappings/pack format + hint NeoForge 20.2+.
+5. **E2E REAL executado**: os TRÊS loaders compilam `dark_kingdom-0.1.0.jar` de verdade — fabric 158s, **forge 339s** (decompile MC completo), **neoforge 170s** (artifact NeoForged resolvido). 6 E2E ignored no total.
+
+**Bugs caçados** (4):
+- Wrapper files do template na raiz (glob do cp mal direcionado) → `gradle-wrapper.properties` não encontrado no 1º run do Forge. Fix na origem + embed regenerado.
+- `#` não é comentário em Groovy → settings.gradle não compilava ("Unexpected character '#'"). Fix `//`.
+- **Operacional (3ª tentativa, causa raiz achada)**: `pkill -f "tauri dev"` faz **self-match do próprio shell** (o comando contém a string) → shell se mata → timeout aparente do tool. Fix: pattern com classe de caracteres (`"tauri de[v]"`). Aprendizado permanente.
+- pnpm typecheck: ProjectLoader já existia em types (linha 64) — reuso, sem duplicar.
+
+**Verificação**: typecheck ✓ · lint 0 errors (23 warns família) · **vitest 52/52** (+5: availability + maven ranges) · **cargo 35/35** (+2 renders) · **E2E 3/3 compilação real** ✓ · vite build 2m16s ✓ · boot vivo 0 panics ✓. Release v0.3.4.
+
+**Estado pós-sessão**: criar mod para Fabric, Forge ou NeoForge 1.20.1-1.21.1 funciona de ponta a ponta (wizard → template → gradle → jar). Próximos naturais: Model Router por fase (§66), push notifications (§62), NeoForge 20.2+ MDK (NeoGradle), Quilt?, Modpack Creator (§9.5).
