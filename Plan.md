@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (21 sessões)
+## 5. Histórico de sessões (22 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -190,6 +190,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 19 | Executáveis mobile | **APK Android real** (build completo 17m, apksigner/aapt, publicado) + pipeline iOS (xcarchive unsigned no CI) + workflow mobile-builds | settings.gradle pnpm paths-trick, nodeLinker hoisted, Metro subpath-exports, SDK removido das runners, ANDROID_SDK_ROOT conflito, xcworkspace nasce do pod install |
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
+| 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
 
 ## 6. Decisões-chave (respeitar SEMPRE)
 
@@ -237,17 +238,18 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 21, v0.3.3)
+## 8. Estado atual (verificado — Sessão 22, v0.3.4)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (33) | ✅ template, ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (47) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset** |
+| Rust unit (35) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Vitest (52) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
 | E2E SLP multi-server | ✅ Hypixel + CubeCraft + **Minemen via SRV** (reprodução do bug do dono) |
+| **E2E compilação ×3 loaders** | ✅ **fabric 158s · forge 339s · neoforge 170s — todos produzem dark_kingdom-0.1.0.jar real** (Sessão 22) |
 | Typecheck / ESLint | ✅ 0 errors (warns set-state-in-effect = backlog família conhecida) |
 | Mobile typecheck | ✅ `pnpm --filter @voxel/mobile typecheck` (CI verde) |
 | Vite build | ✅ resolve @voxel/core via workspace |
@@ -256,7 +258,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| v0.3.3 (latest) | Desktop: NIM, model picker, SRV, Launcher, temas, ~/Voxel, CSP, live preview, **Task force** + **APK mobile 0.2.0 replicado** |
+| **v0.3.4 (latest)** | Desktop: **templates Forge + NeoForge + wizard 3 loaders** + APK mobile 0.2.0 replicado |
+| v0.3.3 | Desktop: NIM, model picker, SRV, Launcher, temas, ~/Voxel, CSP, live preview, **Task force** |
 | v0.3.2 | Bridge multimodal + PWA iOS + APK 0.2.0 |
 | v0.3.1 / v0.3.0 / v0.2.0 / v0.1.x | histórico — desktop com Bridge, skin Next, rebrand, multi-OS original |
 
@@ -269,8 +272,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 33 unit
-cargo test -- --ignored --nocapture # 4 E2E (gradle, launcher, server, SLP real)
+cd src-tauri && cargo test          # 35 unit
+cargo test -- --ignored --nocapture # 6 E2E (compilação fabric/forge/neoforge, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
 ```
@@ -282,7 +285,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ## 9. Roadmap pós-MVP (priorizado — o que ainda pode ser construído)
 
-1. **Forge & NeoForge templates** — o Version Adapter já mapeia versões; faltam templates Java análogos ao fabric-1.20.1 (próximo candidato natural)
+1. ~~Forge & NeoForge templates~~ → **ENTREGUE (Sessão 22)**: os três loaders compilam jar real (E2E). Próximo natural do braço Java: MDK NeoForge 20.2+ (NeoGradle, neoforge.mods.toml) — pipeline diferente
 2. **Model Router por fase** (§66) — a Task force já existe; falta o setting para escolher modelo por agente (Architect forte, Reviewer rápido)
 3. **Push notifications** (§62) — desktop nativo + mobile; agora com a Task force, "AI terminou uma tarefa" ganhou sentido
 4. **Mobile polish** (§59) — secure-store do token, biometria, APK com keystore de release (Play Store), TestFlight quando houver conta Apple
@@ -303,6 +306,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 - ✅ SRV resolution no live import (bug do dono reproduzido e corrigido) — Sessão 21
 - ✅ 7 accents + micro-motion + ~/Voxel + migration + CSP real — Sessão 21
 - ✅ Site premium + GitHub Pages + repo público + releases multi-OS — Sessões 14/17
+- ✅ Templates Forge + NeoForge (MDKs oficiais, E2E 3/3) — Sessão 22
 
 ## 10. Regras de operação com o dono
 
