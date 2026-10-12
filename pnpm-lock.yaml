@@ -177,9 +177,15 @@ importers:
       expo-linking:
         specifier: ~6.3.1
         version: 6.3.1(expo@51.0.39(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(react-native@0.74.5(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.2.79)(react@18.2.0)(supports-color@7.2.0))(react@18.2.0)(supports-color@7.2.0))(supports-color@7.2.0)
+      expo-local-authentication:
+        specifier: ~14.0.1
+        version: 14.0.1(expo@51.0.39(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(react-native@0.74.5(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.2.79)(react@18.2.0)(supports-color@7.2.0))(react@18.2.0)(supports-color@7.2.0))
       expo-router:
         specifier: ~3.5.23
         version: 3.5.24(0c2cf23f27334401c7c1caa553e14963)
+      expo-secure-store:
+        specifier: ~13.0.2
+        version: 13.0.2(expo@51.0.39(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(react-native@0.74.5(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.2.79)(react@18.2.0)(supports-color@7.2.0))(react@18.2.0)(supports-color@7.2.0))
       expo-status-bar:
         specifier: ~1.12.1
         version: 1.12.1
@@ -3386,6 +3392,11 @@ packages:
   expo-linking@6.3.1:
     resolution: {integrity: sha512-xuZCntSBGWCD/95iZ+mTUGTwHdy8Sx+immCqbUBxdvZ2TN61P02kKg7SaLS8A4a/hLrSCwrg5tMMwu5wfKr35g==}
 
+  expo-local-authentication@14.0.1:
+    resolution: {integrity: sha512-kAwUD1wEqj1fhwQgIHlP4H/JV9AcX+NO3BJwhPM2HuCFS0kgx2wvcHisnKBSTRyl8u5Jt4odzMyQkDJystwUTg==}
+    peerDependencies:
+      expo: '*'
+
   expo-modules-autolinking@1.11.3:
     resolution: {integrity: sha512-oYh8EZEvYF5TYppxEKUTTJmbr8j7eRRnrIxzZtMvxLTXoujThVPMFS/cbnSnf2bFm1lq50TdDNABhmEi7z0ngQ==}
     hasBin: true
@@ -3412,6 +3423,11 @@ packages:
         optional: true
       react-native-reanimated:
         optional: true
+
+  expo-secure-store@13.0.2:
+    resolution: {integrity: sha512-3QYgoneo8p8yeeBPBiAfokNNc2xq6+n8+Ob4fAlErEcf4H7Y72LH+K/dx0nQyWau2ZKZUXBxyyfuHFyVKrEVLg==}
+    peerDependencies:
+      expo: '*'
 
   expo-splash-screen@0.27.7:
     resolution: {integrity: sha512-s+eGcG185878nixlrjhhLD6UDYrvoqBUaBkIEozBVWFg3pkdsKpONPiUAco4XR3h7I/9ODq4quN28RJLFO+s0Q==}
@@ -10222,6 +10238,11 @@ snapshots:
       - expo
       - supports-color
 
+  expo-local-authentication@14.0.1(expo@51.0.39(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(react-native@0.74.5(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.2.79)(react@18.2.0)(supports-color@7.2.0))(react@18.2.0)(supports-color@7.2.0)):
+    dependencies:
+      expo: 51.0.39(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(react-native@0.74.5(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.2.79)(react@18.2.0)(supports-color@7.2.0))(react@18.2.0)(supports-color@7.2.0)
+      invariant: 2.2.4
+
   expo-modules-autolinking@1.11.3:
     dependencies:
       chalk: 4.1.2
@@ -10260,6 +10281,10 @@ snapshots:
       - react-native
       - supports-color
       - typescript
+
+  expo-secure-store@13.0.2(expo@51.0.39(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(react-native@0.74.5(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.2.79)(react@18.2.0)(supports-color@7.2.0))(react@18.2.0)(supports-color@7.2.0)):
+    dependencies:
+      expo: 51.0.39(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(react-native@0.74.5(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.2.79)(react@18.2.0)(supports-color@7.2.0))(react@18.2.0)(supports-color@7.2.0)
 
   expo-splash-screen@0.27.7(expo-modules-autolinking@1.11.3)(expo@51.0.39(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(react-native@0.74.5(@babel/core@7.29.7(supports-color@7.2.0))(@babel/preset-env@7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0))(@types/react@18.2.79)(react@18.2.0)(supports-color@7.2.0))(react@18.2.0)(supports-color@7.2.0))(supports-color@7.2.0):
     dependencies:
