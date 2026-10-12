@@ -8,11 +8,13 @@ import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from "react
 import { router } from "expo-router";
 import { bridge, BridgeStatus, BridgeServer } from "../../src/lib/bridge";
 import { useConnection } from "../../src/lib/store";
+import { useBiometricGate } from "../../src/lib/biometricGate";
 import { colors } from "../../src/theme";
 import { Badge, Card, SectionTitle, Stat, StatusDot, VButton } from "../../src/components/ui";
 
 export default function Home() {
   const connection = useConnection((s) => s.connection);
+  const gate = useBiometricGate(!!connection);
   const [status, setStatus] = useState<BridgeStatus | null>(null);
   const [servers, setServers] = useState<BridgeServer[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,6 +40,26 @@ export default function Home() {
     const interval = setInterval(() => void load(), 5000);
     return () => clearInterval(interval);
   }, [load]);
+
+  if (gate.state === "locked" || gate.state === "checking") {
+    return (
+      <View style={styles.center}>
+        <Card style={{ width: "92%" }}>
+          <Text style={styles.title}>VOXEL is locked</Text>
+          <Text style={styles.hint}>
+            Your PC pairing is stored securely. Unlock with Face / Touch
+            to use VOXEL on this device.
+          </Text>
+          <VButton
+            onPress={() => void gate.unlock()}
+            disabled={gate.state === "checking"}
+          >
+            {gate.state === "checking" ? "Checking…" : "Unlock"}
+          </VButton>
+        </Card>
+      </View>
+    );
+  }
 
   if (!connection) {
     return (
