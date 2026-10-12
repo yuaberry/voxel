@@ -4,6 +4,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Home,
+  Package,
   Rocket,
   Settings,
   Sparkles,
@@ -33,6 +34,7 @@ interface NavItem {
 const workspaceItems: NavItem[] = [
   { to: "/", label: "Home", icon: Home, enabled: true },
   { to: "/launcher", label: "Launcher", icon: Rocket, enabled: true },
+    { to: "/modpacks", label: "Modpacks", icon: Package, enabled: true },
   { to: "/projects", label: "Projects", icon: Boxes, enabled: true },
   { to: "/ai-creator", label: "AI Creator", icon: Sparkles, enabled: true },
   { to: "/shaders", label: "Shaders", icon: Palette, enabled: true },

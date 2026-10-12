@@ -12,6 +12,7 @@ const ROUTE_LABELS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /^\/$/, label: "Home" },
   { pattern: /^\/projects\/[^/]+/, label: "Workspace / Project" },
   { pattern: /^\/launcher/, label: "Workspace / Launcher" },
+    { pattern: /^\/modpacks/, label: "Workspace / Modpacks" },
   { pattern: /^\/projects/, label: "Workspace / Projects" },
   { pattern: /^\/ai-creator/, label: "Workspace / AI Creator" },
   { pattern: /^\/shaders/, label: "Workspace / Shaders" },

@@ -4,6 +4,7 @@ pub mod fs;
 pub mod github;
 pub mod git;
 pub mod launcher;
+pub mod modpack;
 pub mod process;
 pub mod projects;
 pub mod ledger;
