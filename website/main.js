@@ -93,7 +93,7 @@
     windows: `${PKG}_${VERSION}_x64-setup.exe`,
     macos: `${PKG}_${VERSION}_aarch64.dmg`,
     linux: `${PKG}_${VERSION}_amd64.AppImage`,
-    android: "VOXEL-mobile-0.1.0-android.apk",
+    android: "VOXEL-mobile-0.3.0-android.apk",
   };
   if (heroLabel) heroLabel.textContent = osLabels[os];
   if (heroBtn) heroBtn.href = RELEASE_BASE + osCards[os];
