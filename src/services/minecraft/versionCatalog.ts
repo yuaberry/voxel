@@ -4,7 +4,7 @@ import type {
   MinecraftVersionInfo,
   McVersionKind,
 } from "@/types/catalog";
-import type { CreateProjectRequest } from "@/types";
+import type { CreateProjectRequest, ProjectLoader } from "@/types";
 import { getDb } from "@/services/db/client";
 
 /**
@@ -482,8 +482,12 @@ export async function getVersion(version: string): Promise<MinecraftVersionInfo 
 }
 
 /**
- * Resolves the full template parameters for a Minecraft version.
+ * Resolves the full template parameters for a Minecraft version + loader.
  * Guaranteed to return usable values (catalog -> fallback chain).
+ *
+ * Dependency formats differ by loader (honest to each ecosystem):
+ *  - fabric:        SemVer-ish tilde ("~1.20.1") in fabric.mod.json
+ *  - forge/neoforge: Maven ranges ("[1.20.1,1.21)") in mods.toml
  */
 export interface TemplateParams {
   minecraftVersion: string;
@@ -494,36 +498,119 @@ export interface TemplateParams {
   loaderMin: string;
   fabricApiVersion: string;
   mcDepends: string;
+  packFormat: number;
+  templateId: string;
   experimental: boolean;
+}
+
+/** Resource/data pack format per MC version (factual, from the game). */
+const PACK_FORMATS: Record<string, number> = {
+  "1.20.1": 15,
+  "1.20.2": 18,
+  "1.20.3": 22,
+  "1.20.4": 22,
+  "1.20.5": 32,
+  "1.20.6": 32,
+  "1.21": 34,
+  "1.21.1": 34,
+};
+
+/**
+ * The ForgeGradle-6 MDK (mods.toml + javafml) covers Forge 47-52, i.e.
+ * 1.20.1-1.21.1. The NeoForge template covers the 1.20.1 lineage only
+ * (net.neoforged:forge 47.1.x); 20.2+ switched to a different MDK.
+ */
+function loaderAvailable(
+  info: MinecraftVersionInfo,
+  loader: ProjectLoader,
+): boolean {
+  switch (loader) {
+    case "fabric":
+      return info.loaders.includes("fabric");
+    case "forge":
+      return info.loaders.includes("forge") && !!info.forge;
+    case "neoforge":
+      return info.version === "1.20.1" && !!info.neoforge;
+  }
+}
+
+/** Availability probe for the wizard's loader chips. */
+export function isLoaderAvailable(
+  info: Pick<MinecraftVersionInfo, "version" | "loaders" | "forge" | "neoforge">,
+  loader: ProjectLoader,
+): boolean {
+  return loaderAvailable(info as MinecraftVersionInfo, loader);
+}
+
+/** Maven range for mods.toml: [current, next minor). */
+export function mavenRangeFor(version: string): string {
+  const parts = version.split(".");
+  if (parts.length < 2) return `[${version},)`;
+  const nextMinor = Number(parts[1]) + 1;
+  return `[${version},${parts[0]}.${nextMinor})`;
 }
 
 export async function resolveTemplateParams(
   version: string,
+  loader: ProjectLoader = "fabric",
 ): Promise<TemplateParams> {
   const info = (await getVersion(version)) ?? FALLBACK_CATALOG[0];
   const fallback = FALLBACK_CATALOG[0];
   const kind = info.kind;
   const yarn = info.fabric?.yarn ?? null;
-  const loaderVersion = info.fabric?.loader ?? fallback.fabric!.loader;
-  const loaderMin = `>=${loaderVersion.split(".").slice(0, 2).join(".")}.0`;
+
+  if (!loaderAvailable(info, loader)) {
+    throw new Error(
+      `Loader "${loader}" is not available for Minecraft ${info.version}`,
+    );
+  }
+
+  // Per-loader version resolution — all from the live catalog.
+  const loaderVersion =
+    loader === "fabric"
+      ? (info.fabric?.loader ?? fallback.fabric!.loader)
+      : loader === "forge"
+        ? (info.forge?.recommended ?? fallback.forge!.recommended)
+        : (info.neoforge?.latest ?? fallback.neoforge!.latest);
+
+  // fabric: ">=0.16.0" (SemVer); forge/neoforge: "[47,)" (Maven).
+  const loaderMin =
+    loader === "fabric"
+      ? `>=${loaderVersion.split(".").slice(0, 2).join(".")}.0`
+      : `[${loaderVersion.split(".")[0]},)`;
+
+  const mcDepends =
+    loader === "fabric"
+      ? mcDependsFor(info.version, kind)
+      : mavenRangeFor(info.version);
+
   return {
     minecraftVersion: info.version,
     javaRelease: info.javaRelease,
-    yarnMappings: yarn,
-    mappingsLine: yarn
-      ? `mappings "net.fabricmc:yarn:${yarn}:v2"`
-      : "mappings loom.officialMojangMappings()",
+    yarnMappings: loader === "fabric" ? yarn : null,
+    mappingsLine:
+      loader === "fabric"
+        ? yarn
+          ? `mappings "net.fabricmc:yarn:${yarn}:v2"`
+          : "mappings loom.officialMojangMappings()"
+        : "mappings channel: 'official'",
     loaderVersion,
     loaderMin,
-    fabricApiVersion: info.fabric?.fabricApi ?? fallback.fabric!.fabricApi,
-    mcDepends: mcDependsFor(info.version, kind),
-    experimental: info.experimental,
+    fabricApiVersion:
+      loader === "fabric"
+        ? (info.fabric?.fabricApi ?? fallback.fabric!.fabricApi)
+        : "",
+    mcDepends,
+    packFormat: PACK_FORMATS[info.version] ?? PACK_FORMATS["1.20.1"],
+    templateId: `${loader}-1.20.1-mod`,
+    experimental: isExperimental(info.version, kind),
   };
 }
 
 /** Builds the Rust create_project payload fields for a version. */
 export function templateParamsToPayload(
   params: Awaited<ReturnType<typeof resolveTemplateParams>>,
+  loader: ProjectLoader,
 ): Pick<
   CreateProjectRequest,
   | "minecraftVersion"
@@ -534,6 +621,8 @@ export function templateParamsToPayload(
   | "loaderMin"
   | "fabricApiVersion"
   | "mcDepends"
+  | "loader"
+  | "packFormat"
 > {
   return {
     minecraftVersion: params.minecraftVersion,
@@ -544,5 +633,7 @@ export function templateParamsToPayload(
     loaderMin: params.loaderMin,
     fabricApiVersion: params.fabricApiVersion,
     mcDepends: params.mcDepends,
+    loader,
+    packFormat: params.packFormat,
   };
 }

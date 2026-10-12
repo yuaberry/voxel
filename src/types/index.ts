@@ -102,6 +102,10 @@ export interface CreateProjectRequest {
   loaderMin: string;
   fabricApiVersion: string;
   mcDepends: string;
+  // Loader identity (fabric | forge | neoforge) — must agree with `template`
+  loader: ProjectLoader;
+  // pack.mcmeta pack_format the template declares (15 for 1.20.1)
+  packFormat: number;
 }
 
 export interface CreateProjectResult {

@@ -76,7 +76,7 @@ export default function App() {
               "The VOXEL example project — a dark medieval sword, recipe and advancement to build upon.",
             license: settings.general.defaultLicense,
             author: settings.general.authorName || "VOXEL",
-            ...templateParamsToPayload(params),
+            ...templateParamsToPayload(params, "fabric"),
           });
           projectPath = result.projectPath;
         } catch (error) {

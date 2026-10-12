@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -37,11 +38,18 @@ import {
 import {
   ensureCatalog,
   getVersions,
+  isLoaderAvailable,
   resolveTemplateParams,
   templateParamsToPayload,
 } from "@/services/minecraft/versionCatalog";
 import type { MinecraftVersionInfo } from "@/types/catalog";
-import type { ProjectRecord } from "@/types";
+import type { ProjectLoader, ProjectRecord } from "@/types";
+
+const LOADERS: { id: ProjectLoader; label: string; hint: string }[] = [
+  { id: "fabric", label: "Fabric", hint: "Lightweight, fast updates — Fabric Loom template" },
+  { id: "forge", label: "Forge", hint: "The classic ecosystem — ForgeGradle 6 template (1.20.1-1.21.1)" },
+  { id: "neoforge", label: "NeoForge", hint: "The modern Forge successor — 1.20.1 lineage template" },
+];
 
 const LICENSES = ["MIT", "Apache-2.0", "GPL-3.0", "LGPL-3.0", "Custom", "Proprietary"];
 
@@ -63,6 +71,7 @@ export function CreateProjectWizard() {
   const [versions, setVersions] = useState<MinecraftVersionInfo[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [mcVersion, setMcVersion] = useState<string>(settings.minecraft.defaultVersion);
+  const [loader, setLoader] = useState<ProjectLoader>("fabric");
   const [resolved, setResolved] = useState<Awaited<ReturnType<typeof resolveTemplateParams>> | null>(
     null,
   );
@@ -100,9 +109,26 @@ export function CreateProjectWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  const selectedInfo = useMemo(
+    () => versions.find((v) => v.version === mcVersion) ?? null,
+    [versions, mcVersion],
+  );
+
+  // Loaders the selected version actually supports (live catalog data).
+  // NeoForge is honest: only the 1.20.1 lineage has this template for now.
+  const loaderOptions = useMemo(
+    () => LOADERS.filter((l) => !selectedInfo || isLoaderAvailable(selectedInfo, l.id)),
+    [selectedInfo],
+  );
+
+  // If the current loader is unavailable on the new version, fall back.
+  const activeLoader = loaderOptions.some((l) => l.id === loader)
+    ? loader
+    : (loaderOptions[0]?.id ?? "fabric");
+
   useEffect(() => {
     let cancelled = false;
-    resolveTemplateParams(mcVersion)
+    resolveTemplateParams(mcVersion, activeLoader)
       .then((params) => {
         if (!cancelled) setResolved(params);
       })
@@ -112,7 +138,7 @@ export function CreateProjectWizard() {
     return () => {
       cancelled = true;
     };
-  }, [mcVersion]);
+  }, [mcVersion, activeLoader]);
 
   const releases = useMemo(
     () => versions.filter((v) => v.kind === "release").slice(0, 40),
@@ -122,11 +148,6 @@ export function CreateProjectWizard() {
     () => versions.filter((v) => v.kind === "snapshot").slice(0, 8),
     [versions],
   );
-  const selectedInfo = useMemo(
-    () => versions.find((v) => v.version === mcVersion) ?? null,
-    [versions, mcVersion],
-  );
-
   const slug = useMemo(() => slugify(name), [name]);
   const modId = useMemo(() => toModId(slug), [slug]);
   const modIdClass = useMemo(() => toPascalCase(modId), [modId]);
@@ -154,14 +175,14 @@ export function CreateProjectWizard() {
         storageBase: basePath,
         slug,
         name: name.trim(),
-        template: "fabric-1.20.1-mod",
+        template: resolved.templateId,
         modId,
         modIdClass,
         package: javaPackage,
         description: description.trim(),
         license,
         author: author.trim(),
-        ...templateParamsToPayload(resolved),
+        ...templateParamsToPayload(resolved, activeLoader),
       });
 
       const now = new Date().toISOString();
@@ -171,7 +192,7 @@ export function CreateProjectWizard() {
         slug,
         type: "mod",
         minecraft_version: resolved.minecraftVersion,
-        loader: "fabric",
+        loader: activeLoader,
         description: description.trim() || null,
         license,
         path: result.projectPath,
@@ -285,23 +306,67 @@ export function CreateProjectWizard() {
             {resolved && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
                 <Badge variant="secondary">Java {resolved.javaRelease}</Badge>
-                {selectedInfo?.fabric && (
-                  <>
-                    <Badge variant="outline">loader {resolved.loaderVersion}</Badge>
-                    <Badge variant="outline">
-                      {resolved.yarnMappings
-                        ? `yarn ${resolved.yarnMappings}`
-                        : "official Mojang mappings"}
-                    </Badge>
-                    <Badge variant="outline">fabric-api {resolved.fabricApiVersion}</Badge>
-                  </>
+                <Badge variant="outline">loader {resolved.loaderVersion}</Badge>
+                <Badge variant="outline">
+                  {resolved.yarnMappings
+                    ? `yarn ${resolved.yarnMappings}`
+                    : "official Mojang mappings"}
+                </Badge>
+                {activeLoader === "fabric" && (
+                  <Badge variant="outline">fabric-api {resolved.fabricApiVersion}</Badge>
                 )}
+                <Badge variant="outline">pack format {resolved.packFormat}</Badge>
                 {resolved.experimental && (
                   <Badge variant="warning">
                     experimental — template targets ≤ 1.21.1; newer APIs may need agent fixes (Phase 4)
                   </Badge>
                 )}
               </div>
+            )}
+          </div>
+
+          {/* Mod loader — availability from the live catalog */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label>Mod loader</Label>
+              <span className="text-[10px] text-muted-foreground">
+                {LOADERS.find((l) => l.id === activeLoader)?.hint}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {LOADERS.map((l) => {
+                const available = loaderOptions.some((o) => o.id === l.id);
+                const active = activeLoader === l.id;
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    disabled={!available}
+                    onClick={() => setLoader(l.id)}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-sm font-medium transition-all",
+                      "active:scale-[0.97]",
+                      active
+                        ? "border-primary bg-primary/15 text-primary shadow-[0_0_12px_rgba(145,85,255,0.25)]"
+                        : "border-border bg-card/50 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                      !available && "cursor-not-allowed opacity-40",
+                    )}
+                    title={
+                      available
+                        ? l.hint
+                        : `${l.label} is not available for Minecraft ${mcVersion}`
+                    }
+                  >
+                    {l.label}
+                  </button>
+                );
+              })}
+            </div>
+            {activeLoader === "neoforge" && (
+              <p className="text-[11px] text-muted-foreground">
+                NeoForge template covers the 1.20.1 lineage (net.neoforged:forge
+                47.1.x). The 20.2+ MDK is a different pipeline — arriving next.
+              </p>
             )}
           </div>
 
