@@ -414,6 +414,71 @@ mod tests {
     }
 
     #[test]
+    fn writes_neoforge_moddevgradle_template() {
+        let mut tokens = sample_tokens();
+        tokens.loader_id = "neoforge".to_string();
+        tokens.mc_version = "1.21.4".to_string();
+        tokens.loader_version = "21.4.138".to_string();
+        tokens.loader_min = "[21.4,)".to_string();
+        tokens.mc_depends = "[1.21.4,1.22)".to_string();
+
+        let base = std::env::temp_dir().join(format!("voxel-mdg-{}", std::process::id()));
+        let dst = base.join("mdg-mod");
+        let count = write_template("neoforge-1.21.4-mod", &tokens, &dst).unwrap();
+        assert!(count >= 25, "expected >= 25 files, wrote {count}");
+
+        // ModDevGradle 2 DSL with the neoForge block
+        let gradle = fs::read_to_string(dst.join("build.gradle")).unwrap();
+        assert!(gradle.contains("net.neoforged.moddev' version '2.0.91'"));
+        assert!(gradle.contains("neoForge {"));
+        assert!(gradle.contains("version = project.neo_version"));
+        assert!(gradle.contains("generateModMetadata"));
+
+        // Metadata lives in the templates dir and the dependency uses type=required
+        let toml_path = dst.join("src/main/templates/META-INF/neoforge.mods.toml");
+        let toml = fs::read_to_string(&toml_path).unwrap();
+        assert!(toml_path.is_file());
+        assert!(toml.contains("modId=\"${mod_id}\""));
+        assert!(toml.contains("type=\"required\""));
+        assert!(!dst.join("src/main/resources/META-INF/mods.toml").exists(),
+            "the MDG era keeps metadata ONLY in src/main/templates");
+        // no pack.mcmeta in this era
+        assert!(!dst.join("src/main/resources/pack.mcmeta").exists());
+
+        // 1.21 data format: recipe result uses "id"
+        let recipe = fs::read_to_string(dst
+            .join("src/main/resources/data/dark_kingdom/recipes/darksteel_sword.json"))
+            .unwrap();
+        assert!(recipe.contains("\"id\": \"dark_kingdom:darksteel_sword\""));
+        assert!(!recipe.contains("\"item\": \"dark_kingdom:"));
+
+        // Advancement 1.21 format: icon id + explicit requirements
+        let adv = fs::read_to_string(dst
+            .join("src/main/resources/data/dark_kingdom/advancements/root.json"))
+            .unwrap();
+        assert!(adv.contains("\"id\": \"dark_kingdom:darksteel_sword\""));
+        assert!(adv.contains("\"requirements\""));
+
+        // Lang prefix of the era: itemGroup.
+        let lang = fs::read_to_string(dst
+            .join("src/main/resources/assets/dark_kingdom/lang/en_us.json"))
+            .unwrap();
+        assert!(lang.contains("itemGroup.dark_kingdom"));
+        assert!(!lang.contains("itemgroup.dark_kingdom"));
+
+        // Gradle wrapper 8.14.2 from the official MDK
+        let wrapper = fs::read_to_string(dst.join("gradle/wrapper/gradle-wrapper.properties")).unwrap();
+        assert!(wrapper.contains("gradle-8.14.2"));
+
+        let spec_raw = fs::read_to_string(dst.join(".voxel/project-spec.json")).unwrap();
+        let spec: serde_json::Value = serde_json::from_str(&spec_raw).unwrap();
+        assert_eq!(spec["build_configuration"]["template"], "neoforge-1.21.4-mod");
+
+        assert_no_tokens(&dst);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn renders_modern_mc_version_1_21() {
         let mut tokens = sample_tokens();
         tokens.mc_version = "1.21.1".to_string();

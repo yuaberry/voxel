@@ -403,6 +403,71 @@ mod e2e_tests {
     }
 
     #[test]
+    #[ignore = "e2e: downloads ModDevGradle 2 + NeoForge 21.4 + NeoForm decompile (network; ~20 min first run)"]
+    fn e2e_gradle_build_compiles_neoforge_moddevgradle() {
+        let home = std::env::var("HOME").expect("HOME is set");
+        let base = std::path::PathBuf::from(&home).join("VOXEL");
+        std::fs::create_dir_all(&base).unwrap();
+        let slug = "e2e-neoforge-mdg";
+        let _ = std::fs::remove_dir_all(base.join("projects").join(slug));
+
+        let payload = CreateProjectPayload {
+            storage_base: base.to_string_lossy().to_string(),
+            slug: slug.to_string(),
+            name: "NeoForge MDG E2E".to_string(),
+            template: "neoforge-1.21.4-mod".to_string(),
+            mod_id: "dark_kingdom".to_string(),
+            mod_id_class: "DarkKingdom".to_string(),
+            package: "com.voxel.darkkingdom".to_string(),
+            description: "E2E acceptance build".to_string(),
+            license: "MIT".to_string(),
+            author: "VOXEL E2E".to_string(),
+            minecraft_version: "1.21.4".to_string(),
+            java_release: 21,
+            yarn_mappings: "".to_string(),
+            loader_version: "21.4.138".to_string(),
+            loader_min: "[21.4,)".to_string(),
+            fabric_api_version: "".to_string(),
+            mc_depends: "[1.21.4,1.22)".to_string(),
+            mappings_line: "".to_string(),
+            loader: "neoforge".to_string(),
+            pack_format: 46,
+        };
+
+        let result = create_project(payload).expect("project creation must succeed");
+        let project_dir = std::path::PathBuf::from(&result.project_path);
+        let gradle_home = base.join(".gradle-cache");
+        std::fs::create_dir_all(&gradle_home).unwrap();
+
+        let output = Command::new(project_dir.join("gradlew"))
+            .arg("build")
+            .arg("--console=plain")
+            .current_dir(&project_dir)
+            .env("GRADLE_USER_HOME", &gradle_home)
+            .output()
+            .expect("failed to run gradlew");
+
+        if !output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            panic!(
+                "GRADLE BUILD FAILED (neoforge-mdg, exit {:?})\n--- stdout tail ---\n{}\n--- stderr tail ---\n{}",
+                output.status.code(),
+                stdout.chars().rev().take(4000).collect::<String>().chars().rev().collect::<String>(),
+                stderr.chars().rev().take(2000).collect::<String>().chars().rev().collect::<String>()
+            );
+        }
+        let libs = project_dir.join("build/libs");
+        let jars: Vec<_> = std::fs::read_dir(&libs)
+            .expect("build/libs must exist after build")
+            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+            .filter(|name| name.ends_with(".jar") && !name.contains("sources"))
+            .collect();
+        assert!(!jars.is_empty(), "compiled jar missing in build/libs: {jars:?}");
+        eprintln!("E2E OK (neoforge-mdg) — jar: {jars:?}");
+    }
+
+    #[test]
     #[ignore = "e2e: downloads NeoGradle 7 + NeoForge 20.2 userdev from the NeoForged maven (network)"]
     fn e2e_gradle_build_compiles_neoforge_modern() {
         // The e2e helper pins 1.20.1 fields; the modern template targets the

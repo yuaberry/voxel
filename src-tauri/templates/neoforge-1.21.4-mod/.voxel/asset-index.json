@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "assets": [],
+  "naming": {
+    "textures": "assets/{{MOD_ID}}/textures/<domain>/{{MOD_ID}}_<name>.png",
+    "models": "assets/{{MOD_ID}}/models/<domain>/{{MOD_ID}}_<name>.json",
+    "sounds": "assets/{{MOD_ID}}/sounds.json + sounds/{{MOD_ID}}_<name>.ogg"
+  },
+  "notes": "Every generated or imported asset gets an entry: path, type, source (original|ai|imported), palette hint and relations to spec entries."
+}
