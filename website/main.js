@@ -8,7 +8,7 @@
   "use strict";
 
   const REPO = "yuaberry/voxel";
-  const VERSION = "0.3.8";
+  const VERSION = "0.3.9";
   const RELEASE_BASE = `https://github.com/${REPO}/releases/download/v${VERSION}/`;
   const ALL_RELEASES = `https://github.com/${REPO}/releases`;
   // Tauri bundle naming: productName "VOXEL" (v0.2.0+ — assets are
@@ -93,7 +93,7 @@
     windows: `${PKG}_${VERSION}_x64-setup.exe`,
     macos: `${PKG}_${VERSION}_aarch64.dmg`,
     linux: `${PKG}_${VERSION}_amd64.AppImage`,
-    android: "VOXEL-mobile-0.3.0-android.apk",
+    android: "VOXEL-mobile-0.3.1-android.apk",
   };
   if (heroLabel) heroLabel.textContent = osLabels[os];
   if (heroBtn) heroBtn.href = RELEASE_BASE + osCards[os];

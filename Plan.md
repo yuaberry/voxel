@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (26 sessões)
+## 5. Histórico de sessões (27 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 27 | Grafo + Blocos + Push mobile | **Resolver de dependências** (BFS required, optional skipped, incompatible falha, cap 25, 6 testes) + **block textures** (bricks/planks/ore/panel, asset_kind enforced) + **mobile 0.3.1** (notifications de build, watcher honesto) + v0.3.9 | aspas duplas em strings JS via python-replace (2×); handler SDK 51 vs 52; imports órfãos |
 | 26 | Modpack v3: Modrinth | **Catálogo externo oficial**: busca via API pública (facets MC+loader reais) + download SHA-1-verified no perímetro (allowlist host exato, cap 256MB) + card no Modpacks + **E2E real com fabric-api vivo** + v0.3.8 | guard recusava `+` Maven no filename (E2E pegou); `getState()` em useMemo quebra o React Compiler; import órfão |
 | 25 | Studio + Score + Secure | **Asset Studio** (7 receitas 16x16 no Rust, agent tool, /studio) + **Compatibility Score** (manifests lidos dos jars, parser Maven+SemVer, bug de fronteira corrigido) + **mobile 0.3.0** (secure-store + biometria honesta) + v0.3.7 | validated_path exige parent (ordem do guard); intersect equal-boundary (bug real); prebuild apagou local.properties; escape python corrupto |
 | 24 | Assets + Modpacks v1 | **Sprites premium** (char-map pixel art: darksteel sword, Voxel Gem, mod icon 128) nos 4 templates + **Modpack Creator v1** (export/import real com manifest camelCase, workspace guards, zip-slip, fatos dos records) + rota /modpacks + v0.3.6 | en_us.json faltava no template 1.20.2 (cp silencioso); `<name>` literal engolido pelo parser JSX; manifest com fatos reais (não placeholders) |
@@ -242,13 +243,13 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 26, v0.3.8)
+## 8. Estado atual (verificado — Sessão 27, v0.3.9)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (49) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (59) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Rust unit (51) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Vitest (65) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -262,7 +263,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.3.8 (latest)** | Desktop: **Modrinth catalog (SHA-1-verified installs)** + APK mobile 0.3.0 |
+| **v0.3.9 (latest)** | Desktop: **dependency graph + block textures** + **APK mobile 0.3.1 (build notifications)** |
+| v0.3.8 | Desktop: **Modrinth catalog (SHA-1-verified installs)** + APK mobile 0.3.0 |
 | v0.3.7 | Desktop: **Asset Studio + Compatibility Score** + **APK mobile 0.3.0 (secure-store + biometria)** |
 | v0.3.6 | Desktop: **sprites premium nos templates + Modpack Creator v1 (export/import)** + APK mobile 0.2.0 replicado |
 | v0.3.5 | Desktop: **NeoForge moderno (1.20.2-1.21.1) + Model Router por fase + desktop notifications** + APK mobile 0.2.0 replicado |
@@ -280,7 +282,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 49 unit
+cd src-tauri && cargo test          # 51 unit
 cargo test -- --ignored --nocapture # 8 E2E (compilação ×4, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -297,7 +299,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 2. ~~Model Router por fase~~ → **ENTREGUE (Sessão 23)**: phaseModels por fase, provider/key global (multi-key por provider = extensão futura honesta)
 3. ~~Push notifications (desktop)~~ → **ENTREGUE (Sessão 23)**: build exit + fim da task force, com permissão honesta. Mobile push = ainda futuro (precisa Expo notifications + backend)
 4. **Mobile polish** (§59) — secure-store do token, biometria, APK com keystore de release (Play Store), TestFlight quando houver conta Apple
-5. **Modpack Creator** → **v1 ENTREGUE (S24)**: export/import real com manifest. **v2 ENTREGUE (S25)**: Compatibility Score dos manifests. **v3 ENTREGUE (S26)**: catálogo Modrinth oficial + installs SHA-1-verified. Próxima fatia: grafo transitivo de dependências (API expõe `dependencies`) + CurseForge
+5. **Modpack Creator** → v1 (S24: export/import) · v2 (S25: score) · v3 (S26: catálogo Modrinth SHA-1) · **v4 ENTREGUE (S27): grafo transitivo required**. Restam: CurseForge (precisa API key do dono) e um editor visual de modpack salvo
 6. ~~Resource Pack / World / Structure Studios~~ → Asset Studio v1 ENTREGUE (Sessão 25: gerador de item textures + agent tool). Próximas fatias: blocks 32x32, resource packs completos, world/structure geradores
 7. **Mais módulos de servidor** — SkyBlock, Factions, BedWars (Economy/Prison/Token entregues)
 8. **Docker + Deployment Providers** (§44-45) — VPS/SSH/cloud (`DeploymentProvider` reservada)
@@ -317,7 +319,8 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 - ✅ Templates Forge + NeoForge (MDKs oficiais, E2E 3/3) — Sessão 22
 - ✅ NeoForge Moderno NeoGradle 7 (repo oficial, E2E 4/4) + Model Router (§66) + Desktop notifications (§62) — Sessão 23
 - ✅ Sprites premium nos templates (pixel art artesanal) + Modpack Creator v1 (export/import) — Sessão 24
-- ✅ Asset Studio (gerador real + agent tool + /studio) + Compatibility Score (manifests dos jars) + mobile secure-store/biometria — Sessão 25
+- ✅ Asset Studio items + blocks (agent tool com asset_kind) + Compatibility Score (manifests dos jars) + mobile secure-store/biometria — Sessões 25+27
+- ✅ Grafo de dependências Modrinth (required/optional/embedded/inclusive honesto) + mobile build notifications — Sessão 27
 
 ## 10. Regras de operação com o dono
 
@@ -437,7 +440,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 26 — Modpack v3: catálogo Modrinth oficial (busca facets real, download SHA-1-verified no perímetro, E2E com fabric-api vivo). 59/59 + 49/49. Release v0.3.8.*
+*Última atualização: Sessão 27 — grafo transitivo de dependências Modrinth (BFS required, optional/embedded/incompatible honestos, cap 25) + block textures no Studio (bricks/planks/ore/panel, asset_kind enforced no Rust) + mobile 0.3.1 com build notifications. 65/65 + 51/51. Release v0.3.9.*
 
 ---
 
@@ -703,3 +706,21 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: typecheck 0 ✓ · lint 0 errors (28 warns família) · vitest **59/59** ✓ · cargo **49/49** + E2E Modrinth REAL ✓ · vite build 1m44s ✓ · boot vivo 0 panics ✓. Release v0.3.8.
 
 **Estado pós-sessão**: Modpack Creator v3 completo local (export/import/score) + catálogo externo oficial com checksum. Próximos naturais: grafo de dependências transitivo (a Modrinth API expõe `dependencies` por version), CurseForge paralelo, push mobile (Expo notifications), Texture Studio ampliado (blocks/32x32), era ModDevGradle.
+
+---
+
+## 27. Sessão 27 — Dependency Graph + Block Textures + Mobile Notifications
+
+**Pedido do dono**: "sim faça tudo" → os três próximos naturais de uma vez (CurseForge fica de fora honestamente: a API deles exige key que o dono não deu).
+
+**1. Modpack v4 — grafo transitivo de dependências**: `resolveModrinthTree` — BFS pelas edges `required` com visited set (ciclos terminam, duplicatas colapsam); **optional** volta como `skippedOptional` (escolha do usuário, nunca nossa); **embedded** nunca baixa duas vezes; **incompatible** contra algo sendo instalado FALHA o resolve; required sem versão SHA-1-instalável FALHA também — modpack quebrado nunca é montado em silêncio; cap 25 mods contra grafos patológicos. UI: instala o root + deps com progresso por arquivo ("Installing 2/5: …") e toast final com o resumo honesto (incl. optionals pulados). 6 testes cobrem a matriz toda.
+
+**2. Asset Studio — block textures**: 4 recipes de face de cubo (bricks com fiapos alternados e tom por fileira; planks com 4 bandas + veios + pregos; ore com stone de variação determinística por pixel + clusters da secondary; panel com bisel de máquina e rebites) — todos tiles 16x16 FULLY OPAQUE como bloco de verdade. `asset_kind (item|block)` roteia `textures/item` vs `textures/block` e é **ENFORCED contra as recipes no Rust** (sword como block recusado; bricks como item recusado). Tool do agent ganha asset_kind → projetos de block ganham arte real. UI com seletor de tipo, grid de styles por kind e hint de path dinâmico. +2 cargo (opaquidade, matriz de consistência, ore com secondary).
+
+**3. Mobile 0.3.1 — build notifications (§62)**: o celular que DISPAROU o build recebe ping quando termina — watcher de 5s/15min no `last_build_status` REAL (limpo no unmount, nunca zumbi), expo-notifications com permissão pedida uma vez (negada = no-op silencioso). Handler corrigido para o shape do SDK 51 (`shouldShowAlert`, não `shouldShowBanner`).
+
+**Bugs caçados (3)**: aspas duplas cravadas DENTRO de strings JS por replace em python (2× — description e schema doc do tool; lição: usar aspas simples no conteúdo); handler do SDK 51 com campos do 52; imports órfãos (2×).
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (28 warns família) · vitest **65/65** (+6 resolver) · cargo **51/51** (+2 blocks) · vite build 1m52s ✓ · boot vivo 0 panics ✓ · mobile tsc ✓ · APK 0.3.1 rebuild. Release v0.3.9.
+
+**Estado pós-sessão**: Modpack Creator v4 completo (export/import/score/catálogo/grafo), Studio gera items E blocks, mobile notifica builds. Próximos naturais: CurseForge (precisa API key do dono), era ModDevGradle (1.21.4+), push externo (FCM/APNs — precisa backend), world/structure geradores.
