@@ -75,7 +75,7 @@ export function ProjectsPage() {
     <div className="mx-auto max-w-5xl px-8 py-10">
       <div className="flex items-center justify-between pb-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Projects</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">Projects</h1>
           <p className="text-sm text-muted-foreground">
             Real workspaces on disk — git-versioned, ready for the AI Creator.
           </p>

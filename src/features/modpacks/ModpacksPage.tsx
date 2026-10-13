@@ -44,6 +44,7 @@ import {
 } from "@/services/modpacks/modrinthService";
 import { openInFileManager } from "@/services/storage/storageService";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/EmptyState";
 
 interface LauncherInstance {
   slug: string;
@@ -301,7 +302,7 @@ export function ModpacksPage() {
     <div className="mx-auto max-w-5xl px-8 py-10">
       <header className="mb-8 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Modpack Creator</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">Modpack Creator</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Bundle what this workspace produced — compiled mod jars and authored
             shaderpacks — into a shareable zip, or install a VOXEL modpack into
@@ -355,10 +356,11 @@ export function ModpacksPage() {
                 </span>
               </div>
               {assets.jars.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border/70 p-3 text-xs text-muted-foreground">
-                  No compiled jars yet — build a project and its latest jar
-                  becomes exportable here.
-                </p>
+                <EmptyState
+                  icon="spark"
+                  title="No compiled jars yet"
+                  hint="Build a project and its latest jar becomes exportable here."
+                />
               ) : (
                 <div className="max-h-44 space-y-1.5 overflow-y-auto pr-1">
                   {assets.jars.map((j) => {
@@ -400,9 +402,11 @@ export function ModpacksPage() {
                 </span>
               </div>
               {assets.shaderPacks.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border/70 p-3 text-xs text-muted-foreground">
-                  No shaderpacks yet — author one in the Shaders tab.
-                </p>
+                <EmptyState
+                  icon="cube"
+                  title="No shaderpacks yet"
+                  hint="Author one in the Shaders tab and it becomes part of your modpacks."
+                />
               ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {assets.shaderPacks.map((p) => {
@@ -513,10 +517,11 @@ export function ModpacksPage() {
             <div className="space-y-1.5">
               <Label>Target instance</Label>
               {instances.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border/70 p-3 text-xs text-muted-foreground">
-                  No prepared instances — open the Launcher tab and prepare one
-                  (Run) first.
-                </p>
+                <EmptyState
+                  icon="server"
+                  title="No prepared instances"
+                  hint="Open the Launcher tab and prepare one (Run) first."
+                />
               ) : (
                 <div className="grid gap-1.5 sm:grid-cols-2">
                   {instances.map((i) => {

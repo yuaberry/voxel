@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { FolderOpen, Gamepad2, Package, Palette, Rocket, RefreshCw } from "lucide-react";
+import { FolderOpen, Package, Palette, Rocket, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { useProjectsStore } from "@/stores/projectsStore";
 import { openInFileManager } from "@/services/storage/storageService";
 import { invoke } from "@tauri-apps/api/core";
 import { LaunchDialog } from "@/features/projects/workspace/LaunchDialog";
+import { EmptyArt } from "@/components/EmptyState";
 import { formatRelativeTime } from "@/lib/utils";
 import type { ProjectRecord } from "@/types";
 
@@ -60,7 +61,7 @@ export function LauncherPage() {
     <div className="mx-auto max-w-5xl px-8 py-10">
       <div className="flex items-center justify-between pb-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Launcher</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">Launcher</h1>
           <p className="text-sm text-muted-foreground">
             Play directly from VOXEL — your prepared instances, the mods and
             shaders installed in each one, and the jar each project built last.
@@ -74,8 +75,8 @@ export function LauncherPage() {
 
       {instances.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border/80 px-6 py-16 text-center">
-          <div className="rounded-xl bg-secondary/60 p-4">
-            <Gamepad2 className="h-8 w-8 text-muted-foreground/70" />
+          <div className="drop-shadow-[0_0_18px_rgba(145,85,255,0.25)]">
+            <EmptyArt.CubeArt />
           </div>
           <div>
             <p className="font-semibold">No instances yet</p>
