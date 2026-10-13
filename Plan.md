@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (28 sessões)
+## 5. Histórico de sessões (29 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 29 | Structure Studio + Visual | **Estruturas .nbt reais** (NBT writer próprio, 4 templates determinísticos, DataVersion por era, pasta por versão) + **preview isométrico canvas** + tab Structure no Studio + **títulos brand-gradient em todas as páginas + EmptyState com arte pixel** + v0.4.1 | chaminé fora do size (bound assert); u32→i32 negativo no rubble; compiler de novo (useCallback desfeito) |
 | 28 | Era ModDevGradle | **5º template** (MDG 2.0.91, neoForge{} DSL, neoforge.mods.toml em templates/, data formats 1.21, wrapper 8.14.2) cobrindo 1.21.4-1.21.8 + catalog por era + **E2E REAL 5/5** + v0.4.0 | `FMLJavaModLoadingContext` sumiu (injeção no @Mod); `Tiers`→`ToolMaterial`; 1.20.2 sem data files (cp silencioso); OOM transitório do NeoForm |
 | 27 | Grafo + Blocos + Push mobile | **Resolver de dependências** (BFS required, optional skipped, incompatible falha, cap 25, 6 testes) + **block textures** (bricks/planks/ore/panel, asset_kind enforced) + **mobile 0.3.1** (notifications de build, watcher honesto) + v0.3.9 | aspas duplas em strings JS via python-replace (2×); handler SDK 51 vs 52; imports órfãos |
 | 26 | Modpack v3: Modrinth | **Catálogo externo oficial**: busca via API pública (facets MC+loader reais) + download SHA-1-verified no perímetro (allowlist host exato, cap 256MB) + card no Modpacks + **E2E real com fabric-api vivo** + v0.3.8 | guard recusava `+` Maven no filename (E2E pegou); `getState()` em useMemo quebra o React Compiler; import órfão |
@@ -244,12 +245,12 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 28, v0.4.0)
+## 8. Estado atual (verificado — Sessão 29, v0.4.1)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (52) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Rust unit (55) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (65) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
@@ -264,7 +265,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.4.0 (latest)** | Desktop: **era ModDevGradle (1.21.4-1.21.8) — 5º template E2E** + APK mobile 0.3.1 |
+| **v0.4.1 (latest)** | Desktop: **Structure Studio (.nbt real + preview iso) + polimento visual** + APK mobile 0.3.1 |
+| v0.4.0 | Desktop: **era ModDevGradle (1.21.4-1.21.8) — 5º template E2E** + APK mobile 0.3.1 |
 | v0.3.9 | Desktop: **dependency graph + block textures** + **APK mobile 0.3.1 (build notifications)** |
 | v0.3.8 | Desktop: **Modrinth catalog (SHA-1-verified installs)** + APK mobile 0.3.0 |
 | v0.3.7 | Desktop: **Asset Studio + Compatibility Score** + **APK mobile 0.3.0 (secure-store + biometria)** |
@@ -284,7 +286,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 52 unit
+cd src-tauri && cargo test          # 55 unit
 cargo test -- --ignored --nocapture # 9 E2E (compilação ×5 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -302,7 +304,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 3. ~~Push notifications (desktop)~~ → **ENTREGUE (Sessão 23)**: build exit + fim da task force, com permissão honesta. Mobile push = ainda futuro (precisa Expo notifications + backend)
 4. **Mobile polish** (§59) — secure-store do token, biometria, APK com keystore de release (Play Store), TestFlight quando houver conta Apple
 5. **Modpack Creator** → v1 (S24: export/import) · v2 (S25: score) · v3 (S26: catálogo Modrinth SHA-1) · **v4 ENTREGUE (S27): grafo transitivo required**. Restam: CurseForge (precisa API key do dono) e um editor visual de modpack salvo
-6. ~~Resource Pack / World / Structure Studios~~ → Asset Studio v1 ENTREGUE (Sessão 25: gerador de item textures + agent tool). Próximas fatias: blocks 32x32, resource packs completos, world/structure geradores
+6. ~~Resource Pack / World / Structure Studios~~ → items (S25), blocks (S27) e **structures .nbt com preview isométrico (S29)** entregues. Restam: agent tool de structures, worldgen presets, resource packs completos
 7. **Mais módulos de servidor** — SkyBlock, Factions, BedWars (Economy/Prison/Token entregues)
 8. **Docker + Deployment Providers** (§44-45) — VPS/SSH/cloud (`DeploymentProvider` reservada)
 9. **Marketplace** (§48) e **Cloud opcional (Supabase)** (§85) — arquiteturas preparadas
@@ -324,6 +326,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 - ✅ Asset Studio items + blocks (agent tool com asset_kind) + Compatibility Score (manifests dos jars) + mobile secure-store/biometria — Sessões 25+27
 - ✅ Grafo de dependências Modrinth (required/optional/embedded/inclusive honesto) + mobile build notifications — Sessão 27
 - ✅ Era ModDevGradle (5º template, data formats 1.21, injeção @Mod, ToolMaterial) — Sessão 28
+- ✅ Structure Studio (.nbt vanilla real, 4 templates, preview iso) + brand-gradient titles + EmptyState art — Sessão 29
 
 ## 10. Regras de operação com o dono
 
@@ -443,7 +446,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 28 — 5º template: a era ModDevGradle (repo oficial, DSL neoForge, neoforge.mods.toml em templates/, sem pack.mcmeta, data formats 1.21) cobrindo 1.21.4-1.21.8, E2E REAL 5/5 (o E2E pescou FMLJavaModLoadingContext e Tiers inexistentes na 1.21.4). 65/65 + 52/52. Release v0.4.0.*
+*Última atualização: Sessão 29 — Structure Studio: 4 templates procedurais → .nbt vanilla REAL (NBT writer próprio, DataVersion por era, pasta structure/structures por versão) com preview isométrico vivo + polimento visual: títulos brand-gradient em todas as páginas e EmptyState com arte pixel própria. 65/65 + 55/55. Release v0.4.1.*
 
 ---
 
@@ -749,3 +752,26 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Nota de operação**: cargo test "pendurado" por contenção de RAM com o daemon Gradle do APK em background — nada de lock; após o build, tudo rápido. Bater não rodar builds pesados em paralelo.
 
 **Estado pós-sessão**: **5 templates E2E-provados** cobrindo Fabric + Forge + NeoForge 1.20.1→1.21.8. Próximos naturais: era 26.x (MDG quando research), world/structure geradores (§9.6), editor visual de modpack salvo, CurseForge (precisa key do dono).
+
+---
+
+## 29. Sessão 29 — Structure Studio (.nbt reais + preview isométrico) + Polimento visual global
+
+**Pedido do dono**: "sim continue com tudo, sempre dando o máximo de qualidade visual possível."
+
+**1. Structure Studio (§9.6, a fatia world/structure)**:
+- **`structure_generate` (Rust)**: 4 templates procedurais determinísticos (watchtower com postes de log/ameias/weathering musgo; cottage com telhado degrau de stairs/chaminé/pebbles; obelisk deepslate com coroa de amethyst/velas; ruin erodido com ar solitário) serializados no **formato vanilla REAL**: gzip NBT (writer NBT próprio — subset Compound/List/Int/String) com size/blocks/palette dedupe/entities/DataVersion. **DataVersions factuais** (3465→4440) e o **rename de pasta da era** (data/<ns>/structures/ antes de 1.21, structure/ depois) decididos pelo MC version REAL do projeto.
+- **Preview isométrico (`IsoStructureCanvas`)**: cada bloco do resultado desenhado como cubo iso sombreado (top/left/right 1.12/0.72/0.5) sobre backdrop voxel-grid da marca, painter's order correto — **o que você vê é exatamente o que o .nbt contém**.
+- **Asset Studio ganha a tab Structure**: chips de kind, seed + dice, preview grande com contador de blocos/dimensões, write .nbt com o path real. O id do campo segue a tab (watch_post vs darksteel_ingot).
+- **Bugs caçados pelos testes (2, de novo o valor da bateria)**: chaminé do cottage estourando o size declarado (bound assert); cast `u32 as i32` virando coordenadas negativas no rubble do ruin. Fix + re-prova. cargo **55/55** (+3).
+
+**2. Polimento visual (o "máximo de qualidade visual")**:
+- **Títulos brand-gradient** em todas as páginas principais (Launcher, Projects, Server Studio, Shader Studio, Modpack Creator, Asset Studio — o `.text-brand-gradient` que a Home já usava).
+- **EmptyState com arte própria**: ilustrações pixel-art SVG da marca (cubo isométrico com nós neon, spark, server rack) com glow — aplicadas nos painéis vazios dos Modpacks (jars/shaderpacks/instâncias) e no Launcher. `EmptyArt` exportado para reuso.
+- O h1 do Studio usa a util compartilhada (sem duplicar o gradiente inline).
+
+**React Compiler (lição da sessão 27 aplicada de novo)**: useCallback manual do preview desfeito em effect direto — 2 errors de "memoization could not be preserved" viraram 0.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (30 warns família) · vitest 65/65 ✓ · cargo **55/55** ✓ · vite build 2m40s ✓ · boot vivo 0 panics ✓. Release v0.4.1.
+
+**Estado pós-sessão**: o Studio gera items, blocks E estruturas .nbt com preview isométrico; o app usa o gradiente da marca e arte própria nos estados vazios. Próximos naturais: o agent ganhar tool de structures, worldgen presets (a fatia "World"), editor visual de modpack, era 26.x.
