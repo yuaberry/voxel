@@ -3120,6 +3120,7 @@ dependencies = [
  "tokio-stream",
  "toml 0.8.2",
  "tower-http",
+ "url",
  "zip",
 ]
 

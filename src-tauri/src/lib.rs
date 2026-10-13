@@ -78,6 +78,7 @@ pub fn run() {
             commands::modpack::modpack_export,
             commands::modpack::modpack_exportable_assets,
             commands::modpack::modpack_check_compatibility,
+            commands::modrinth::modrinth_download,
             commands::modpack::modpack_import_into,
             commands::servers::server_create,
             commands::servers::server_start,

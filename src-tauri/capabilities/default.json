@@ -72,6 +72,9 @@
         },
         {
           "url": "https://api.github.com/*"
+        },
+        {
+          "url": "https://api.modrinth.com/*"
         }
       ]
     },

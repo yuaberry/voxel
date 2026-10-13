@@ -6,6 +6,7 @@ pub mod github;
 pub mod git;
 pub mod launcher;
 pub mod modpack;
+pub mod modrinth;
 pub mod process;
 pub mod projects;
 pub mod ledger;

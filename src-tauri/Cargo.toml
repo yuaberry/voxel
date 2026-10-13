@@ -1,6 +1,6 @@
 [package]
 name = "nexuscraft-studio"
-version = "0.3.7"
+version = "0.3.8"
 description = "NexusCraft Studio - AI Minecraft Creation Studio"
 authors = ["Yua Devs"]
 edition = "2021"
@@ -39,3 +39,4 @@ tauri-plugin-notification = "2.6.0"
 png = "0.18"
 base64 = "0.22"
 toml = "0.8"
+url = "2"
