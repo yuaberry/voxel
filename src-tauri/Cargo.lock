@@ -3094,10 +3094,11 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "nexuscraft-studio"
-version = "0.3.9"
+version = "0.4.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
+ "flate2",
  "futures-util",
  "hickory-resolver",
  "include_dir",

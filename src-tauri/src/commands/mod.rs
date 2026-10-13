@@ -16,5 +16,6 @@ pub mod shaders;
 pub mod tunnel;
 pub mod servers;
 pub mod storage;
+pub mod structures;
 pub mod templates;
 pub mod templates_embed;
