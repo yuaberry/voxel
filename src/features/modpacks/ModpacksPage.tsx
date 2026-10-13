@@ -38,8 +38,7 @@ import {
 } from "@/services/modpacks/modpackService";
 import {
   downloadModrinthMod,
-  getModrinthVersions,
-  pickModrinthFile,
+  resolveModrinthTree,
   searchModrinthMods,
   type ModrinthSearchHit,
 } from "@/services/modpacks/modrinthService";
@@ -137,25 +136,46 @@ export function ModpacksPage() {
   const addFromModrinth = async (hit: ModrinthSearchHit) => {
     if (!basePath || !modTarget || !manifestFacts) return;
     setAdding(hit.project_id);
+    const installing = toast.loading(`Resolving ${hit.title}…`, {
+      description: "Reading its dependency graph from Modrinth",
+    });
     try {
-      const versions = await getModrinthVersions(
+      const tree = await resolveModrinthTree(
         hit.project_id,
         manifestFacts.mcVersion,
         manifestFacts.loader,
       );
-      const picked = pickModrinthFile(versions);
-      if (!picked) {
-        toast.error("Not installable", {
-          description: "No version for this game/loader publishes a SHA-1-verified file.",
+      const total = tree.mods.length;
+      toast.dismiss(installing);
+      for (let i = 0; i < total; i++) {
+        const mod = tree.mods[i];
+        toast.loading(
+          total > 1 ? `Installing ${i + 1}/${total}: ${mod.fileName}` : `Installing ${mod.fileName}`,
+          { id: `mod-${i}`, description: "SHA-1-verified download from cdn.modrinth.com" },
+        );
+        await downloadModrinthMod(basePath, modTarget, {
+          url: mod.url,
+          sha1: mod.sha1,
+          fileName: mod.fileName,
+          versionNumber: mod.versionNumber,
         });
-        return;
+        toast.dismiss(`mod-${i}`);
       }
-      const result = await downloadModrinthMod(basePath, modTarget, picked);
-      toast.success(`Installed ${hit.title} ${picked.versionNumber}`, {
-        description: `${(result.bytes / 1048576).toFixed(1)} MB · SHA-1 verified · instances/${modTarget}/mods/${picked.fileName}`,
-        duration: 8000,
+      const deps = total - 1;
+      toast.success(`Installed ${hit.title}${deps > 0 ? ` + ${deps} required dependenc${deps === 1 ? "y" : "ies"}` : ""}`, {
+        description: [
+          `instance ${modTarget} · all files SHA-1 verified`,
+          tree.skippedOptional.length > 0
+            ? `${tree.skippedOptional.length} optional dep(s) skipped — install them yourself if you want them`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        duration: 10000,
       });
+      void refresh();
     } catch (error) {
+      toast.dismiss(installing);
       toast.error(`Could not install ${hit.title}`, {
         description: error instanceof Error ? error.message : String(error),
       });

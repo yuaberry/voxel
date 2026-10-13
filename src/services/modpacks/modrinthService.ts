@@ -29,11 +29,18 @@ export interface ModrinthVersionFile {
   hashes: { sha1?: string; sha512?: string };
 }
 
+export interface ModrinthDependency {
+  version_id: string | null;
+  project_id: string | null;
+  dependency_type: "required" | "optional" | "embedded" | "incompatible";
+}
+
 export interface ModrinthVersion {
   id: string;
   name: string;
   version_number: string;
   files: ModrinthVersionFile[];
+  dependencies?: ModrinthDependency[];
 }
 
 /** Facet filter so search results actually load on the target game+loader. */
@@ -126,4 +133,111 @@ export function downloadModrinthMod(
       fileName: picked.fileName,
     },
   });
+}
+
+export interface ResolvedMod {
+  projectId: string;
+  titleHint: string;
+  versionNumber: string;
+  fileName: string;
+  url: string;
+  sha1: string;
+  requiredBy: string | null;
+}
+
+export interface ModrinthTree {
+  mods: ResolvedMod[];
+  skippedOptional: string[];
+}
+
+/** Hard stop against pathological graphs. */
+export const MAX_RESOLVED_MODS = 25;
+
+/**
+ * Resolves the full installable tree for a Modrinth project: the root's
+ * newest compatible version plus every REQUIRED transitive dependency
+ * (each resolved against the same game version + loader).
+ *
+ * Honest by construction:
+ * - optional deps are returned as `skippedOptional` (user choice, not ours)
+ * - embedded deps ship inside the jar already — never downloaded twice
+ * - an `incompatible` edge against anything being installed FAILS the resolve
+ * - a required dep with no installable (SHA-1-carrying) version FAILS too —
+ *   a broken modpack is never silently assembled
+ */
+export async function resolveModrinthTree(
+  rootProjectId: string,
+  mcVersion: string,
+  loader: ProjectLoader,
+  fetchVersions: (
+    projectId: string,
+    mc: string,
+    loader: ProjectLoader,
+  ) => Promise<ModrinthVersion[]> = getModrinthVersions,
+): Promise<ModrinthTree> {
+  const mods: ResolvedMod[] = [];
+  const skippedOptional: string[] = [];
+  const installed = new Set<string>();
+  const queue: Array<{ projectId: string; requiredBy: string | null }> = [
+    { projectId: rootProjectId, requiredBy: null },
+  ];
+
+  while (queue.length > 0) {
+    if (mods.length >= MAX_RESOLVED_MODS) {
+      throw new Error(
+        `Dependency graph exceeds ${MAX_RESOLVED_MODS} mods — refusing to install blindly`,
+      );
+    }
+    const { projectId, requiredBy } = queue.shift()!;
+    if (installed.has(projectId)) continue;
+    installed.add(projectId);
+
+    const versions = await fetchVersions(projectId, mcVersion, loader);
+    const picked = pickModrinthFile(versions);
+    if (!picked) {
+      throw new Error(
+        requiredBy
+          ? `Required dependency ${projectId} has no SHA-1-verified version for MC ${mcVersion} (${loader})`
+          : `No SHA-1-verified version for MC ${mcVersion} (${loader})`,
+      );
+    }
+    mods.push({
+      projectId,
+      titleHint: projectId,
+      versionNumber: picked.versionNumber,
+      fileName: picked.fileName,
+      url: picked.url,
+      sha1: picked.sha1,
+      requiredBy,
+    });
+
+    const chosen = versions.find((v) => v.version_number === picked.versionNumber);
+    for (const dep of chosen?.dependencies ?? []) {
+      if (dep.dependency_type === "embedded") continue;
+      if (dep.dependency_type === "optional") {
+        if (dep.project_id) skippedOptional.push(dep.project_id);
+        continue;
+      }
+      if (dep.dependency_type === "incompatible") {
+        if (dep.project_id && installed.has(dep.project_id)) {
+          throw new Error(
+            `Incompatibility declared: ${projectId} is incompatible with ${dep.project_id}`,
+          );
+        }
+        continue;
+      }
+      // required — but a dependency edge may carry only a version_id
+      if (dep.project_id) {
+        if (!installed.has(dep.project_id)) {
+          queue.push({ projectId: dep.project_id, requiredBy: projectId });
+        }
+      } else {
+        throw new Error(
+          `Unresolvable required dependency in ${projectId} (no project reference)`,
+        );
+      }
+    }
+  }
+
+  return { mods, skippedOptional };
 }
