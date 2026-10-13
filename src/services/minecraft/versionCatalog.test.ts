@@ -27,14 +27,19 @@ describe("loader availability (live catalog truth)", () => {
     expect(isLoaderAvailable({ ...base, forge: null }, "forge")).toBe(false);
   });
 
-  it("neoforge covers both embedded eras: 1.20.1 lineage and 1.20.2-1.21.1 modern", () => {
+  it("neoforge covers all three embedded eras up to 1.21.8", () => {
     expect(isLoaderAvailable(base, "neoforge")).toBe(true); // 1.20.1 lineage
-    const modern = { ...base, version: "1.20.2", neoforge: { latest: "20.2.93" } };
-    expect(isLoaderAvailable(modern, "neoforge")).toBe(true);
+    const ng7 = { ...base, version: "1.20.2", neoforge: { latest: "20.2.93" } };
+    expect(isLoaderAvailable(ng7, "neoforge")).toBe(true);
     const lts = { ...base, version: "1.21.1", neoforge: { latest: "21.1.259" } };
     expect(isLoaderAvailable(lts, "neoforge")).toBe(true);
-    // Beyond 1.21.1 the embedded NeoGradle-7 template is not claimed
-    const tooNew = { ...base, version: "1.21.4", neoforge: { latest: "21.4.99" } };
+    // The ModDevGradle era: 1.21.4 through 1.21.8
+    const mdg = { ...base, version: "1.21.4", neoforge: { latest: "21.4.138" } };
+    expect(isLoaderAvailable(mdg, "neoforge")).toBe(true);
+    const mdg8 = { ...base, version: "1.21.8", neoforge: { latest: "21.8.1" } };
+    expect(isLoaderAvailable(mdg8, "neoforge")).toBe(true);
+    // Beyond 1.21.8 nothing is claimed (26.x needs its own era research)
+    const tooNew = { ...base, version: "26.3", neoforge: { latest: "26.3.0.76" } };
     expect(isLoaderAvailable(tooNew, "neoforge")).toBe(false);
   });
 

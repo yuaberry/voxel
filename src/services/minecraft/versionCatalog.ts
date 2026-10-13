@@ -529,8 +529,9 @@ export function compareMcVersions(a: string, b: string): number {
 /**
  * Loader coverage, honest to the embedded templates:
  *  - forge: the ForgeGradle-6 MDK covers Forge 47-52 (MC 1.20.1-1.21.1)
- *  - neoforge: the 1.20.1 lineage (net.neoforged:forge, FG6) OR the modern
- *    era (net.neoforged:neoforge, NeoGradle 7) covering 1.20.2-1.21.1
+ *  - neoforge: three eras, each with its own embedded template — the 1.20.1
+ *    lineage (net.neoforged:forge, FG6), NeoGradle 7 (1.20.2-1.21.1) and
+ *    ModDevGradle 2 (1.21.4-1.21.8)
  */
 function loaderAvailable(
   info: MinecraftVersionInfo,
@@ -551,7 +552,7 @@ function loaderAvailable(
         !!info.neoforge &&
         (info.version === "1.20.1" ||
           (compareMcVersions(info.version, "1.20.2") >= 0 &&
-            compareMcVersions(info.version, "1.21.1") <= 0))
+            compareMcVersions(info.version, "1.21.8") <= 0))
       );
   }
 }
@@ -624,11 +625,14 @@ export async function resolveTemplateParams(
         : "",
     mcDepends,
     packFormat: PACK_FORMATS[info.version] ?? PACK_FORMATS["1.20.1"],
-    // Two NeoForge eras: the 1.20.1 lineage vs the NeoGradle-7 modern one.
+    // Three NeoForge eras, each with its own embedded template: the 1.20.1
+    // Forge drop-in, NeoGradle 7 (1.20.2-1.21.1), ModDevGradle 2 (1.21.4+).
     templateId:
-      loader === "neoforge" && info.version !== "1.20.1"
-        ? "neoforge-1.20.2-mod"
-        : `${loader}-1.20.1-mod`,
+      loader === "neoforge" && compareMcVersions(info.version, "1.21.4") >= 0
+        ? "neoforge-1.21.4-mod"
+        : loader === "neoforge" && info.version !== "1.20.1"
+          ? "neoforge-1.20.2-mod"
+          : `${loader}-1.20.1-mod`,
     experimental: isExperimental(info.version, kind),
   };
 }

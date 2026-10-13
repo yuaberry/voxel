@@ -48,7 +48,7 @@ import type { ProjectLoader, ProjectRecord } from "@/types";
 const LOADERS: { id: ProjectLoader; label: string; hint: string }[] = [
   { id: "fabric", label: "Fabric", hint: "Lightweight, fast updates — Fabric Loom template" },
   { id: "forge", label: "Forge", hint: "The classic ecosystem — ForgeGradle 6 template (1.20.1-1.21.1)" },
-  { id: "neoforge", label: "NeoForge", hint: "The modern Forge successor — 1.20.1-1.21.1 templates" },
+  { id: "neoforge", label: "NeoForge", hint: "Three embedded eras: 1.20.1 lineage, 1.20.2-1.21.1 (NeoGradle 7), 1.21.4-1.21.8 (ModDevGradle 2)" },
 ];
 
 const LICENSES = ["MIT", "Apache-2.0", "GPL-3.0", "LGPL-3.0", "Custom", "Proprietary"];
@@ -315,7 +315,9 @@ export function CreateProjectWizard() {
                 {activeLoader === "fabric" && (
                   <Badge variant="outline">fabric-api {resolved.fabricApiVersion}</Badge>
                 )}
-                <Badge variant="outline">pack format {resolved.packFormat}</Badge>
+                {resolved.templateId !== "neoforge-1.21.4-mod" && (
+                  <Badge variant="outline">pack format {resolved.packFormat}</Badge>
+                )}
                 {resolved.experimental && (
                   <Badge variant="warning">
                     experimental — template targets ≤ 1.21.1; newer APIs may need agent fixes (Phase 4)
@@ -364,9 +366,10 @@ export function CreateProjectWizard() {
             </div>
             {activeLoader === "neoforge" && (
               <p className="text-[11px] text-muted-foreground">
-                Two embedded templates: the 1.20.1 lineage (Forge drop-in) and
-                the modern NeoGradle pipeline for 1.20.2-1.21.1 — picked
-                automatically from the version above.
+                Three embedded templates: the 1.20.1 lineage (Forge drop-in),
+                NeoGradle 7 (1.20.2-1.21.1) and ModDevGradle 2 (1.21.4-1.21.8) —
+                picked automatically from the version above. The MDG era has no
+                pack.mcmeta (the loader handles it), so no pack format is shown.
               </p>
             )}
           </div>
