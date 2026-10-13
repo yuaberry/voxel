@@ -6,16 +6,18 @@
  * claimed here.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowDownToLine,
   Check,
   Download,
   FileArchive,
+  Globe,
   Package,
   PackageOpen,
   RefreshCw,
+  Search,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -34,6 +36,13 @@ import {
   type ExportableAssets,
   type ModpackCompatibility,
 } from "@/services/modpacks/modpackService";
+import {
+  downloadModrinthMod,
+  getModrinthVersions,
+  pickModrinthFile,
+  searchModrinthMods,
+  type ModrinthSearchHit,
+} from "@/services/modpacks/modrinthService";
 import { openInFileManager } from "@/services/storage/storageService";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +55,7 @@ interface LauncherInstance {
 
 export function ModpacksPage() {
   const basePath = useSettingsStore((s) => s.settings.storage.basePath);
+  const minecraftDefaults = useSettingsStore((s) => s.settings.minecraft);
   const projects = useProjectsStore((s) => s.projects);
 
   const [assets, setAssets] = useState<ExportableAssets>({ jars: [], shaderPacks: [] });
@@ -62,6 +72,13 @@ export function ModpacksPage() {
   // compatibility (live, computed from the jars' own manifests)
   const [compat, setCompat] = useState<ModpackCompatibility | null>(null);
 
+  // Modrinth catalog (official API; file downloads are SHA-1-verified in Rust)
+  const [modQuery, setModQuery] = useState("");
+  const [modResults, setModResults] = useState<ModrinthSearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [modTarget, setModTarget] = useState<string | null>(null);
+
   // import form
   const [importZip, setImportZip] = useState<string | null>(null);
   const [importTarget, setImportTarget] = useState<string | null>(null);
@@ -77,6 +94,7 @@ export function ModpacksPage() {
       setAssets(a);
       setInstances(inst);
       if (!importTarget && inst.length > 0) setImportTarget(inst[0].slug);
+      if (!modTarget && inst.length > 0) setModTarget(inst[0].slug);
     } catch (error) {
       toast.error("Could not load workspace assets", {
         description: error instanceof Error ? error.message : String(error),
@@ -90,6 +108,61 @@ export function ModpacksPage() {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [basePath]);
+
+  const runModSearch = async () => {
+    const q = modQuery.trim();
+    if (!q || !manifestFacts) return;
+    setSearching(true);
+    try {
+      const hits = await searchModrinthMods(
+        q,
+        manifestFacts.mcVersion,
+        manifestFacts.loader,
+      );
+      setModResults(hits);
+      if (hits.length === 0) {
+        toast.info("No mods found", {
+          description: `Nothing on Modrinth matches "${q}" for MC ${manifestFacts.mcVersion} (${manifestFacts.loader}).`,
+        });
+      }
+    } catch (error) {
+      toast.error("Modrinth search failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const addFromModrinth = async (hit: ModrinthSearchHit) => {
+    if (!basePath || !modTarget || !manifestFacts) return;
+    setAdding(hit.project_id);
+    try {
+      const versions = await getModrinthVersions(
+        hit.project_id,
+        manifestFacts.mcVersion,
+        manifestFacts.loader,
+      );
+      const picked = pickModrinthFile(versions);
+      if (!picked) {
+        toast.error("Not installable", {
+          description: "No version for this game/loader publishes a SHA-1-verified file.",
+        });
+        return;
+      }
+      const result = await downloadModrinthMod(basePath, modTarget, picked);
+      toast.success(`Installed ${hit.title} ${picked.versionNumber}`, {
+        description: `${(result.bytes / 1048576).toFixed(1)} MB · SHA-1 verified · instances/${modTarget}/mods/${picked.fileName}`,
+        duration: 8000,
+      });
+    } catch (error) {
+      toast.error(`Could not install ${hit.title}`, {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setAdding(null);
+    }
+  };
 
   const canExport = name.trim().length >= 2 && (selectedJars.size > 0 || selectedPacks.size > 0);
 
@@ -118,17 +191,17 @@ export function ModpacksPage() {
   }, [basePath, selectedJars, assets.jars]);
 
   // Manifest facts come from the real project records — never invented.
-  const manifestFacts = useMemo(() => {
-    const firstSlug = assets.jars.find((j) =>
-      selectedJars.has(`${j.projectSlug}/${j.jarFile}`),
-    )?.projectSlug;
-    const project = projects.find((p) => p.slug === firstSlug);
-    if (project) {
-      return { mcVersion: project.minecraft_version, loader: project.loader };
-    }
-    const defaults = useSettingsStore.getState().settings.minecraft;
-    return { mcVersion: defaults.defaultVersion, loader: defaults.defaultLoader };
-  }, [assets.jars, selectedJars, projects]);
+  // (no manual memo: the React Compiler preserves this computation)
+  const selectedJarSlug = assets.jars.find((j) =>
+    selectedJars.has(`${j.projectSlug}/${j.jarFile}`),
+  )?.projectSlug;
+  const selectedJarProject = projects.find((p) => p.slug === selectedJarSlug) ?? null;
+  const manifestFacts = selectedJarProject
+    ? { mcVersion: selectedJarProject.minecraft_version, loader: selectedJarProject.loader }
+    : {
+        mcVersion: minecraftDefaults.defaultVersion,
+        loader: minecraftDefaults.defaultLoader,
+      };
 
   const toggleJar = (slug: string, file: string) => {
     const key = `${slug}/${file}`;
@@ -470,13 +543,111 @@ export function ModpacksPage() {
         </Card>
       </div>
 
+      {/* ---------------- Modrinth catalog ---------------- */}
+      <Card className="animate-card-rise mt-6 border-border/70 bg-card/60 [animation-delay:160ms]">
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Globe className="h-4 w-4 text-primary" />
+              <h2 className="font-semibold">Add from Modrinth</h2>
+              <Badge variant="outline">official API · SHA-1 verified</Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">MC {manifestFacts.mcVersion} · {manifestFacts.loader}</Badge>
+              <select
+                className="h-8 rounded-md border border-border bg-card/60 px-2 text-xs outline-none focus:border-primary"
+                value={modTarget ?? ""}
+                onChange={(e) => setModTarget(e.target.value)}
+              >
+                {instances.length === 0 && <option value="">no prepared instance</option>}
+                {instances.map((i) => (
+                  <option key={i.slug} value={i.slug}>
+                    {i.slug}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Input
+              placeholder="Search mods — e.g. JEI, sodium, fabric-api…"
+              value={modQuery}
+              onChange={(e) => setModQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void runModSearch();
+              }}
+            />
+            <Button
+              variant="outline"
+              disabled={!modQuery.trim() || searching}
+              onClick={() => void runModSearch()}
+            >
+              <Search className="mr-2 h-4 w-4" />
+              {searching ? "Searching…" : "Search"}
+            </Button>
+          </div>
+
+          {modResults.length > 0 && (
+            <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+              {modResults.map((hit) => (
+                <div
+                  key={hit.project_id}
+                  className="flex items-center gap-3 rounded-lg border border-border/70 bg-card/40 px-3 py-2 transition-all"
+                >
+                  {hit.icon_url ? (
+                    <img
+                      src={hit.icon_url}
+                      alt=""
+                      className="h-9 w-9 shrink-0 rounded-md object-cover"
+                    />
+                  ) : (
+                    <Package className="h-9 w-9 shrink-0 text-muted-foreground/40" />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium">{hit.title}</span>
+                      {hit.license && (
+                        <Badge variant="outline" className="shrink-0 text-[9px]">
+                          {hit.license}
+                        </Badge>
+                      )}
+                    </span>
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {hit.description}
+                    </span>
+                    <span className="block text-[10px] text-muted-foreground/70">
+                      {Intl.NumberFormat("en", { notation: "compact" }).format(hit.downloads)} downloads · {hit.author}
+                    </span>
+                  </span>
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    disabled={!modTarget || adding === hit.project_id}
+                    onClick={() => void addFromModrinth(hit)}
+                  >
+                    <ArrowDownToLine className="mr-1.5 h-3.5 w-3.5" />
+                    {adding === hit.project_id ? "…" : "Add"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] text-muted-foreground">
+            Files come from cdn.modrinth.com only, land in the instance above, and are
+            installed only when the SHA-1 Modrinth publishes matches the download.
+          </p>
+        </CardContent>
+      </Card>
+
       <div className="mt-6 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-        <Badge variant="outline">v1 scope</Badge>
+        <Badge variant="outline">v3 scope</Badge>
         <span>
-          Selection, export and install are fully real. Dependency resolution
-          against external catalogs (Modrinth/CurseForge) and a Compatibility
-          Score are the next slice — the manifest format already carries the
-          facts they need.
+          Selection, export and install are fully real; the Compatibility Score
+          reads the jars' own manifests; external mods arrive from the official
+          Modrinth API with SHA-1 verification. Still honest about what v3
+          does NOT do: transitive dependency graphs and CurseForge support —
+          the manifest format already carries the facts they need.
         </span>
       </div>
     </div>
