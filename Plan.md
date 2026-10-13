@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (25 sessões)
+## 5. Histórico de sessões (26 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 26 | Modpack v3: Modrinth | **Catálogo externo oficial**: busca via API pública (facets MC+loader reais) + download SHA-1-verified no perímetro (allowlist host exato, cap 256MB) + card no Modpacks + **E2E real com fabric-api vivo** + v0.3.8 | guard recusava `+` Maven no filename (E2E pegou); `getState()` em useMemo quebra o React Compiler; import órfão |
 | 25 | Studio + Score + Secure | **Asset Studio** (7 receitas 16x16 no Rust, agent tool, /studio) + **Compatibility Score** (manifests lidos dos jars, parser Maven+SemVer, bug de fronteira corrigido) + **mobile 0.3.0** (secure-store + biometria honesta) + v0.3.7 | validated_path exige parent (ordem do guard); intersect equal-boundary (bug real); prebuild apagou local.properties; escape python corrupto |
 | 24 | Assets + Modpacks v1 | **Sprites premium** (char-map pixel art: darksteel sword, Voxel Gem, mod icon 128) nos 4 templates + **Modpack Creator v1** (export/import real com manifest camelCase, workspace guards, zip-slip, fatos dos records) + rota /modpacks + v0.3.6 | en_us.json faltava no template 1.20.2 (cp silencioso); `<name>` literal engolido pelo parser JSX; manifest com fatos reais (não placeholders) |
 | 23 | Router + Notifications + NeoForge Moderno | **Model Router por fase** (phaseModels, provider/key global) + **desktop notifications** (plugin-notification 2.6.0 same-minor; build exit + fim da task force; no-op honesto sem permissão) + **template NeoGradle 7** (repo oficial neoforged/MDK@1.20.2; 1.20.2-1.21.1 incl. LTS; wizard escolhe a era) + **E2E 4/4** + v0.3.5 | permission é `notification:` (singular); `registerItem(String, Function<Props,Item>)` é a assinatura 20.2 (Supplier não existe); `register()` retorna DeferredHolder |
@@ -241,13 +242,13 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 25, v0.3.7)
+## 8. Estado atual (verificado — Sessão 26, v0.3.8)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (46) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (55) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Rust unit (49) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Vitest (59) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -261,7 +262,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.3.7 (latest)** | Desktop: **Asset Studio + Compatibility Score** + **APK mobile 0.3.0 (secure-store + biometria)** |
+| **v0.3.8 (latest)** | Desktop: **Modrinth catalog (SHA-1-verified installs)** + APK mobile 0.3.0 |
+| v0.3.7 | Desktop: **Asset Studio + Compatibility Score** + **APK mobile 0.3.0 (secure-store + biometria)** |
 | v0.3.6 | Desktop: **sprites premium nos templates + Modpack Creator v1 (export/import)** + APK mobile 0.2.0 replicado |
 | v0.3.5 | Desktop: **NeoForge moderno (1.20.2-1.21.1) + Model Router por fase + desktop notifications** + APK mobile 0.2.0 replicado |
 | v0.3.4 | Desktop: templates Forge + NeoForge + wizard 3 loaders |
@@ -278,8 +280,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 46 unit
-cargo test -- --ignored --nocapture # 7 E2E (compilação ×4 templates, launcher, server, SLP real)
+cd src-tauri && cargo test          # 49 unit
+cargo test -- --ignored --nocapture # 8 E2E (compilação ×4, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
 ```
@@ -295,7 +297,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 2. ~~Model Router por fase~~ → **ENTREGUE (Sessão 23)**: phaseModels por fase, provider/key global (multi-key por provider = extensão futura honesta)
 3. ~~Push notifications (desktop)~~ → **ENTREGUE (Sessão 23)**: build exit + fim da task force, com permissão honesta. Mobile push = ainda futuro (precisa Expo notifications + backend)
 4. **Mobile polish** (§59) — secure-store do token, biometria, APK com keystore de release (Play Store), TestFlight quando houver conta Apple
-5. ~~Modpack Creator v1~~ → **ENTREGUE (Sessão 24)**: export/import real com manifest (workspace-only, zero fontes externas). Próxima fatia: resolução de dependências externas (Modrinth/CurseForge APIs) + Compatibility Score — o manifest já carrega os fatos
+5. **Modpack Creator** → **v1 ENTREGUE (S24)**: export/import real com manifest. **v2 ENTREGUE (S25)**: Compatibility Score dos manifests. **v3 ENTREGUE (S26)**: catálogo Modrinth oficial + installs SHA-1-verified. Próxima fatia: grafo transitivo de dependências (API expõe `dependencies`) + CurseForge
 6. ~~Resource Pack / World / Structure Studios~~ → Asset Studio v1 ENTREGUE (Sessão 25: gerador de item textures + agent tool). Próximas fatias: blocks 32x32, resource packs completos, world/structure geradores
 7. **Mais módulos de servidor** — SkyBlock, Factions, BedWars (Economy/Prison/Token entregues)
 8. **Docker + Deployment Providers** (§44-45) — VPS/SSH/cloud (`DeploymentProvider` reservada)
@@ -435,7 +437,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 25 — Asset Studio (7 receitas pixel-art, agent tool generate_item_texture, página /studio) + Compatibility Score real (parser ranges de 2 ecossistemas, bug de fronteira caçado pelo teste) + mobile secure-store/biometria 0.3.0. 55/55 + 46/46. Release v0.3.7.*
+*Última atualização: Sessão 26 — Modpack v3: catálogo Modrinth oficial (busca facets real, download SHA-1-verified no perímetro, E2E com fabric-api vivo). 59/59 + 49/49. Release v0.3.8.*
 
 ---
 
@@ -683,3 +685,21 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: typecheck 0 ✓ · lint 0 errors (27 warns família) · vitest 55/55 ✓ · **cargo 46/46** (+3 compat) · vite build 2m02s ✓ · boot vivo 0 panics ✓ · mobile tsc ✓ · APK 0.3.0 rebuild (apksigner/aapt). Release v0.3.7.
 
 **Estado pós-sessão**: o app gera arte real (e o agente também), modpacks têm score honesto lido dos manifests, o celular guarda o token como segredo. Próximos naturais: dep-res externa no Modpack Creator (Modrinth/CurseForge), Texture Studio ampliado (blocks/items 32x32), push mobile (Expo notifications), era ModDevGradle (1.21.4+).
+
+---
+
+## 26. Sessão 26 — Modpack v3: catálogo Modrinth (busca oficial + SHA-1)
+
+**Pedido do dono**: "sim continue" → o próximo natural do Modpack Creator: dependências externas, começando pela plataforma oficial.
+
+**Entregue**:
+- **`modrinth_download` (Rust)**: perímetro como sempre — allowlist de host EXATO (`cdn.modrinth.com`, https sem porta; subdomínios-lookalike recusados), cap 256MB, e o **SHA-1 publicado pelo Modrinth tem que bater** com os bytes ou o write é recusado. Instância precisa estar preparada; nomes de arquivo guardados (versions Maven com `+` aceitos — caçado pelo E2E).
+- **Service TS**: search/version resolution via API pública documentada (capability `https://api.modrinth.com/*`, User-Agent identificado como o guidelines deles pede). `pickModrinthFile` NUNCA instala arquivo sem SHA-1 publicado (honestidade > conveniência) — testes provam: prefere primary, pula versões sem hash, null quando nada é verificável.
+- **UI**: card "Add from Modrinth" no Modpacks — busca com facets do MC version + loader REAIS do manifest, resultados com license badge + downloads compactos + autor, install one-click na instância escolhida com toast do path verificado. Badge de escopo v3 atualizado (o que ainda NÃO faz: grafo transitivo de deps, CurseForge).
+- **E2E REAL**: `fabric-api-0.92.12+1.20.1.jar` baixado do CDN vivo com SHA-1 verificado (1.06s) — a primeira rodada pescou o guard recusando `+` no nome; fix e re-prova.
+
+**Bugs caçados (3)**: (1) guard rejeitava versão Maven `+` no filename (bug REAL achado pelo E2E com o arquivo real do CDN); (2) React Compiler: `getState()` dentro de useMemo quebra a preservação — memo manual desfeita em favor do compiler (padrão novo); (3) import `useMemo` órfão.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (28 warns família) · vitest **59/59** ✓ · cargo **49/49** + E2E Modrinth REAL ✓ · vite build 1m44s ✓ · boot vivo 0 panics ✓. Release v0.3.8.
+
+**Estado pós-sessão**: Modpack Creator v3 completo local (export/import/score) + catálogo externo oficial com checksum. Próximos naturais: grafo de dependências transitivo (a Modrinth API expõe `dependencies` por version), CurseForge paralelo, push mobile (Expo notifications), Texture Studio ampliado (blocks/32x32), era ModDevGradle.
