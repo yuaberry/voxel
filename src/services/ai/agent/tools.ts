@@ -353,7 +353,7 @@ export function buildTools(): ToolExecutor[] {
       schema: {
         name: "generate_item_texture",
         description:
-          "Generate a REAL 16x16 pixel-art texture for an item and write it into the project at src/main/resources/assets/<mod_id>/textures/item/<item_id>.png. Styles: sword, gem, ingot, orb, apple, book, wand. Colors are #rrggbb. Use this whenever a new item needs a texture instead of leaving it blank.",
+          "Generate a REAL 16x16 pixel-art texture and write it into the project. asset_kind 'item' (default) → src/main/resources/assets/<mod_id>/textures/item/<item_id>.png with styles sword, gem, ingot, orb, apple, book, wand; asset_kind 'block' → textures/block/<block_id>.png with styles bricks, planks, ore, panel. Colors are #rrggbb. Use this whenever a new item or block needs a texture instead of leaving it blank.",
         parameters: {
           type: "object",
           properties: {
@@ -378,6 +378,10 @@ export function buildTools(): ToolExecutor[] {
               description:
                 "The mod id of this project (only when unsure — the project's mod id is the default)",
             },
+            asset_kind: {
+              type: "string",
+              description: "'item' (default) or 'block' — must match the style recipes",
+            },
           },
           required: ["item_id", "style", "primary", "secondary"],
         },
@@ -397,9 +401,13 @@ export function buildTools(): ToolExecutor[] {
           style: str(args, "style") as TextureGenRequest["style"],
           primary: str(args, "primary"),
           secondary: str(args, "secondary"),
+          assetKind:
+            typeof args.asset_kind === "string" && args.asset_kind.trim().length > 0
+              ? (args.asset_kind.trim() as TextureGenRequest["assetKind"])
+              : "item",
           previewOnly: false,
         });
-        return `Texture written: ${result.wrotePath ?? "unknown"} (16x16 pixel art, style ${String(args.style)})`;
+        return `Texture written: ${result.wrotePath ?? "unknown"} (16x16 pixel art, ${String(args.asset_kind ?? "item")} style ${String(args.style)})`;
       },
     },
   ];

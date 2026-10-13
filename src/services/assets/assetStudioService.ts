@@ -15,16 +15,26 @@ export const ITEM_STYLES = [
   "wand",
 ] as const;
 
+export const BLOCK_STYLES = ["bricks", "planks", "ore", "panel"] as const;
+
 export type ItemStyle = (typeof ITEM_STYLES)[number];
+export type BlockStyle = (typeof BLOCK_STYLES)[number];
+export type AssetKind = "item" | "block";
+
+export const STYLES_BY_KIND: Record<AssetKind, readonly string[]> = {
+  item: ITEM_STYLES,
+  block: BLOCK_STYLES,
+};
 
 export interface TextureGenRequest {
   storageBase: string;
   projectRel: string;
   modId: string;
   itemId: string;
-  style: ItemStyle;
+  style: ItemStyle | BlockStyle;
   primary: string;
   secondary: string;
+  assetKind: AssetKind;
   previewOnly: boolean;
 }
 

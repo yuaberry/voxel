@@ -17,7 +17,8 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useProjectsStore } from "@/stores/projectsStore";
 import {
   generateItemTexture,
-  ITEM_STYLES,
+  STYLES_BY_KIND,
+  type AssetKind,
   type ItemStyle,
 } from "@/services/assets/assetStudioService";
 import { cn } from "@/lib/utils";
@@ -37,12 +38,16 @@ export function AssetStudioPage() {
 
   const [slug, setSlug] = useState<string | null>(null);
   const [itemId, setItemId] = useState("darksteel_ingot");
+  const [assetKind, setAssetKind] = useState<AssetKind>("item");
   const [style, setStyle] = useState<ItemStyle>("sword");
   const [primary, setPrimary] = useState("#5a6a94");
   const [secondary, setSecondary] = useState("#7ee8fa");
   const [preview, setPreview] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
   const [wrotePath, setWrotePath] = useState<string | null>(null);
+
+  const stylesForKind = STYLES_BY_KIND[assetKind];
+  const activeStyle = stylesForKind.includes(style) ? style : (stylesForKind[0] as ItemStyle);
 
   const project = useMemo(
     () => projects.find((p) => p.slug === slug) ?? null,
@@ -64,9 +69,10 @@ export function AssetStudioPage() {
         projectRel: `projects/${project.slug}`,
         modId: project.slug.replace(/-/g, "_"),
         itemId: itemId.trim(),
-        style,
+        style: activeStyle,
         primary,
         secondary,
+        assetKind,
         previewOnly: true,
       });
       setPreview(result.pngBase64);
@@ -76,7 +82,7 @@ export function AssetStudioPage() {
         description: error instanceof Error ? error.message : String(error),
       });
     }
-  }, [basePath, project, itemId, style, primary, secondary]);
+  }, [basePath, project, itemId, activeStyle, assetKind, primary, secondary]);
 
   useEffect(() => {
     const t = setTimeout(() => void renderPreview(), 180);
@@ -92,9 +98,10 @@ export function AssetStudioPage() {
         projectRel: `projects/${project.slug}`,
         modId: project.slug.replace(/-/g, "_"),
         itemId: itemId.trim(),
-        style,
+        style: activeStyle,
         primary,
         secondary,
+        assetKind,
         previewOnly: false,
       });
       setWrotePath(result.wrotePath);
@@ -124,7 +131,7 @@ export function AssetStudioPage() {
             too, so new items never ship with missing art.
           </p>
         </div>
-        <Badge variant="outline">16x16 · vanilla-style</Badge>
+        <Badge variant="outline">16x16 · {assetKind === "item" ? "item sprite" : "block face"}</Badge>
       </header>
 
       {projects.length === 0 ? (
@@ -193,26 +200,50 @@ export function AssetStudioPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Style
-                </Label>
-                <div className="grid grid-cols-4 gap-2">
-                  {ITEM_STYLES.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setStyle(s)}
-                      className={cn(
-                        "rounded-lg border px-2 py-1.5 text-xs font-medium capitalize transition-all active:scale-[0.96]",
-                        style === s
-                          ? "border-primary/70 bg-primary/15 text-primary shadow-[0_0_10px_rgba(145,85,255,0.2)]"
-                          : "border-border/70 text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                      )}
-                    >
-                      {s}
-                    </button>
-                  ))}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Asset type
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["item", "block"] as const).map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setAssetKind(k)}
+                        className={cn(
+                          "rounded-lg border px-2 py-1.5 text-xs font-medium capitalize transition-all active:scale-[0.96]",
+                          assetKind === k
+                            ? "border-primary/70 bg-primary/15 text-primary shadow-[0_0_10px_rgba(145,85,255,0.2)]"
+                            : "border-border/70 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                        )}
+                      >
+                        {k === "item" ? "Item" : "Block face"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Style
+                  </Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {stylesForKind.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setStyle(s as ItemStyle)}
+                        className={cn(
+                          "rounded-lg border px-2 py-1.5 text-xs font-medium capitalize transition-all active:scale-[0.96]",
+                          activeStyle === s
+                            ? "border-primary/70 bg-primary/15 text-primary shadow-[0_0_10px_rgba(145,85,255,0.2)]"
+                            : "border-border/70 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                        )}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -290,7 +321,9 @@ export function AssetStudioPage() {
                 <Brush className="mr-1 inline h-3 w-3" />
                 {"Lands in "}
                 <code className="text-foreground/70">
-                  {"src/main/resources/assets/<mod_id>/textures/item/"}
+                  {assetKind === "item"
+                    ? "src/main/resources/assets/<mod_id>/textures/item/"
+                    : "src/main/resources/assets/<mod_id>/textures/block/"}
                 </code>
                 {" — add the model + lang entry (or let the agent do it end-to-end)."}
               </p>
