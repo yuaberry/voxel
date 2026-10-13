@@ -3,15 +3,17 @@
  * Build action that runs the SAME Gradle command the desktop button uses.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { bridge, BridgeProject } from "../../src/lib/bridge";
 import { useConnection } from "../../src/lib/store";
+import { notifyBuildFinished } from "../../src/lib/notify";
 import { colors } from "../../src/theme";
 import { Badge, Card, StatusDot, VButton } from "../../src/components/ui";
 
 export default function Projects() {
   const connection = useConnection((s) => s.connection);
+  const watchers = useRef<ReturnType<typeof setInterval>[]>([]);
   const [projects, setProjects] = useState<BridgeProject[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [building, setBuilding] = useState<string | null>(null);
@@ -28,13 +30,45 @@ export default function Projects() {
 
   useEffect(() => {
     void load();
+    return () => {
+      for (const t of watchers.current) clearInterval(t);
+      watchers.current = [];
+    };
   }, [load]);
+
+  // Watch a build started from THIS phone until its status changes, then
+  // ping. Timeout-bounded and cleaned on unmount — never a zombie poller.
+  const watchBuild = (slug: string, name: string, previousStatus: string | null) => {
+    const startedAt = Date.now();
+    const timer = setInterval(async () => {
+      try {
+        const list = await bridge.projects();
+        setProjects(list.projects);
+        const current = list.projects.find((p) => p.slug === slug)?.lastBuildStatus ?? null;
+        if (current !== previousStatus && (current === "success" || current === "failed")) {
+          clearInterval(timer);
+          void notifyBuildFinished(name, current === "success");
+        }
+        if (Date.now() - startedAt > 15 * 60 * 1000) {
+          clearInterval(timer);
+        }
+      } catch {
+        clearInterval(timer);
+      }
+    }, 5000);
+    watchers.current.push(timer);
+  };
 
   const build = async (slug: string, name: string) => {
     setBuilding(slug);
     try {
+      const previousStatus = projects.find((p) => p.slug === slug)?.lastBuildStatus ?? null;
       await bridge.build(slug);
-      Alert.alert("Build started", `"${name}" is compiling on the PC — watch the status refresh.`);
+      Alert.alert(
+        "Build started",
+        `"${name}" is compiling on the PC — you'll get a notification when it finishes.`,
+      );
+      watchBuild(slug, name, previousStatus);
     } catch (e) {
       Alert.alert("Build failed to start", e instanceof Error ? e.message : String(e));
     } finally {
