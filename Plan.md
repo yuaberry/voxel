@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (27 sessões)
+## 5. Histórico de sessões (28 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 28 | Era ModDevGradle | **5º template** (MDG 2.0.91, neoForge{} DSL, neoforge.mods.toml em templates/, data formats 1.21, wrapper 8.14.2) cobrindo 1.21.4-1.21.8 + catalog por era + **E2E REAL 5/5** + v0.4.0 | `FMLJavaModLoadingContext` sumiu (injeção no @Mod); `Tiers`→`ToolMaterial`; 1.20.2 sem data files (cp silencioso); OOM transitório do NeoForm |
 | 27 | Grafo + Blocos + Push mobile | **Resolver de dependências** (BFS required, optional skipped, incompatible falha, cap 25, 6 testes) + **block textures** (bricks/planks/ore/panel, asset_kind enforced) + **mobile 0.3.1** (notifications de build, watcher honesto) + v0.3.9 | aspas duplas em strings JS via python-replace (2×); handler SDK 51 vs 52; imports órfãos |
 | 26 | Modpack v3: Modrinth | **Catálogo externo oficial**: busca via API pública (facets MC+loader reais) + download SHA-1-verified no perímetro (allowlist host exato, cap 256MB) + card no Modpacks + **E2E real com fabric-api vivo** + v0.3.8 | guard recusava `+` Maven no filename (E2E pegou); `getState()` em useMemo quebra o React Compiler; import órfão |
 | 25 | Studio + Score + Secure | **Asset Studio** (7 receitas 16x16 no Rust, agent tool, /studio) + **Compatibility Score** (manifests lidos dos jars, parser Maven+SemVer, bug de fronteira corrigido) + **mobile 0.3.0** (secure-store + biometria honesta) + v0.3.7 | validated_path exige parent (ordem do guard); intersect equal-boundary (bug real); prebuild apagou local.properties; escape python corrupto |
@@ -243,18 +244,18 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 27, v0.3.9)
+## 8. Estado atual (verificado — Sessão 28, v0.4.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (51) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Rust unit (52) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (65) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
 | E2E SLP multi-server | ✅ Hypixel + CubeCraft + **Minemen via SRV** (reprodução do bug do dono) |
-| **E2E compilação ×4 templates** | ✅ **fabric 158s · forge 339s · neo-legacy 170s · neo-modern 854s — todos produzem dark_kingdom-0.1.0.jar real** (Sessões 22-23) |
+| **E2E compilação ×5 templates** | ✅ **fabric 158s · forge 339s · neo-legacy 170s · neo-NG7 854s · neo-MDG 64s — todos produzem dark_kingdom-0.1.0.jar real** (Sessões 22-28) |
 | Typecheck / ESLint | ✅ 0 errors (warns set-state-in-effect = backlog família conhecida) |
 | Mobile typecheck | ✅ `pnpm --filter @voxel/mobile typecheck` (CI verde) |
 | Vite build | ✅ resolve @voxel/core via workspace |
@@ -263,7 +264,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.3.9 (latest)** | Desktop: **dependency graph + block textures** + **APK mobile 0.3.1 (build notifications)** |
+| **v0.4.0 (latest)** | Desktop: **era ModDevGradle (1.21.4-1.21.8) — 5º template E2E** + APK mobile 0.3.1 |
+| v0.3.9 | Desktop: **dependency graph + block textures** + **APK mobile 0.3.1 (build notifications)** |
 | v0.3.8 | Desktop: **Modrinth catalog (SHA-1-verified installs)** + APK mobile 0.3.0 |
 | v0.3.7 | Desktop: **Asset Studio + Compatibility Score** + **APK mobile 0.3.0 (secure-store + biometria)** |
 | v0.3.6 | Desktop: **sprites premium nos templates + Modpack Creator v1 (export/import)** + APK mobile 0.2.0 replicado |
@@ -282,8 +284,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 51 unit
-cargo test -- --ignored --nocapture # 8 E2E (compilação ×4, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
+cd src-tauri && cargo test          # 52 unit
+cargo test -- --ignored --nocapture # 9 E2E (compilação ×5 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
 ```
@@ -321,6 +323,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 - ✅ Sprites premium nos templates (pixel art artesanal) + Modpack Creator v1 (export/import) — Sessão 24
 - ✅ Asset Studio items + blocks (agent tool com asset_kind) + Compatibility Score (manifests dos jars) + mobile secure-store/biometria — Sessões 25+27
 - ✅ Grafo de dependências Modrinth (required/optional/embedded/inclusive honesto) + mobile build notifications — Sessão 27
+- ✅ Era ModDevGradle (5º template, data formats 1.21, injeção @Mod, ToolMaterial) — Sessão 28
 
 ## 10. Regras de operação com o dono
 
@@ -440,7 +443,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 27 — grafo transitivo de dependências Modrinth (BFS required, optional/embedded/incompatible honestos, cap 25) + block textures no Studio (bricks/planks/ore/panel, asset_kind enforced no Rust) + mobile 0.3.1 com build notifications. 65/65 + 51/51. Release v0.3.9.*
+*Última atualização: Sessão 28 — 5º template: a era ModDevGradle (repo oficial, DSL neoForge, neoforge.mods.toml em templates/, sem pack.mcmeta, data formats 1.21) cobrindo 1.21.4-1.21.8, E2E REAL 5/5 (o E2E pescou FMLJavaModLoadingContext e Tiers inexistentes na 1.21.4). 65/65 + 52/52. Release v0.4.0.*
 
 ---
 
@@ -724,3 +727,25 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: typecheck 0 ✓ · lint 0 errors (28 warns família) · vitest **65/65** (+6 resolver) · cargo **51/51** (+2 blocks) · vite build 1m52s ✓ · boot vivo 0 panics ✓ · mobile tsc ✓ · APK 0.3.1 rebuild. Release v0.3.9.
 
 **Estado pós-sessão**: Modpack Creator v4 completo (export/import/score/catálogo/grafo), Studio gera items E blocks, mobile notifica builds. Próximos naturais: CurseForge (precisa API key do dono), era ModDevGradle (1.21.4+), push externo (FCM/APNs — precisa backend), world/structure geradores.
+
+---
+
+## 28. Sessão 28 — A era ModDevGradle: 5º template (1.21.4-1.21.8)
+
+**Pedido do dono**: "Sim continue" → o próximo natural: templates para o NeoForge moderno-alto.
+
+**Pesquisa empírica (repo oficial `neoforged/MDK`, branch `archive/1.21.4-mdg`)**: pipeline **ModDevGradle 2.0.91** — DSL `neoForge {}` (version, runs com `client()`/`server()`, mods bindings), metadata gerada de **`src/main/templates/META-INF/neoforge.mods.toml`** via task `generateModMetadata` (ProcessResources → build/generated), dependencies com **`type="required"`** (não mais `mandatory`), **sem pack.mcmeta** (a era dispensa), wrapper Gradle 8.14.2, Java 21.
+
+**Entregue — template `neoforge-1.21.4-mod` (30 arquivos)**: build.gradle MDG + settings + properties tokenizadas; Java com as APIs da era; **data formats da era** (recipe `result.id` — a mudança 1.20.5; advancement `icon.id` + `requirements` explícito; lang `itemGroup.` prefixo novo); catalog escolhe a era por versão (1.20.1 lineage / NG7 1.20.2-1.21.1 / **MDG 1.21.4-1.21.8**); 26.x continua desabilitado honestamente; wizard esconde o badge pack format nesta era (não há pack.mcmeta) e explica as 3 eras.
+
+**Bugs caçados (4 — 2 de API pescados pelo E2E REAL)**:
+1. **`FMLJavaModLoadingContext` não existe em 1.21.x** — `@Mod` construtor recebe `(IEventBus, ModContainer)` por injeção (confirmado contra o ExampleMod do próprio MDK).
+2. **`Tiers` não existe** — o record vanilla virou `ToolMaterial.NETHERITE` (import + uso).
+3. **O template 1.20.2 nunca teve data files** (recipes/advancements — mesma família do cp silencioso do lang da sessão 25): restaurados do fabric provado; o E2E do 1.20.2 compila mas o mod gerado tinha perdido a recipe.
+4. NeoForm decompile falhou na 1ª rodada por OOM transitório (daemon Gradle+Kotlin comendo RAM junto) — re-run provou que era ambiente, não template.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (28 warns família) · vitest **65/65** (eras 3×) ✓ · cargo **52/52** (+1 render MDG) ✓ · **E2E REAL 5/5** (fabric 158s, forge 339s, neo-legacy 170s, neo-NG7 854s, **neo-MDG 63.72s** com cache NeoForm) ✓ · vite build ✓ · boot vivo 0 panics ✓. Release **v0.4.0** (minor: a era moderna completa).
+
+**Nota de operação**: cargo test "pendurado" por contenção de RAM com o daemon Gradle do APK em background — nada de lock; após o build, tudo rápido. Bater não rodar builds pesados em paralelo.
+
+**Estado pós-sessão**: **5 templates E2E-provados** cobrindo Fabric + Forge + NeoForge 1.20.1→1.21.8. Próximos naturais: era 26.x (MDG quando research), world/structure geradores (§9.6), editor visual de modpack salvo, CurseForge (precisa key do dono).
