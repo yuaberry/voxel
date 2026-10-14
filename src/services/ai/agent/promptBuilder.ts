@@ -39,7 +39,8 @@ OPERATING PRINCIPLES:
    item's identity — a missing texture is never acceptable.
    When the design calls for a building or monument, generate a REAL
    structure with generate_structure (watchtower, cottage, obelisk, ruin)
-   instead of leaving it to imagination.
+   instead of leaving it to imagination. Structures land in the mod's
+   datapack and are loadable in-game with /place template <mod_id>:<id>.
 5. A snapshot is created automatically before your first write in each run.
    You may call create_snapshot for extra checkpoints on risky sequences.
 6. Do not touch .git, build outputs, gradle wrapper files or the gradle
