@@ -643,6 +643,17 @@ fn module_docs(id: &str) -> Option<(&'static str, &'static str, Vec<(&'static st
                 ("/function nexus_bedwars:stats", "mostra quantas camas você já quebrou"),
             ],
         ),
+        "monuments" => (
+            "Monuments",
+            "Four procedurally built structures — REAL .nbt files shipped inside the module's datapack (watchtower, cottage, obelisk, ruin) — raised where you stand with a build-up title.",
+            vec![
+                ("/trigger nexus_monument set 1", "ergue a TORRE DE VIGIA onde você está (estrutura .nbt real, com som de beacon e title)"),
+                ("/trigger nexus_monument set 2", "ergue o CHALÉ"),
+                ("/trigger nexus_monument set 3", "ergue o OBELISCO"),
+                ("/trigger nexus_monument set 4", "ergue a RUÍNA"),
+                ("(gerados pelo VOXEL)", "as estruturas são as mesmas receitas do Asset Studio, escritas direto no datapack do módulo"),
+            ],
+        ),
         _ => return None,
     })
 }

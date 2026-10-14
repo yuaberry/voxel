@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (36 sessões)
+## 5. Histórico de sessões (37 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 37 | Monuments + Snapshots | **Módulo Monuments** (.nbt reais no datapack do server, /place template via trigger, wizard gera via Rust) + **Workspace Snapshots** (autoria zipada com manifest includes/excludes) + v0.5.3 | guard de output_kind só na escrita (preview vazava); Write trait ausente; imports dupes |
 | 36 | Marketplace + editor | **Marketplace local** (modpacks/shaders com swatch real/mods com Play) + **editor de modpack salvo** (manifest re-pack atômico, byte-identical) + agent /place guidance + v0.5.2 | linha de rascunho inválida; read_to_end API; Rgb vs number[] |
 | 35 | Era 26.x + presets reais | **6º template** (MDK-26.3-ModDevGradle, MDG 2.0.148, Gradle 9.2.1, Java 25, items/*.json) **E2E com jar real** (SwordItem não existe em 26.x — pescado pelo E2E) + presets skyblock-isles/pvp-arena com os módulos NOVOS de verdade + v0.5.1 | — |
 | 34 | 3 módulos de gameplay | **SkyBlock Islands** (16 ilhas construídas, chest NBT, slots literais + cap honesto) + **Factions War** (3 times, kills via statistic real) + **BedWars Lite** (kit/arena/contagem/cama via statistic) + READMEs com tabelas + v0.5.0 | rascunho semi-feito do skyblock detectado na revisão e refeito; replace não casou com dispatch real |
@@ -252,13 +253,13 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 36, v0.5.2)
+## 8. Estado atual (verificado — Sessão 37, v0.5.3)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (61) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (69) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Rust unit (63) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Vitest (70) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -272,7 +273,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.5.2 (latest)** | Desktop: **Marketplace local + modpack editor + agent /place guidance** + APK mobile 0.3.1 |
+| **v0.5.3 (latest)** | Desktop: **Monuments (.nbt nos servidores) + Workspace Snapshots** + APK mobile 0.3.1 |
+| v0.5.2 | Desktop: **Marketplace local + modpack editor + agent /place guidance** + APK mobile 0.3.1 |
 | v0.5.1 | Desktop: **era 26.x (6º template E2E) + presets com módulos reais** + APK mobile 0.3.1 |
 | v0.5.0 | Desktop: **SkyBlock + Factions + BedWars Lite** + APK mobile 0.3.1 |
 | v0.4.5 | Desktop: **/mine real no Prison + command tables nos READMEs** + APK mobile 0.3.1 |
@@ -300,7 +302,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 61 unit
+cd src-tauri && cargo test          # 63 unit
 cargo test -- --ignored --nocapture # 10 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -319,7 +321,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 4. **Mobile polish** (§59) — secure-store do token, biometria, APK com keystore de release (Play Store), TestFlight quando houver conta Apple
 5. **Modpack Creator** → v1 (S24: export/import) · v2 (S25: score) · v3 (S26: catálogo Modrinth SHA-1) · **v4 ENTREGUE (S27): grafo transitivo required**. Restam: CurseForge (precisa API key do dono) e um editor visual de modpack salvo
 6. ~~Resource Pack / World / Structure Studios~~ → items (S25), blocks (S27), structures .nbt + preview iso (S29), **agent tool de structures + custom dimensions (S30)** entregues. Restam: schema de dimensions 1.21.2+, resource packs completos
-7. ~~Mais módulos de servidor~~ → **6 entregues**: Economy/Prison/Token (S11) + **SkyBlock/Factions/BedWars Lite (S34)**. Próximas fatias: módulos com datapack+estrutura .nbt combinados, móis presets usando os novos módulos
+7. **Módulos de servidor** → **7 entregues**: Economy/Prison/Token (S11) + SkyBlock/Factions/BedWars (S34) + **Monuments (S37: .nbt reais + /place)**. Próximas fatias: presets usando os novos módulos, restauração guiada de snapshot
 8. **Docker + Deployment Providers** (§44-45) — VPS/SSH/cloud (`DeploymentProvider` reservada)
 9. **Marketplace** (§48) e **Cloud opcional (Supabase)** (§85) — arquiteturas preparadas
 10. **Backlog de qualidade**: migrar warns `set-state-in-effect` (~20), auto-refresh de sessão MSA/GitHub, `@tauri-apps/api` mismatch (CLI de dev reescreve Cargo.toml com `features = []` — neutro; reverter após `tauri dev`)
@@ -462,7 +464,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 36 — Marketplace local (vitrine real: modpacks com fatos do manifest, shaderpacks com swatch de céu da própria paleta, mods com status vivo + Play) + editor de modpack salvo (re-pack atômico, byte-identical) + agent /place guidance. 69/69 + 61/61. Release v0.5.2.*
+*Última atualização: Sessão 37 — módulo Monuments (estruturas .nbt reais no datapack do servidor, /trigger ergue com /place template; output_kind server_module no gerador) + Workspace Snapshots (autoria zipada, produtos excluídos com manifest honesto). 70/70 + 63/63. Release v0.5.3.*
 
 ---
 
@@ -924,3 +926,19 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (31 warns) · vitest 69/69 ✓ · cargo **61/61** (+1 editor) ✓ · vite build 12m24s (máquina carregada) ✓ · boot vivo 0 panics ✓. Release v0.5.2.
 
 **Estado pós-sessão**: marketplace local + editor + agent guidance entregues. Próximos naturais: módulos estrutura+datapack (monuments para SERVIDORES), mais assets visuais (32x32? blocks com variação), publicação/backup do workspace inteiro, push externo.
+
+---
+
+## 37. Sessão 37 — Módulo Monuments (.nbt nos servidores) + Workspace Snapshots
+
+**Pedido do dono**: "sim continue com tudo."
+
+**1. Módulo Monuments — o Structure Studio encontra os Server Modules**: datapack com **estruturas .nbt REAIS** (as 4 receitas: watchtower/cottage/obelisk/ruin) escritas DENTRO do datapack do módulo pelo gerador Rust (`output_kind: "server_module"` → `world/datapacks/nexus_monuments/data/.../structures/`, com o DataVersion da era do servidor). `/trigger nexus_monument set 1-4` **ergue a estrutura onde o player está** (`/place template`, 1.19+) com title de build-up, beacon activate e rumble de wither. O wizard gera os 4 .nbt (seeds estáveis) logo após instalar os datapacks. README documenta cada monumento.
+
+**2. Workspace Snapshots**: `workspace_export_snapshot` empacota **o trabalho de autoria** — projects (sources + .voxel), shaderpacks, modpacks — num zip timestampado em `backups/snapshots/`, **excluindo honestamente** build outputs, caches e instâncias baixadas (produtos recriáveis). O `SNAPSHOT.json` dentro declara includes/excludes e como restaurar. UI: Settings → Storage, export 1-clique com toast factual + reveal.
+
+**Bugs caçados (3)**: guard de output_kind validado só no branch de escrita (preview passava com kind inválido — teste pegou, hoisted); imports duplicados (toast/openInFileManager já existiam); trait `std::io::Write` ausente no storage.rs (write_all não resolvia).
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (31 warns) · vitest **70/70** (+1 monuments) ✓ · cargo **63/63** (+2) ✓ · vite build 2m12s ✓ · boot vivo 0 panics ✓. Release v0.5.3.
+
+**Estado pós-sessão**: 7 módulos de gameplay (monuments é a ponte Studio↔Servers), snapshots protegem o trabalho. Próximos naturais: presets usando monuments, import de snapshot (restauração guiada), push externo (backend), curadoria/backup automático agendado.
