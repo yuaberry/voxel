@@ -3,6 +3,7 @@ import {
   DEFAULT_MODULE_OPTIONS,
   generateSelectedModules,
   generateModuleFiles,
+  MONUMENT_STRUCTURES,
 } from "./serverModules";
 
 describe("serverModules", () => {
@@ -181,5 +182,36 @@ describe("bedwars lite", () => {
     )!;
     expect(bed).toContain("QUEBROU UMA CAMA!");
     expect(bed).toContain("title @a title");
+  });
+});
+
+describe("monuments module", () => {
+  it("raises real structures with /place template by trigger value", () => {
+    const files = generateSelectedModules(["monuments"], DEFAULT_MODULE_OPTIONS);
+    const byPath = new Map(files.map((f) => [f.path, f.content]));
+
+    const load = byPath.get(
+      "world/datapacks/nexus_monuments/data/nexus_monuments/functions/load.mcfunction",
+    )!;
+    expect(load).toContain("scoreboard players enable * nexus_monument");
+
+    const raise = byPath.get(
+      "world/datapacks/nexus_monuments/data/nexus_monuments/functions/raise.mcfunction",
+    )!;
+    // one /place per kind, consuming the trigger once
+    expect(raise).toContain("place template nexus_monuments:monument_watchtower ~ ~ ~");
+    expect(raise).toContain("place template nexus_monuments:monument_cottage ~ ~ ~");
+    expect(raise).toContain("place template nexus_monuments:monument_obelisk ~ ~ ~");
+    expect(raise).toContain("place template nexus_monuments:monument_ruin ~ ~ ~");
+    expect(raise).toContain("scoreboard players set @s nexus_monument 0");
+    // build-up title with the kind's label
+    expect(raise).toContain("WATCHTOWER");
+
+    // the shipped structure list the wizard feeds the Rust generator
+    expect(MONUMENT_STRUCTURES).toHaveLength(4);
+    expect(MONUMENT_STRUCTURES[0]).toEqual({
+      structureId: "monument_watchtower",
+      kind: "watchtower",
+    });
   });
 });

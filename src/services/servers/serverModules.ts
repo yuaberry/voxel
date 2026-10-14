@@ -64,6 +64,14 @@ export const SERVER_MODULES: ServerModuleMeta[] = [
     icon: "Swords",
   },
   {
+    id: "monuments",
+    name: "Monuments",
+    tagline: "Real .nbt structures, placed by a command",
+    description:
+      "Four procedurally built structures (watchtower, cottage, obelisk, ruin) ship inside the datapack as real .nbt files. /trigger nexus_monument set 1-4 raises the chosen one where you stand, with a build-up title.",
+    icon: "Landmark",
+  },
+  {
     id: "bedwars",
     name: "BedWars Lite",
     tagline: "Arena, kits and bed-break glory",
@@ -364,6 +372,7 @@ tellraw @s [{"text":"[${options.currencySymbol}] chain balance: ","color":"gray"
 const SKY = "nexus_skyblock";
 const FAC = "nexus_factions";
 const BED = "nexus_bedwars";
+const MON = "nexus_monuments";
 
 /**
  * SkyBlock Islands — REAL islands, built by the datapack itself. The load
@@ -614,6 +623,63 @@ tellraw @s [{"text":"[BedWars] ","color":"#22d3ee"},{"text":"Camas quebradas: ",
   ];
 }
 
+/**
+ * Monuments — REAL .nbt structures shipped inside the datapack (the wizard
+ * writes them via the Rust structure generator), raised with /place template.
+ * The four kinds match what the Structure Studio builds.
+ */
+function monumentsFiles(): GeneratedFile[] {
+  const KINDS: Array<{ id: string; name: string; label: string }> = [
+    { id: "1", name: "monument_watchtower", label: "WATCHTOWER" },
+    { id: "2", name: "monument_cottage", label: "COTTAGE" },
+    { id: "3", name: "monument_obelisk", label: "OBELISK" },
+    { id: "4", name: "monument_ruin", label: "RUIN" },
+  ];
+  const kinds: Array<{ id: string; name: string; label: string }> = KINDS;
+
+  const branchLines = kinds
+    .map(
+      (k) =>
+        `execute if score @s nexus_monument matches ${k.id} at @s run place template ${MON}:${k.name} ~ ~ ~`,
+    )
+    .join("\n");
+
+  const announceLines = kinds
+    .map(
+      (k) =>
+        `execute if score @s nexus_monument matches ${k.id} at @s run title @s subtitle [{"text":"${k.label}","color":"#22d3ee","bold":true}]`,
+    )
+    .join("\n");
+
+  return [
+    { path: `world/datapacks/${MON}/pack.mcmeta`, content: packMcmeta("monuments") },
+    {
+      path: `world/datapacks/${MON}/data/${MON}/functions/load.mcfunction`,
+      content: `# Monuments setup — the .nbt structures are written by the VOXEL wizard
+scoreboard objectives add nexus_monument trigger "Monument (/trigger nexus_monument set 1-4)"
+scoreboard players enable * nexus_monument
+tellraw @a [{"text":"[VOXEL] ","color":"#a78bfa"},{"text":"Monuments active — /trigger nexus_monument set 1-4 raises a real structure where you stand","color":"gray"}]`,
+    },
+    {
+      path: `world/datapacks/${MON}/data/${MON}/functions/tick.mcfunction`,
+      content: `# Raise the chosen monument where the player stands
+execute as @a[scores={nexus_monument=1..}] at @s run function ${MON}:raise`,
+    },
+    {
+      path: `world/datapacks/${MON}/data/${MON}/functions/raise.mcfunction`,
+      content: `# Consume the trigger, play the build-up title and /place the chosen kind
+scoreboard players set @s nexus_monument 0
+title @s times 0t 60t 20t
+title @s title [{"text":" monument","color":"#fbbf24","bold":true}]
+${announceLines}
+playsound minecraft:block.beacon.activate master @s ~ ~ ~ 0.8 0.9
+${branchLines}
+playsound minecraft:entity.wither.spawn master @a ~ ~ ~ 0.4 1.4
+scoreboard players set @s nexus_monument 0`,
+    },
+  ];
+}
+
 export function generateModuleFiles(
   moduleId: ServerModuleId,
   options: ModuleInstallOptions = DEFAULT_MODULE_OPTIONS,
@@ -634,6 +700,8 @@ export function generateModuleFiles(
       return factionsFiles();
     case "bedwars":
       return bedwarsFiles();
+    case "monuments":
+      return monumentsFiles();
   }
 }
 
@@ -644,3 +712,15 @@ export function generateSelectedModules(
 ): GeneratedFile[] {
   return selected.flatMap((id) => generateModuleFiles(id, options));
 }
+
+/** The .nbt structures the monuments module ships — written by the Rust
+ * generator into the module's datapack when the wizard installs it. */
+export const MONUMENT_STRUCTURES: Array<{
+  structureId: string;
+  kind: "watchtower" | "cottage" | "obelisk" | "ruin";
+}> = [
+  { structureId: "monument_watchtower", kind: "watchtower" },
+  { structureId: "monument_cottage", kind: "cottage" },
+  { structureId: "monument_obelisk", kind: "obelisk" },
+  { structureId: "monument_ruin", kind: "ruin" },
+];

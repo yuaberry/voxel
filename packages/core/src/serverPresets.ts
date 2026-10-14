@@ -11,7 +11,7 @@
  * keys, `online-mode` is never overridable.
  */
 
-export type ServerModuleId = "economy" | "prison" | "token" | "skyblock" | "factions" | "bedwars";
+export type ServerModuleId = "economy" | "prison" | "token" | "skyblock" | "factions" | "bedwars" | "monuments";
 
 export type ServerPresetCategory = "official" | "community";
 

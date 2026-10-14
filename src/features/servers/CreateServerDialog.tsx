@@ -165,6 +165,24 @@ export function CreateServerDialog({
           await writeProjectFile(basePath, `servers/${slug}/${file.path}`, file.content);
         }
       }
+      // Monuments ships REAL .nbt structures — the Rust generator writes
+      // them straight into the module's datapack (era-factual, server version)
+      if (selected.includes("monuments")) {
+        const { MONUMENT_STRUCTURES } = await import("@/services/servers/serverModules");
+        const { generateStructure } = await import("@/services/assets/structureService");
+        for (const monument of MONUMENT_STRUCTURES) {
+          await generateStructure({
+            storageBase: basePath,
+            projectRel: `servers/${slug}`,
+            structureId: monument.structureId,
+            kind: monument.kind,
+            seed: 1337 + monument.structureId.length,
+            mcVersion: mcVersion,
+            previewOnly: false,
+            outputKind: "server_module",
+          });
+        }
+      }
       // The server README documents exactly what got installed (objectives
       // + in-game commands per module) — rewritten with the real facts
       await invoke("server_write_info", {

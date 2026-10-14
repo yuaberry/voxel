@@ -31,6 +31,8 @@ export function generateStructure(payload: {
   seed: number;
   mcVersion: string;
   previewOnly: boolean;
+  /** "mod" (default) or "server_module" (the Monuments module's datapack) */
+  outputKind?: "mod" | "server_module";
 }): Promise<StructureGenResult> {
   return invoke<StructureGenResult>("structure_generate", { payload });
 }

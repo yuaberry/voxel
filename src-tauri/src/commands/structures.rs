@@ -619,6 +619,10 @@ pub struct StructureGenPayload {
     pub mc_version: String,
     /// preview returns base64 + block map without writing
     pub preview_only: bool,
+    /// "mod" (default) → the project's datapack;
+    /// "server_module" → world/datapacks/nexus_monuments of a SERVER
+    /// (the Monuments gameplay module needs real .nbt files inside it)
+    pub output_kind: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -662,6 +666,12 @@ pub fn structure_generate(payload: StructureGenPayload) -> Result<StructureGenRe
         return Err("Minecraft version is required (from the project record)".to_string());
     }
 
+    // output_kind must be validated even in preview mode
+    match payload.output_kind.as_deref().unwrap_or("mod") {
+        "mod" | "server_module" => {}
+        other => return Err(format!("Unknown output kind: {other:?} (use mod or server_module)")),
+    }
+
     let structure = generate_structure(kind, payload.seed);
     let nbt = structure_nbt_bytes(&structure, mc)?;
     let b64 = base64::engine::general_purpose::STANDARD.encode(&nbt);
@@ -671,11 +681,18 @@ pub fn structure_generate(payload: StructureGenPayload) -> Result<StructureGenRe
     } else {
         let project_dir = validated_path(&payload.storage_base, payload.project_rel.trim(), false)?;
         let folder = structures_folder_for(mc);
-        let target = project_dir
-            .join("src/main/resources/data")
-            .join(project_slug_modid(&payload.project_rel))
-            .join(folder)
-            .join(format!("{}.nbt", payload.structure_id));
+        let target = match payload.output_kind.as_deref().unwrap_or("mod") {
+            "mod" => project_dir
+                .join("src/main/resources/data")
+                .join(project_slug_modid(&payload.project_rel))
+                .join(folder)
+                .join(format!("{}.nbt", payload.structure_id)),
+            "server_module" => project_dir
+                .join("world/datapacks/nexus_monuments/data/nexus_monuments")
+                .join(folder)
+                .join(format!("{}.nbt", payload.structure_id)),
+            other => return Err(format!("Unknown output kind: {other:?} (use mod or server_module)")),
+        };
         if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
@@ -723,6 +740,7 @@ mod tests {
             seed: 42,
             mc_version: "1.20.1".to_string(),
             preview_only: preview,
+            output_kind: None,
         }
     }
 
@@ -767,6 +785,33 @@ mod tests {
             assert!(nbt.len() > 100, "{kind}: nbt suspiciously small");
             let _ = std::fs::remove_dir_all(&base);
         }
+    }
+
+    #[test]
+    fn server_module_destination_lands_inside_the_monuments_datapack() {
+        let base = std::env::temp_dir().join(format!("voxel-struct-srv-{}", std::process::id()));
+        std::fs::create_dir_all(base.join("servers/arena")).unwrap();
+        std::fs::write(base.join("servers/arena/server.properties"), b"motd=x").unwrap();
+
+        let mut p = payload("watchtower", false);
+        p.storage_base = base.to_string_lossy().to_string();
+        p.project_rel = "servers/arena".to_string();
+        p.structure_id = "grand_tower".to_string();
+        p.output_kind = Some("server_module".to_string());
+        let result = structure_generate(p).unwrap();
+        let wrote = result.wrote_path.unwrap();
+        assert!(
+            wrote.contains("servers/arena/world/datapacks/nexus_monuments/data/nexus_monuments/structures/grand_tower.nbt"),
+            "unexpected path: {wrote}"
+        );
+        assert!(std::path::PathBuf::from(&wrote).is_file());
+
+        // unknown kinds refused
+        let mut p = payload("obelisk", true);
+        p.storage_base = base.to_string_lossy().to_string();
+        p.output_kind = Some("castle".to_string());
+        assert!(structure_generate(p).is_err());
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]
