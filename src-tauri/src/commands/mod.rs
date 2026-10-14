@@ -17,5 +17,6 @@ pub mod tunnel;
 pub mod servers;
 pub mod storage;
 pub mod structures;
+pub mod worldgen;
 pub mod templates;
 pub mod templates_embed;

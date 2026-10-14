@@ -1,6 +1,7 @@
 import type { ProjectRecord } from "@/types";
 import type { ToolSchema } from "./toolCallFormat";
 import { generateItemTexture, type TextureGenRequest } from "@/services/assets/assetStudioService";
+import { generateStructure } from "@/services/assets/structureService";
 import {
   createProjectDirectory,
   deleteProjectEntry,
@@ -408,6 +409,46 @@ export function buildTools(): ToolExecutor[] {
           previewOnly: false,
         });
         return `Texture written: ${result.wrotePath ?? "unknown"} (16x16 pixel art, ${String(args.asset_kind ?? "item")} style ${String(args.style)})`;
+      },
+    },
+    {
+      schema: {
+        name: "generate_structure",
+        description:
+          "Generate a REAL Minecraft structure (.nbt, structure-block ready) and write it into the project's datapack at src/main/resources/data/<mod_id>/structures/<structure_id>.nbt (or structure/ on MC 1.21+). Procedural templates: watchtower (defensive tower), cottage (cozy house), obelisk (mystic monument), ruin (eroded remnant). Same seed always produces the same build.",
+        parameters: {
+          type: "object",
+          properties: {
+            structure_id: {
+              type: "string",
+              description: "snake_case id, e.g. dark_castle_gate",
+            },
+            kind: {
+              type: "string",
+              description: "One of: watchtower, cottage, obelisk, ruin",
+            },
+            seed: {
+              type: "number",
+              description:
+                "Deterministic seed (integer). Optional — omit and the structure is generated with seed 0.",
+            },
+          },
+          required: ["structure_id", "kind"],
+        },
+      },
+      summarize: (args) =>
+        `generate structure ${String(args.structure_id)} (${String(args.kind)}, seed ${String(args.seed ?? 0)})`,
+      execute: async (args, ctx) => {
+        const result = await generateStructure({
+          storageBase: ctx.basePath,
+          projectRel: ctx.projectRel,
+          structureId: str(args, "structure_id"),
+          kind: str(args, "kind") as Parameters<typeof generateStructure>[0]["kind"],
+          seed: typeof args.seed === "number" ? Math.floor(args.seed) : 0,
+          mcVersion: ctx.project.minecraft_version,
+          previewOnly: false,
+        });
+        return `Structure written: ${result.wrotePath ?? "unknown"} (${result.blockCount} blocks, ${result.size.join("x")} — load it in-game with a structure block or reference it from a datapack)`;
       },
     },
   ];

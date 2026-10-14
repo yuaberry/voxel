@@ -66,7 +66,7 @@ export interface RunAgentOptions {
   shouldAbort?: () => boolean;
 }
 
-const WRITE_TOOLS = new Set(["write_file", "edit_file", "delete_file", "rename_file", "generate_item_texture"]);
+const WRITE_TOOLS = new Set(["write_file", "edit_file", "delete_file", "rename_file", "generate_item_texture", "generate_structure"]);
 
 interface LoopOptions extends RunAgentOptions {
   phase: AgentPhase;
