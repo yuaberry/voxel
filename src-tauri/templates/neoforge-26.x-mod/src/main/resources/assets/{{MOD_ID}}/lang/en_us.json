@@ -1,0 +1,5 @@
+{
+  "itemGroup.{{MOD_ID}}": "{{MOD_NAME}}",
+  "item.{{MOD_ID}}.example_item": "Voxel Gem",
+  "item.{{MOD_ID}}.darksteel_sword": "Darksteel Sword"
+}

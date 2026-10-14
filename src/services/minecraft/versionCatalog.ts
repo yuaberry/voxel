@@ -548,11 +548,13 @@ function loaderAvailable(
         compareMcVersions(info.version, "1.21.1") <= 0
       );
     case "neoforge":
+      // 26.x compares as (26, 0, 0) — newer than any 1.x by segment math
       return (
         !!info.neoforge &&
         (info.version === "1.20.1" ||
           (compareMcVersions(info.version, "1.20.2") >= 0 &&
-            compareMcVersions(info.version, "1.21.8") <= 0))
+            compareMcVersions(info.version, "1.21.8") <= 0) ||
+          /^26\./.test(info.version))
       );
   }
 }
@@ -625,14 +627,17 @@ export async function resolveTemplateParams(
         : "",
     mcDepends,
     packFormat: PACK_FORMATS[info.version] ?? PACK_FORMATS["1.20.1"],
-    // Three NeoForge eras, each with its own embedded template: the 1.20.1
-    // Forge drop-in, NeoGradle 7 (1.20.2-1.21.1), ModDevGradle 2 (1.21.4+).
+    // Four NeoForge eras, each with its own embedded template: the 1.20.1
+    // Forge drop-in, NeoGradle 7 (1.20.2-1.21.1), ModDevGradle 2 (1.21.4+)
+    // and the 26.x era (own MDK, Java 25).
     templateId:
-      loader === "neoforge" && compareMcVersions(info.version, "1.21.4") >= 0
-        ? "neoforge-1.21.4-mod"
-        : loader === "neoforge" && info.version !== "1.20.1"
-          ? "neoforge-1.20.2-mod"
-          : `${loader}-1.20.1-mod`,
+      loader === "neoforge" && /^26\./.test(info.version)
+        ? "neoforge-26.x-mod"
+        : loader === "neoforge" && compareMcVersions(info.version, "1.21.4") >= 0
+          ? "neoforge-1.21.4-mod"
+          : loader === "neoforge" && info.version !== "1.20.1"
+            ? "neoforge-1.20.2-mod"
+            : `${loader}-1.20.1-mod`,
     experimental: isExperimental(info.version, kind),
   };
 }

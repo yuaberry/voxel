@@ -38,9 +38,11 @@ describe("loader availability (live catalog truth)", () => {
     expect(isLoaderAvailable(mdg, "neoforge")).toBe(true);
     const mdg8 = { ...base, version: "1.21.8", neoforge: { latest: "21.8.1" } };
     expect(isLoaderAvailable(mdg8, "neoforge")).toBe(true);
-    // Beyond 1.21.8 nothing is claimed (26.x needs its own era research)
-    const tooNew = { ...base, version: "26.3", neoforge: { latest: "26.3.0.76" } };
-    expect(isLoaderAvailable(tooNew, "neoforge")).toBe(false);
+    // The 26.x era: supported with its own embedded MDK
+    const era26 = { ...base, version: "26.3", neoforge: { latest: "26.3.0.76" } };
+    expect(isLoaderAvailable(era26, "neoforge")).toBe(true);
+    // forge still honestly ends at 1.21.1
+    expect(isLoaderAvailable(era26, "forge")).toBe(false);
   });
 
   it("forge is honest about the ForgeGradle-6 coverage (1.20.1-1.21.1)", () => {

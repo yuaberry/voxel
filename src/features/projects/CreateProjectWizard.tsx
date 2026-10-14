@@ -48,7 +48,7 @@ import type { ProjectLoader, ProjectRecord } from "@/types";
 const LOADERS: { id: ProjectLoader; label: string; hint: string }[] = [
   { id: "fabric", label: "Fabric", hint: "Lightweight, fast updates — Fabric Loom template" },
   { id: "forge", label: "Forge", hint: "The classic ecosystem — ForgeGradle 6 template (1.20.1-1.21.1)" },
-  { id: "neoforge", label: "NeoForge", hint: "Three embedded eras: 1.20.1 lineage, 1.20.2-1.21.1 (NeoGradle 7), 1.21.4-1.21.8 (ModDevGradle 2)" },
+  { id: "neoforge", label: "NeoForge", hint: "Four embedded eras: 1.20.1 lineage, NeoGradle 7 (1.20.2-1.21.1), ModDevGradle 2 (1.21.4-1.21.8) and the 26.x era (Java 25)" },
 ];
 
 const LICENSES = ["MIT", "Apache-2.0", "GPL-3.0", "LGPL-3.0", "Custom", "Proprietary"];
@@ -366,9 +366,10 @@ export function CreateProjectWizard() {
             </div>
             {activeLoader === "neoforge" && (
               <p className="text-[11px] text-muted-foreground">
-                Three embedded templates: the 1.20.1 lineage (Forge drop-in),
-                NeoGradle 7 (1.20.2-1.21.1) and ModDevGradle 2 (1.21.4-1.21.8) —
-                picked automatically from the version above. The MDG era has no
+                Four embedded templates: the 1.20.1 lineage (Forge drop-in),
+                NeoGradle 7 (1.20.2-1.21.1), ModDevGradle 2 (1.21.4-1.21.8) and
+                the 26.x era MDK (Java 25, item model definitions) — picked
+                automatically from the version above. The MDG eras have no
                 pack.mcmeta (the loader handles it), so no pack format is shown.
               </p>
             )}

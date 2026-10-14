@@ -104,19 +104,19 @@ export const SERVER_STYLE_PRESETS: readonly ServerStylePreset[] = [
   {
     id: "skyblock-isles",
     name: "SkyBlock Isles",
-    tagline: "Island-style economy survival",
+    tagline: "A floating island per player, one command away",
     description:
-      "Survival built around economy progression — coins, a token market and shop triggers ready to play. Pair it with your own island world map.",
+      "Real sky islands: the datapack builds 16 floating islands (platform, starter tree, welcome chest) and /trigger nexus_skyblock claims yours. Coins and the token market complete the economy loop.",
     category: "community",
     software: "paper",
     ramMb: 4096,
     properties: {
-      motd: "A VOXEL sky-style economy server",
+      motd: "A VOXEL skyblock — claim your island with /trigger nexus_skyblock",
       difficulty: "normal",
       "spawn-protection": "0",
       pvp: "false",
     },
-    modules: ["economy", "token"],
+    modules: ["skyblock", "economy", "token"],
   },
   {
     id: "prison-break",
@@ -155,21 +155,21 @@ export const SERVER_STYLE_PRESETS: readonly ServerStylePreset[] = [
   {
     id: "pvp-arena",
     name: "PvP Arena",
-    tagline: "Competitive practice",
+    tagline: "Factions, beds and fair fights",
     description:
-      "Tuned for fair fights — low view distance for responsiveness, hard difficulty, command blocks for arena logic.",
+      "Competitive play with the war systems: colored factions with kill scoring, and the BedWars Lite arena — kit, countdown and bed-break glory. Tuned for responsiveness with a low view distance.",
     category: "community",
     software: "paper",
     ramMb: 4096,
     properties: {
-      motd: "A VOXEL PvP arena — good luck",
+      motd: "A VOXEL PvP arena — /trigger nexus_factions ou /trigger nexus_bedwars",
       difficulty: "hard",
       "view-distance": "6",
       "simulation-distance": "4",
       pvp: "true",
       "spawn-protection": "0",
     },
-    modules: [],
+    modules: ["factions", "bedwars"],
   },
   {
     id: "family-craft",

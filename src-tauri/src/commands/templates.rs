@@ -479,6 +479,52 @@ mod tests {
     }
 
     #[test]
+    fn writes_neoforge_26x_template() {
+        let mut tokens = sample_tokens();
+        tokens.loader_id = "neoforge".to_string();
+        tokens.mc_version = "26.3".to_string();
+        tokens.loader_version = "26.3.0.76".to_string();
+        tokens.loader_min = "[26.3,)".to_string();
+        tokens.mc_depends = "[26.3]".to_string();
+        tokens.java_release = 25;
+        tokens.java_enum = "25".to_string();
+
+        let base = std::env::temp_dir().join(format!("voxel-26x-{}", std::process::id()));
+        let dst = base.join("era26-mod");
+        let count = write_template("neoforge-26.x-mod", &tokens, &dst).unwrap();
+        assert!(count >= 28, "expected >= 28 files, wrote {count}");
+
+        let gradle = fs::read_to_string(dst.join("build.gradle")).unwrap();
+        assert!(gradle.contains("net.neoforged.moddev' version '2.0.148'"));
+        assert!(gradle.contains("JavaLanguageVersion.of(25)"));
+
+        let props = fs::read_to_string(dst.join("gradle.properties")).unwrap();
+        assert!(props.contains("minecraft_version=26.3"));
+        assert!(props.contains("neo_version=26.3.0.76"));
+
+        let wrapper = fs::read_to_string(dst.join("gradle/wrapper/gradle-wrapper.properties")).unwrap();
+        assert!(wrapper.contains("gradle-9.2.1"));
+
+        // the era's item model definitions (1.21.4+ format)
+        let item_def = fs::read_to_string(dst
+            .join("src/main/resources/assets/dark_kingdom/items/darksteel_sword.json"))
+            .unwrap();
+        assert!(item_def.contains("minecraft:model"));
+
+        let toml = fs::read_to_string(dst
+            .join("src/main/templates/META-INF/neoforge.mods.toml"))
+            .unwrap();
+        assert!(toml.contains("type=\"required\""));
+
+        let spec_raw = fs::read_to_string(dst.join(".voxel/project-spec.json")).unwrap();
+        let spec: serde_json::Value = serde_json::from_str(&spec_raw).unwrap();
+        assert_eq!(spec["build_configuration"]["template"], "neoforge-26.x-mod");
+
+        assert_no_tokens(&dst);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn renders_modern_mc_version_1_21() {
         let mut tokens = sample_tokens();
         tokens.mc_version = "1.21.1".to_string();

@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "{{MOD_ID}}:item/example_item"
+  }
+}

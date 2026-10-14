@@ -87,7 +87,7 @@ pub fn create_project(payload: CreateProjectPayload) -> Result<CreateProjectResu
     if payload.minecraft_version.trim().is_empty() {
         return Err("Minecraft version is required".to_string());
     }
-    let valid_java = [8u32, 17, 21];
+    let valid_java = [8u32, 17, 21, 25];
     if !valid_java.contains(&payload.java_release) {
         return Err(format!("Unsupported Java release: {}", payload.java_release));
     }
@@ -400,6 +400,71 @@ mod e2e_tests {
             "[1.20.1,1.21)",
             "[47,)",
         );
+    }
+
+    #[test]
+    #[ignore = "e2e: the 26.x era — MDG 2.0.148, Java 25 toolchain download, NeoForm 26.3 decompile (network; ~25 min first run)"]
+    fn e2e_gradle_build_compiles_neoforge_26x() {
+        let home = std::env::var("HOME").expect("HOME is set");
+        let base = std::path::PathBuf::from(&home).join("VOXEL");
+        std::fs::create_dir_all(&base).unwrap();
+        let slug = "e2e-neoforge-26x";
+        let _ = std::fs::remove_dir_all(base.join("projects").join(slug));
+
+        let payload = CreateProjectPayload {
+            storage_base: base.to_string_lossy().to_string(),
+            slug: slug.to_string(),
+            name: "Era 26 E2E".to_string(),
+            template: "neoforge-26.x-mod".to_string(),
+            mod_id: "dark_kingdom".to_string(),
+            mod_id_class: "DarkKingdom".to_string(),
+            package: "com.voxel.darkkingdom".to_string(),
+            description: "E2E acceptance build".to_string(),
+            license: "MIT".to_string(),
+            author: "VOXEL E2E".to_string(),
+            minecraft_version: "26.3".to_string(),
+            java_release: 25,
+            yarn_mappings: "".to_string(),
+            loader_version: "26.3.0.76".to_string(),
+            loader_min: "[26.3,)".to_string(),
+            fabric_api_version: "".to_string(),
+            mc_depends: "[26.3]".to_string(),
+            mappings_line: "".to_string(),
+            loader: "neoforge".to_string(),
+            pack_format: 46,
+        };
+
+        let result = create_project(payload).expect("project creation must succeed");
+        let project_dir = std::path::PathBuf::from(&result.project_path);
+        let gradle_home = base.join(".gradle-cache");
+        std::fs::create_dir_all(&gradle_home).unwrap();
+
+        let output = Command::new(project_dir.join("gradlew"))
+            .arg("build")
+            .arg("--console=plain")
+            .current_dir(&project_dir)
+            .env("GRADLE_USER_HOME", &gradle_home)
+            .output()
+            .expect("failed to run gradlew");
+
+        if !output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            panic!(
+                "GRADLE BUILD FAILED (neoforge-26x, exit {:?})\n--- stdout tail ---\n{}\n--- stderr tail ---\n{}",
+                output.status.code(),
+                stdout.chars().rev().take(5000).collect::<String>().chars().rev().collect::<String>(),
+                stderr.chars().rev().take(2000).collect::<String>().chars().rev().collect::<String>()
+            );
+        }
+        let libs = project_dir.join("build/libs");
+        let jars: Vec<_> = std::fs::read_dir(&libs)
+            .expect("build/libs must exist after build")
+            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+            .filter(|name| name.ends_with(".jar") && !name.contains("sources"))
+            .collect();
+        assert!(!jars.is_empty(), "compiled jar missing in build/libs: {jars:?}");
+        eprintln!("E2E OK (neoforge-26x) — jar: {jars:?}");
     }
 
     #[test]
