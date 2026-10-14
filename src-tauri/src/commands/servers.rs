@@ -614,6 +614,35 @@ fn module_docs(id: &str) -> Option<(&'static str, &'static str, Vec<(&'static st
                 ("(painel VOXEL)", "Economy → Token Chain mostra a chain SHA-256 completa, minta, transfere e verifica"),
             ],
         ),
+        "skyblock" => (
+            "SkyBlock Islands",
+            "A floating island per player, built by the datapack itself: a fixed grid of 16 sky islands (dirt platform, starter tree, welcome chest with a starter kit). /trigger nexus_skyblock claims the next free slot and warps there forever.",
+            vec![
+                ("/trigger nexus_skyblock", "claims a personal sky island (with loading greeting and teleport) — reuso para voltar sempre para a sua ilha"),
+                ("(bem-vindo chest)", "cada ilha nasce com machado, picareta, 6 pães e 2 brotos de carvalho"),
+                ("(grade honesta)", "16 ilhas fixas; quando todas forem reclamadas o comando avisa em vez de inventar espaço"),
+            ],
+        ),
+        "factions" => (
+            "Factions War",
+            "Three factions (Ember/Tide/Verdant) with colored teams and friendly-fire protection. Player kills score points for the team in real time, with team-only announcements.",
+            vec![
+                ("/trigger nexus_factions set 1", "entra na facção EMBER (vermelho)"),
+                ("/trigger nexus_factions set 2", "entra na facção TIDE (azul)"),
+                ("/trigger nexus_factions set 3", "entra na facção VERDANT (verde)"),
+                ("/function nexus_factions:war", "mostra a tabela da guerra (pontos de cada facção)"),
+                ("(kill = ponto)", "cada abate de jogador soma 1 ponto para a SUA facção, com anúncio para o time"),
+            ],
+        ),
+        "bedwars" => (
+            "BedWars Lite",
+            "A ready arena command: kit + sky arena warp + title countdown, and every red bed mined announces the destroyer server-wide with thunder.",
+            vec![
+                ("/trigger nexus_bedwars", "limpa o inventário, entrega o kit (espada, 16 tábuas, 3 bifes), teleporta para a arena com contagem 3-2-1 e o LUTE!"),
+                ("(cama = objetivo)", "minerar uma cama vermelha anuncia para TODO o servidor quem quebrou, com trovão e title"),
+                ("/function nexus_bedwars:stats", "mostra quantas camas você já quebrou"),
+            ],
+        ),
         _ => return None,
     })
 }
@@ -804,6 +833,24 @@ mod unit_tests {
         assert!(readme.contains("| `/trigger nexus_mine` |"));
         assert!(readme.contains("tela de loading personalizada e teleporta o jogador para as minas"));
         assert!(readme.contains("| `/function nexus_prison:warp_c` |"));
+
+        // the new gameplay modules document themselves too
+        let path = server_write_info(ServerInfoPayload {
+            storage_base: base.to_string_lossy().to_string(),
+            slug: "info-server".to_string(),
+            name: "Info Server".to_string(),
+            software: "vanilla".to_string(),
+            mc_version: "1.20.1".to_string(),
+            ram_mb: 2048,
+            modules: vec!["skyblock".into(), "factions".into(), "bedwars".into()],
+        })
+        .unwrap();
+        let readme = std::fs::read_to_string(&path).unwrap();
+        assert!(readme.contains("SkyBlock Islands (`nexus_skyblock` datapack)"));
+        assert!(readme.contains("| `/trigger nexus_skyblock` |"));
+        assert!(readme.contains("| `/trigger nexus_factions set 2` |"));
+        assert!(readme.contains("| `/trigger nexus_bedwars` |"));
+        assert!(readme.contains("anuncia para TODO o servidor"));
 
         let _ = std::fs::remove_dir_all(&base);
     }

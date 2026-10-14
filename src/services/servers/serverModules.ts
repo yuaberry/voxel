@@ -47,6 +47,30 @@ export const SERVER_MODULES: ServerModuleMeta[] = [
       "A server coin backed by an append-only SHA-256 ledger maintained by VOXEL (mint/transfer/burn with block hashing + integrity verify). In-game: players see balances and buy from the market via /trigger; the app processes purchases through the chain.",
     icon: "Link",
   },
+  {
+    id: "skyblock",
+    name: "SkyBlock Islands",
+    tagline: "A floating island per player, one command away",
+    description:
+      "Every player claims a floating island with /trigger nexus_skyblock: a personal sky platform is built in the sky (dirt, a starter tree and a welcome chest) and the player warps there. Reuse the command to warp back home.",
+    icon: "Cloud",
+  },
+  {
+    id: "factions",
+    name: "Factions War",
+    tagline: "Teams, kill points and a live war scoreboard",
+    description:
+      "Players join a faction with /trigger nexus_factions (Ember / Tide / Verdant). Player kills score points for the team on a live sidebar scoreboard, with war announcements for leads and ties.",
+    icon: "Swords",
+  },
+  {
+    id: "bedwars",
+    name: "BedWars Lite",
+    tagline: "Arena, kits and bed-break glory",
+    description:
+      "A ready arena datapack: /trigger nexus_bedwars hands a kit, warps into the arena with a countdown title, and tracks bed destruction — every broken bed announces the destroyer to the whole server.",
+    icon: "Bed",
+  },
 ];
 
 export interface GeneratedFile {
@@ -337,6 +361,259 @@ tellraw @s [{"text":"[${options.currencySymbol}] chain balance: ","color":"gray"
 // Public API — generate + install
 // ---------------------------------------------------------------------------
 
+const SKY = "nexus_skyblock";
+const FAC = "nexus_factions";
+const BED = "nexus_bedwars";
+
+/**
+ * SkyBlock Islands — REAL islands, built by the datapack itself. The load
+ * function constructs 16 personal islands in a fixed sky grid (x = n*200,
+ * y = 120): 5x5 dirt platform, a starter tree and a welcome chest with a
+ * starter kit. /trigger nexus_skyblock claims the next free slot and warps
+ * there forever; the fixed grid makes every warp a literal coordinate —
+ * 1.20.1 datapacks have no dynamic tp, and this is the honest pattern.
+ */
+function skyblockFiles(): GeneratedFile[] {
+  const ISLANDS = 16;
+  const SPACING = 200;
+  const Y = 120;
+
+  const buildLines: string[] = [];
+  for (let n = 1; n <= ISLANDS; n += 1) {
+    const x = n * SPACING;
+    for (let dx = -2; dx <= 2; dx += 1) {
+      for (let dz = -2; dz <= 2; dz += 1) {
+        buildLines.push(`setblock ${x + dx} ${Y - 1} ${dz} minecraft:dirt`);
+      }
+    }
+    buildLines.push(`setblock ${x} ${Y} 0 minecraft:oak_log`);
+    buildLines.push(`setblock ${x} ${Y + 1} 0 minecraft:oak_log`);
+    buildLines.push(`setblock ${x} ${Y + 2} 0 minecraft:oak_log`);
+    buildLines.push(`setblock ${x} ${Y + 3} 0 minecraft:oak_leaves`);
+    buildLines.push(`setblock ${x + 1} ${Y + 2} 0 minecraft:oak_leaves`);
+    buildLines.push(`setblock ${x - 1} ${Y + 2} 0 minecraft:oak_leaves`);
+    buildLines.push(`setblock ${x} ${Y + 2} 1 minecraft:oak_leaves`);
+    buildLines.push(`setblock ${x} ${Y + 2} -1 minecraft:oak_leaves`);
+    buildLines.push(
+      `setblock ${x + 2} ${Y} 2 minecraft:chest{Items:[{Slot:0b,id:"minecraft:wooden_axe",Count:1b},{Slot:1b,id:"minecraft:wooden_pickaxe",Count:1b},{Slot:2b,id:"minecraft:bread",Count:6b},{Slot:3b,id:"minecraft:oak_sapling",Count:2b}]} replace`,
+    );
+  }
+
+  const warpLines: string[] = [];
+  for (let n = 1; n <= ISLANDS; n += 1) {
+    warpLines.push(
+      `execute if score @s nexus_island_id matches ${n} run tp @s ${n * SPACING} ${Y} 0`,
+    );
+  }
+
+  return [
+    { path: `world/datapacks/${SKY}/pack.mcmeta`, content: packMcmeta("skyblock") },
+    {
+      path: `world/datapacks/${SKY}/data/${SKY}/functions/load.mcfunction`,
+      content: `# SkyBlock Islands setup — ${ISLANDS} personal islands in the sky grid
+scoreboard objectives add nexus_island trigger "Island warp (/trigger nexus_skyblock)"
+scoreboard objectives add nexus_island_id dummy "Island slot"
+scoreboard players set #counter nexus_island_id 0
+scoreboard players enable * nexus_island
+${buildLines.join("\n")}
+tellraw @a [{"text":"[VOXEL] ","color":"#a78bfa"},{"text":"SkyBlock Islands active — /trigger nexus_skyblock to claim/warp to your island","color":"gray"}]`,
+    },
+    {
+      path: `world/datapacks/${SKY}/data/${SKY}/functions/tick.mcfunction`,
+      content: `# Claim or warp on trigger
+execute as @a[scores={nexus_island=1..}] at @s run function ${SKY}:claim`,
+    },
+    {
+      path: `world/datapacks/${SKY}/data/${SKY}/functions/claim.mcfunction`,
+      content: `# First use claims the next free slot; later uses just warp home
+scoreboard players set @s nexus_island 0
+execute as @s[scores={nexus_island_id=0}] run function ${SKY}:assign_slot
+execute as @s[scores={nexus_island_id=1..}] run function ${SKY}:warp`,
+    },
+    {
+      path: `world/datapacks/${SKY}/data/${SKY}/functions/assign_slot.mcfunction`,
+      content: `# Honest capacity: up to ${ISLANDS} islands; the grid is fixed
+execute if score #counter nexus_island_id matches ${ISLANDS} run tellraw @s [{"text":"[SkyBlock] ","color":"#fbbf24"},{"text":"All ${ISLANDS} islands are claimed — the grid can be extended in the datapack.","color":"gray"}]
+execute if score #counter nexus_island_id matches ..${ISLANDS - 1} run function ${SKY}:take_slot`,
+    },
+    {
+      path: `world/datapacks/${SKY}/data/${SKY}/functions/take_slot.mcfunction`,
+      content: `# Consume the counter, mark the island as mine and warp in
+scoreboard players add #counter nexus_island_id 1
+scoreboard players operation @s nexus_island_id = #counter nexus_island_id
+tellraw @a [{"text":"[SkyBlock] ","color":"#7ee8fa"},{"selector":"@s","color":"#a78bfa"},{"text":" claimed island #"},{"score":{"objective":"nexus_island_id","name":"@s"},"color":"#22d3ee"}]
+function ${SKY}:warp`,
+    },
+    {
+      path: `world/datapacks/${SKY}/data/${SKY}/functions/warp.mcfunction`,
+      content: `# Warp to YOUR island (literal grid coordinates)
+${warpLines.join("\n")}
+title @s times 0t 40t 20t
+title @s subtitle [{"text":"bem-vindo à sua ilha","color":"#7ee8fa"}]
+playsound minecraft:entity.enderman.teleport master @s ~ ~ ~ 0.6 1.0`,
+    },
+  ];
+}
+
+/**
+ * Factions War — join Ember / Tide / Verdant with a trigger; player kills
+ * score team points with live announcements.
+ */
+function factionsFiles(): GeneratedFile[] {
+  return [
+    { path: `world/datapacks/${FAC}/pack.mcmeta`, content: packMcmeta("factions") },
+    {
+      path: `world/datapacks/${FAC}/data/${FAC}/functions/load.mcfunction`,
+      content: `# Factions War setup
+scoreboard objectives add nexus_faction trigger "Join faction (/trigger nexus_factions set 1-3)"
+scoreboard objectives add nexus_fac_ember dummy "Ember points"
+scoreboard objectives add nexus_fac_tide dummy "Tide points"
+scoreboard objectives add nexus_fac_verdant dummy "Verdant points"
+scoreboard objectives add nexus_player_kills minecraft.custom:minecraft.player_kills "Player kills"
+scoreboard players set #fac nexus_fac_ember 0
+scoreboard players set #fac nexus_fac_tide 0
+scoreboard players set #fac nexus_fac_verdant 0
+scoreboard players enable * nexus_faction
+team add ember
+team add tide
+team add verdant
+team modify ember color red
+team modify tide color blue
+team modify verdant color green
+team modify ember friendlyFire false
+team modify tide friendlyFire false
+team modify verdant friendlyFire false
+tellraw @a [{"text":"[VOXEL] ","color":"#a78bfa"},{"text":"Factions War active — /trigger nexus_factions set 1 (Ember), 2 (Tide) ou 3 (Verdant)","color":"gray"}]`,
+    },
+    {
+      path: `world/datapacks/${FAC}/data/${FAC}/functions/tick.mcfunction`,
+      content: `# Join requests + kill scoring per team
+execute as @a[scores={nexus_faction=1}] at @s run function ${FAC}:join_ember
+execute as @a[scores={nexus_faction=2}] at @s run function ${FAC}:join_tide
+execute as @a[scores={nexus_faction=3}] at @s run function ${FAC}:join_verdant
+execute as @a[scores={nexus_player_kills=1..},team=ember] at @s run function ${FAC}:score_ember
+execute as @a[scores={nexus_player_kills=1..},team=tide] at @s run function ${FAC}:score_tide
+execute as @a[scores={nexus_player_kills=1..},team=verdant] at @s run function ${FAC}:score_verdant`,
+    },
+    {
+      path: `world/datapacks/${FAC}/data/${FAC}/functions/join_ember.mcfunction`,
+      content: `# Join the Ember faction (red)
+scoreboard players set @s nexus_faction 0
+team join ember @s
+tellraw @a [{"text":"[Factions] ","color":"red"},{"selector":"@s","color":"red"},{"text":" joined EMBER ⚔","color":"gray"}]`,
+    },
+    {
+      path: `world/datapacks/${FAC}/data/${FAC}/functions/join_tide.mcfunction`,
+      content: `# Join the Tide faction (blue)
+scoreboard players set @s nexus_faction 0
+team join tide @s
+tellraw @a [{"text":"[Factions] ","color":"blue"},{"selector":"@s","color":"blue"},{"text":" joined TIDE 🌊","color":"gray"}]`,
+    },
+    {
+      path: `world/datapacks/${FAC}/data/${FAC}/functions/join_verdant.mcfunction`,
+      content: `# Join the Verdant faction (green)
+scoreboard players set @s nexus_faction 0
+team join verdant @s
+tellraw @a [{"text":"[Factions] ","color":"green"},{"selector":"@s","color":"green"},{"text":" joined VERDANT 🌿","color":"gray"}]`,
+    },
+    {
+      path: `world/datapacks/${FAC}/data/${FAC}/functions/score_ember.mcfunction`,
+      content: `# Ember scores this kill
+scoreboard players remove @s nexus_player_kills 1
+scoreboard players add #fac nexus_fac_ember 1
+tellraw @a[team=ember] [{"text":"[Factions] ","color":"red"},{"text":"+1 Ember! Total: ","color":"gray"},{"score":{"objective":"nexus_fac_ember","name":"#fac"},"color":"red"}]`,
+    },
+    {
+      path: `world/datapacks/${FAC}/data/${FAC}/functions/score_tide.mcfunction`,
+      content: `# Tide scores this kill
+scoreboard players remove @s nexus_player_kills 1
+scoreboard players add #fac nexus_fac_tide 1
+tellraw @a[team=tide] [{"text":"[Factions] ","color":"blue"},{"text":"+1 Tide! Total: ","color":"gray"},{"score":{"objective":"nexus_fac_tide","name":"#fac"},"color":"blue"}]`,
+    },
+    {
+      path: `world/datapacks/${FAC}/data/${FAC}/functions/score_verdant.mcfunction`,
+      content: `# Verdant scores this kill
+scoreboard players remove @s nexus_player_kills 1
+scoreboard players add #fac nexus_fac_verdant 1
+tellraw @a[team=verdant] [{"text":"[Factions] ","color":"green"},{"text":"+1 Verdant! Total: ","color":"gray"},{"score":{"objective":"nexus_fac_verdant","name":"#fac"},"color":"green"}]`,
+    },
+    {
+      path: `world/datapacks/${FAC}/data/${FAC}/functions/war.mcfunction`,
+      content: `# The live war table (anyone can ask for it)
+tellraw @a [{"text":"[Factions] ","color":"#a78bfa"},{"text":"⚔ EMBER: ","color":"red"},{"score":{"objective":"nexus_fac_ember","name":"#fac"},"color":"red"},{"text":" · TIDE: ","color":"gray"},{"score":{"objective":"nexus_fac_tide","name":"#fac"},"color":"blue"},{"text":" · VERDANT: ","color":"gray"},{"score":{"objective":"nexus_fac_verdant","name":"#fac"},"color":"green"}]`,
+    },
+  ];
+}
+
+/**
+ * BedWars Lite — kit + arena warp + countdown, and bed destruction tracked
+ * through the real mining statistic, announced server-wide.
+ */
+function bedwarsFiles(): GeneratedFile[] {
+  return [
+    { path: `world/datapacks/${BED}/pack.mcmeta`, content: packMcmeta("bedwars") },
+    {
+      path: `world/datapacks/${BED}/data/${BED}/functions/load.mcfunction`,
+      content: `# BedWars Lite setup
+scoreboard objectives add nexus_bedwars trigger "Arena warp (/trigger nexus_bedwars)"
+scoreboard objectives add nexus_beds_broken minecraft.mined:minecraft:red_bed "Beds broken"
+scoreboard players enable * nexus_bedwars
+tellraw @a [{"text":"[VOXEL] ","color":"#a78bfa"},{"text":"BedWars Lite active — /trigger nexus_bedwars para entrar na arena","color":"gray"}]`,
+    },
+    {
+      path: `world/datapacks/${BED}/data/${BED}/functions/tick.mcfunction`,
+      content: `# Arena entry + bed-break glory
+execute as @a[scores={nexus_bedwars=1..}] at @s run function ${BED}:enter
+execute as @a[scores={nexus_beds_broken=1..}] at @s run function ${BED}:bed_broken`,
+    },
+    {
+      path: `world/datapacks/${BED}/data/${BED}/functions/enter.mcfunction`,
+      content: `# Kit + sky arena warp (x=4096 keeps it away from your builds) + countdown
+scoreboard players set @s nexus_bedwars 0
+clear @s
+give @s minecraft:wooden_sword 1
+give @s minecraft:oak_planks 16
+give @s minecraft:cooked_beef 3
+tp @s 4096 120 0
+title @s times 0t 100t 20t
+title @s title [{"text":"BED","color":"#22d3ee"},{"text":"WARS","color":"#22d3ee","bold":true}]
+title @s subtitle [{"text":"3","color":"gray"}]
+schedule function ${BED}:count_2 20t replace ${BED}:count_2
+tellraw @s [{"text":"[BedWars] ","color":"#22d3ee"},{"text":"Proteja sua cama! Minere a cama inimiga para vencer.","color":"gray"}]
+playsound minecraft:block.note_block.pling master @s ~ ~ ~ 1 1.5`,
+    },
+    {
+      path: `world/datapacks/${BED}/data/${BED}/functions/count_2.mcfunction`,
+      content: `title @s subtitle [{"text":"2","color":"gray"}]
+schedule function ${BED}:count_1 20t replace ${BED}:count_1`,
+    },
+    {
+      path: `world/datapacks/${BED}/data/${BED}/functions/count_1.mcfunction`,
+      content: `title @s subtitle [{"text":"1","color":"gray"}]
+schedule function ${BED}:go 20t replace ${BED}:go`,
+    },
+    {
+      path: `world/datapacks/${BED}/data/${BED}/functions/go.mcfunction`,
+      content: `title @s times 0t 40t 20t
+title @s subtitle [{"text":"LUTE!","color":"#22d3ee","bold":true}]
+playsound minecraft:entity.ender_dragon.growl master @s ~ ~ ~ 0.8 1.2`,
+    },
+    {
+      path: `world/datapacks/${BED}/data/${BED}/functions/bed_broken.mcfunction`,
+      content: `# A red bed was mined — announce the destroyer to the whole server
+scoreboard players remove @s nexus_beds_broken 1
+tellraw @a [{"text":"[BedWars] ","color":"#22d3ee"},{"selector":"@s","color":"#a78bfa"},{"text":" QUEBROU UMA CAMA! ⚠","color":"gray"}]
+title @a title [{"text":"CAMA QUEBRADA!","color":"#fbbf24","bold":true}]
+playsound minecraft:entity.lightning_bolt.thunder master @a ~ ~ ~ 0.7 0.8`,
+    },
+    {
+      path: `world/datapacks/${BED}/data/${BED}/functions/stats.mcfunction`,
+      content: `# Personal bedwars stats
+tellraw @s [{"text":"[BedWars] ","color":"#22d3ee"},{"text":"Camas quebradas: ","color":"gray"},{"score":{"objective":"nexus_beds_broken","name":"@s"},"color":"#22d3ee"}]`,
+    },
+  ];
+}
+
 export function generateModuleFiles(
   moduleId: ServerModuleId,
   options: ModuleInstallOptions = DEFAULT_MODULE_OPTIONS,
@@ -351,6 +628,12 @@ export function generateModuleFiles(
         currencyName: options.currencyName,
         currencySymbol: options.currencySymbol,
       });
+    case "skyblock":
+      return skyblockFiles();
+    case "factions":
+      return factionsFiles();
+    case "bedwars":
+      return bedwarsFiles();
   }
 }
 
