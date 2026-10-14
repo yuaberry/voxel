@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (33 sessões)
+## 5. Histórico de sessões (34 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 34 | 3 módulos de gameplay | **SkyBlock Islands** (16 ilhas construídas, chest NBT, slots literais + cap honesto) + **Factions War** (3 times, kills via statistic real) + **BedWars Lite** (kit/arena/contagem/cama via statistic) + READMEs com tabelas + v0.5.0 | rascunho semi-feito do skyblock detectado na revisão e refeito; replace não casou com dispatch real |
 | 33 | /mine real + comandos nos READMEs | **Prison ganha /trigger nexus_mine** (loading personalizada com barras + tp para a mina do rank atual) + **tabelas de comandos nos READMEs** (por módulo, fidelidade contra as mcfunctions + seção vanilla admin) + v0.4.5 | `#` de mcfunction dentro do JS (esbuild pegou); doc de /function inexistente (shop→balance) |
 | 32 | Documentação viva + research 26.x | **README próprio nos 3 níveis**: servers (fatos do properties + objetivos/comandos dos módulos), modpacks (README no zip + guia por loader + import aceita), mods (guia de instalação ×5 templates) + **era 26.x mapeada** (NeoForgeMDKs/MDK-26.3, MDG 2.0.148, Java 25, Gradle 9.2.1) + v0.4.4 | #[test] duplicado empilhado (harness duplicava o teste → race); import recusava README; push char/str; assert vs markdown |
 | 31 | Dimensions modernas + Library | World Studio **1.21.2-1.21.8** (flatten de int providers por era, testado byte-a-byte) + **Modpack Library** (modpack_list lê manifests dos zips; install 1-clique, reveal, delete guardado) + v0.4.3 | replace python não casou `json!(` (teste pegou); &str vs String; pkill self-match com daemon Java; --quiet escondendo erros de compilação |
@@ -249,13 +250,13 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 33, v0.4.5)
+## 8. Estado atual (verificado — Sessão 34, v0.5.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
 | Rust unit (59) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (66) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Vitest (69) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -269,7 +270,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.4.5 (latest)** | Desktop: **/mine real no Prison + command tables nos READMEs** + APK mobile 0.3.1 |
+| **v0.5.0 (latest)** | Desktop: **SkyBlock + Factions + BedWars Lite** + APK mobile 0.3.1 |
+| v0.4.5 | Desktop: **/mine real no Prison + command tables nos READMEs** + APK mobile 0.3.1 |
 | v0.4.4 | Desktop: **self-documenting servers/modpacks/mods** + APK mobile 0.3.1 |
 | v0.4.3 | Desktop: **dimensions 1.20.1-1.21.8 + Modpack Library** + APK mobile 0.3.1 |
 | v0.4.2 | Desktop: **agent structures + World Studio (dimensões reais)** + APK mobile 0.3.1 |
@@ -313,7 +315,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 4. **Mobile polish** (§59) — secure-store do token, biometria, APK com keystore de release (Play Store), TestFlight quando houver conta Apple
 5. **Modpack Creator** → v1 (S24: export/import) · v2 (S25: score) · v3 (S26: catálogo Modrinth SHA-1) · **v4 ENTREGUE (S27): grafo transitivo required**. Restam: CurseForge (precisa API key do dono) e um editor visual de modpack salvo
 6. ~~Resource Pack / World / Structure Studios~~ → items (S25), blocks (S27), structures .nbt + preview iso (S29), **agent tool de structures + custom dimensions (S30)** entregues. Restam: schema de dimensions 1.21.2+, resource packs completos
-7. **Mais módulos de servidor** — SkyBlock, Factions, BedWars (Economy/Prison/Token entregues)
+7. ~~Mais módulos de servidor~~ → **6 entregues**: Economy/Prison/Token (S11) + **SkyBlock/Factions/BedWars Lite (S34)**. Próximas fatias: módulos com datapack+estrutura .nbt combinados, móis presets usando os novos módulos
 8. **Docker + Deployment Providers** (§44-45) — VPS/SSH/cloud (`DeploymentProvider` reservada)
 9. **Marketplace** (§48) e **Cloud opcional (Supabase)** (§85) — arquiteturas preparadas
 10. **Backlog de qualidade**: migrar warns `set-state-in-effect` (~20), auto-refresh de sessão MSA/GitHub, `@tauri-apps/api` mismatch (CLI de dev reescreve Cargo.toml com `features = []` — neutro; reverter após `tauri dev`)
@@ -456,7 +458,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 33 — /mine REAL no Prison (trigger + loading screen com barras + warp por rank) + tabelas de comandos nos READMEs de todos os servidores (módulos + vanilla admin, fidelidade verificada contra as mcfunctions). 66/66 + 59/59. Release v0.4.5.*
+*Última atualização: Sessão 34 — três módulos de gameplay REAIS: SkyBlock Islands (16 ilhas construídas no load, baú com kit NBT, slots honestos), Factions War (3 times, kills via statistic vanilla) e BedWars Lite (kit, arena, contagem, cama via statistic de mineração). 26.x = decisão sênior documentada (sessão dedicada). 69/69 + 59/59. Release v0.5.0.*
 
 ---
 
@@ -860,3 +862,21 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: typecheck 0 ✓ · lint 0 errors (30 warns) · **vitest 66/66** (+1: trigger registrado/consumido, barras agendadas, warps por rank) ✓ · **cargo 59/59** (README renderiza as tabelas, incluindo a linha do /mine com a descrição do dono) ✓ · vite build 1m36s ✓ · boot vivo 0 panics ✓. Release v0.4.5.
 
 **Estado pós-sessão**: os módulos têm UX de gameplay de verdade e os servidores se documentam com comandos. Próximo natural: template neoforge-26.x (research pronta), mais módulos (SkyBlock/Factions/BedWars), marketplace local.
+
+---
+
+## 34. Sessão 34 — Três módulos de gameplay reais (SkyBlock/Factions/BedWars)
+
+**Pedido do dono**: "sim quero todos" → os próximos naturais. **Decisão sênior sobre o 26.x**: a API de espadas/modelos de itens da era 26.x não é verificável offline com a certeza que a casa exige (o E2E de compilação NÃO valida render de modelos) — a research completa (MDK baixado, DeferredRegister 26.3 mapeado, wrapper 9.2.1, Java 25) está documentada e o template vira sessão dedicada com estudo empírico. Nada semi-feito. Em vez disso: os 3 módulos de gameplay do §9.7, 100% entregáveis com provas.
+
+**1. SkyBlock Islands** — o load CONSTRÓI 16 ilhas reais num grid no céu (x = n×200, y=120): plataformas 5×5 de dirt, árvore inicial, e um baú de boas-vindas com kit NBT (machado, picareta, 6 pães, 2 brotos). `/trigger nexus_skyblock` reivindica o próximo slot livre (anúncio no servidor) e teleporta para casa para sempre — **coordenadas literais por slot, o padrão honesto de 1.20.1** (datapacks não têm tp dinâmico). Capacidade honesta: 16 ilhas; quando acabam, o comando AVISA em vez de inventar espaço.
+**2. Factions War** — 3 times coloridos (Ember/Tide/Verdant) com friendly-fire off; join via `/trigger nexus_factions set 1-3` com anúncio; cada abate de jogador pontua pro time pelo **statistic REAL** (`custom:minecraft.player_kills`), com calls só pro time, e tabela da guerra sob demanda.
+**3. BedWars Lite** — `/trigger nexus_bedwars` limpa o inventário, entrega kit (espada, 16 tábuas, 3 bifes), teleporta pra arena no céu com contagem 3-2-1 + LUTE!; cada cama vermelha minerada — pelo **statistic real** (`mined:minecraft.red_bed`) — anuncia o destruidor pro servidor INTEIRO com trovão e title.
+
+READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes automaticamente.
+
+**Bugs caçados (2)**: o rascunho inicial do SkyBlock saiu semi-feito (comentário-explicação no lugar de código — INACEITÁVEL pela regra da casa): detectado na revisão antes de commitar e REFEITO com o design de grid real; replace python não casou com o dispatch real (param `moduleId`) — generators entraram só na 2ª tentativa.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (30 warns) · **vitest 69/69** (+3 módulos: setblock counts, chest NBT, warps por slot, cap message, teams/kills, kit/arena/cama) ✓ · **cargo 59/59** ✓ · vite build 6m53s ✓ · boot vivo 0 panics ✓. Release **v0.5.0** (minor: módulos de gameplay).
+
+**Estado pós-sessão**: 6 módulos de gameplay (economy/prison/token/skyblock/factions/bedwars), todos com README e comandos reais. Próximos naturais: template neoforge-26.x (research pronta, sessão dedicada), marketplace local, editor de modpack, mais presets de servidor com os módulos novos.
