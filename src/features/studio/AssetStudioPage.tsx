@@ -359,7 +359,7 @@ export function AssetStudioPage() {
                 {isStructure
                   ? "Isometric preview of the exact block list — the .nbt contains these and only these."
                   : isWorld
-                    ? "The realm's physics and generator, era-factual for 1.20.1-1.21.1."
+                    ? "The realm's physics and generator — era-factual for 1.20.1 through 1.21.8."
                     : "Live preview — nothing is written until you save."}
               </p>
             </CardContent>
@@ -465,9 +465,9 @@ export function AssetStudioPage() {
                     </>
                   ) : (
                     <p className="rounded-lg border border-dashed border-border/70 p-3 text-[11px] text-muted-foreground">
-                      The dimension datapack schema changed in 1.21.2+ — this
-                      generator covers 1.20.1-1.21.1 honestly. Your project is
-                      on MC {project?.minecraft_version ?? "?"}.
+                      The 26.x rework is not covered by this generator yet —
+                      honest no. Your project is on MC{" "}
+                      {project?.minecraft_version ?? "?"}.
                     </p>
                   )}
                 </>

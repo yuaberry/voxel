@@ -29,7 +29,9 @@ export function createDimension(payload: {
   return invoke<DimensionGenResult>("worldgen_create_dimension", { payload });
 }
 
-/** Honest support check for the wizard UI (mirrors the Rust guard). */
+/** Honest support check for the wizard UI (mirrors the Rust guard):
+ *  1.20.1-1.21.1 uses the wrapped int providers, 1.21.2-1.21.8 the
+ *  flattened ones (24w40a) — both eras are covered. 26.x is not. */
 export function dimensionSchemaSupported(mcVersion: string): boolean {
   const parts = mcVersion.trim().split(".").map((n) => Number(n) || 0);
   const [major, minor, patch] = [
@@ -37,7 +39,5 @@ export function dimensionSchemaSupported(mcVersion: string): boolean {
     parts[1] ?? 0,
     parts[2] ?? 0,
   ];
-  return (
-    [major, minor, patch] >= [1, 20, 1] && [major, minor, patch] < [1, 21, 2]
-  );
+  return [major, minor, patch] >= [1, 20, 1] && [major, minor, patch] < [26, 0, 0];
 }

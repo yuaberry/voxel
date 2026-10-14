@@ -78,6 +78,8 @@ pub fn run() {
             commands::modpack::modpack_export,
             commands::modpack::modpack_exportable_assets,
             commands::modpack::modpack_check_compatibility,
+            commands::modpack::modpack_list,
+            commands::modpack::modpack_delete,
             commands::modrinth::modrinth_download,
             commands::structures::structure_generate,
             commands::worldgen::worldgen_create_dimension,

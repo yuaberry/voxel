@@ -64,7 +64,20 @@ fn safe_dimension_id(id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// The dimension schema is era-stable for 1.20.1-1.21.1.
+/// 1.21.2 flattened the int providers (24w40a): uniform lost its "value"
+/// wrapper. This is the one schema delta across our whole template range.
+pub fn is_modern_schema(mc: &str) -> bool {
+    let parts: Vec<u32> = mc.trim().split('.').map(|s| s.parse().unwrap_or(0)).collect();
+    let (major, minor, patch) = (
+        parts.first().copied().unwrap_or(0),
+        parts.get(1).copied().unwrap_or(0),
+        parts.get(2).copied().unwrap_or(0),
+    );
+    (major, minor, patch) >= (1, 21, 2)
+}
+
+/// The dimension schema is covered era-by-era for 1.20.1-1.21.8; 26.x
+/// reworked more than this generator can honestly claim.
 fn supported_version(mc: &str) -> Result<(), String> {
     let parts: Vec<u32> = mc
         .trim()
@@ -77,22 +90,27 @@ fn supported_version(mc: &str) -> Result<(), String> {
         parts.get(2).copied().unwrap_or(0),
     );
     let at_least_1201 = (major, minor, patch) >= (1, 20, 1);
-    let before_1212 = (major, minor, patch) < (1, 21, 2);
+    let before_26 = (major, minor, patch) < (26, 0, 0);
     if !at_least_1201 {
         return Err(format!(
             "Custom dimensions need Minecraft 1.20.1+ (got {mc})"
         ));
     }
-    if !before_1212 {
+    if !before_26 {
         return Err(
-            "The dimension datapack schema changed in 1.21.2+ — this generator covers 1.20.1-1.21.1 honestly".to_string(),
+            "The 26.x rework is not covered by this generator yet — honest no".to_string(),
         );
     }
     Ok(())
 }
 
 /// The physics of the realm (data/<ns>/dimension_type/<id>.json).
-fn dimension_type_json(preset: WorldPreset, mod_id: &str, dimension_id: &str) -> serde_json::Value {
+fn dimension_type_json(
+    preset: WorldPreset,
+    mod_id: &str,
+    dimension_id: &str,
+    modern_schema: bool,
+) -> serde_json::Value {
     let (ambient, fixed_time, has_skylight, has_ceiling, ultrawarm, bed_works, anchor_works, effects, height, min_y) = match preset {
         // Eternal dusk: sky above, never quite night, safe beds
         WorldPreset::EternalRealm => (0.5, Some(13000), true, false, false, true, false, "minecraft:overworld", 384, -64),
@@ -103,6 +121,20 @@ fn dimension_type_json(preset: WorldPreset, mod_id: &str, dimension_id: &str) ->
         // The void: a 256-tall canvas on flat nothing
         WorldPreset::VoidSanctum => (0.6, None, true, false, false, true, false, "minecraft:overworld", 256, 0),
     };
+    // 1.21.2+ (24w40a) flattened the int providers — uniform lost its
+    // "value" wrapper. Era decides, never guesses.
+    let monster_spawn_light_level = if modern_schema {
+        json!({
+            "type": "minecraft:uniform",
+            "min_inclusive": 0,
+            "max_inclusive": 7
+        })
+    } else {
+        json!({
+            "type": "minecraft:uniform",
+            "value": { "min_inclusive": 0, "max_inclusive": 7 }
+        })
+    };
     json!({
         "ultrawarm": ultrawarm,
         "natural": preset != WorldPreset::EmberWastes,
@@ -111,10 +143,7 @@ fn dimension_type_json(preset: WorldPreset, mod_id: &str, dimension_id: &str) ->
         "has_ceiling": has_ceiling,
         "ambient_light": ambient,
         "fixed_time": fixed_time,
-        "monster_spawn_light_level": {
-            "type": "minecraft:uniform",
-            "value": { "min_inclusive": 0, "max_inclusive": 7 }
-        },
+        "monster_spawn_light_level": monster_spawn_light_level,
         "monster_spawn_block_light_limit": 0,
         "piglin_safe": preset == WorldPreset::EmberWastes,
         "bed_works": bed_works,
@@ -215,7 +244,12 @@ pub fn worldgen_create_dimension(payload: DimensionGenPayload) -> Result<Dimensi
         }
     }
 
-    let type_json = dimension_type_json(preset, &mod_id, &payload.dimension_id);
+    let type_json = dimension_type_json(
+        preset,
+        &mod_id,
+        &payload.dimension_id,
+        is_modern_schema(&payload.mc_version),
+    );
     let dim_json = dimension_json(preset, &mod_id, &payload.dimension_id);
 
     // Pretty JSON, valid by construction — the same bytes the game reads
@@ -312,9 +346,31 @@ mod tests {
         p.storage_base = base.to_string_lossy().to_string();
         assert!(worldgen_create_dimension(p).is_err());
 
+        // 1.21.4 now writes with the FLATTENED int provider (24w40a)
         let mut p = payload("depths", "1.21.4");
         p.storage_base = base.to_string_lossy().to_string();
-        assert!(worldgen_create_dimension(p).is_err(), "1.21.2+ schema is honestly not claimed");
+        let result = worldgen_create_dimension(p).unwrap();
+        let type_json: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&result.dimension_type_path).unwrap())
+                .unwrap();
+        assert!(type_json["monster_spawn_light_level"].get("value").is_none(),
+            "1.21.2+ must use the flattened provider");
+        assert_eq!(type_json["monster_spawn_light_level"]["min_inclusive"], 0);
+
+        // and 1.20.1 keeps the wrapped one
+        let mut p = payload("depths", "1.20.1");
+        p.storage_base = base.to_string_lossy().to_string();
+        let result = worldgen_create_dimension(p).unwrap();
+        let type_json: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&result.dimension_type_path).unwrap())
+                .unwrap();
+        assert!(type_json["monster_spawn_light_level"]["value"].is_object(),
+            "1.20.1 must keep the wrapped provider");
+
+        // 26.x honestly refused
+        let mut p = payload("depths", "26.3");
+        p.storage_base = base.to_string_lossy().to_string();
+        assert!(worldgen_create_dimension(p).is_err(), "the 26.x rework is not claimed");
 
         let mut p = payload("castle", "1.20.1");
         p.storage_base = base.to_string_lossy().to_string();

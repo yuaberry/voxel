@@ -81,3 +81,24 @@ export function checkModpackCompatibility(
     mods,
   });
 }
+
+export interface SavedModpack {
+  fileName: string;
+  name: string;
+  version: string;
+  mcVersion: string;
+  loader: string;
+  modCount: number;
+  shaderPackCount: number;
+  createdAt: string;
+  sizeBytes: number;
+  fullPath: string;
+}
+
+export function listModpacks(storageBase: string): Promise<SavedModpack[]> {
+  return invoke<SavedModpack[]>("modpack_list", { storageBase });
+}
+
+export function deleteModpack(storageBase: string, fileName: string): Promise<void> {
+  return invoke("modpack_delete", { storageBase, fileName });
+}

@@ -737,6 +737,89 @@ pub fn modpack_check_compatibility(
     Ok(ModpackCompatibility { checks, score, mod_count: facts.len() })
 }
 
+// ---------------------------------------------------------------------------
+// Modpack Library — the exported zips, listed and managed
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedModpack {
+    pub file_name: String,
+    pub name: String,
+    pub version: String,
+    pub mc_version: String,
+    pub loader: String,
+    pub mod_count: usize,
+    pub shader_pack_count: usize,
+    pub created_at: String,
+    pub size_bytes: u64,
+    pub full_path: String,
+}
+
+#[tauri::command]
+pub fn modpack_list(storage_base: String) -> Result<Vec<SavedModpack>, String> {
+    let base = workspace_base(&storage_base)?;
+    let dir = base.join("modpacks");
+    let mut out = Vec::new();
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(e) => e,
+        Err(_) => return Ok(out),
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let file_name = entry.file_name().to_string_lossy().to_string();
+        if !file_name.ends_with(".zip") || !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            continue;
+        }
+        let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+        // Read OUR manifest from the zip — a zip without one is skipped, not guessed
+        let mut saved = SavedModpack {
+            file_name: file_name.clone(),
+            name: file_name.trim_end_matches(".zip").to_string(),
+            version: String::new(),
+            mc_version: String::new(),
+            loader: String::new(),
+            mod_count: 0,
+            shader_pack_count: 0,
+            created_at: String::new(),
+            size_bytes: size,
+            full_path: entry.path().to_string_lossy().to_string(),
+        };
+        if let Ok(file) = std::fs::File::open(entry.path()) {
+            if let Ok(mut archive) = zip::ZipArchive::new(file) {
+                if let Ok(mut entry) = archive.by_name(MANIFEST_NAME) {
+                    let mut buf = String::new();
+                    if std::io::Read::read_to_string(&mut entry, &mut buf).is_ok() {
+                        if let Ok(manifest) = serde_json::from_str::<ModpackManifest>(&buf) {
+                            saved.name = manifest.name;
+                            saved.version = manifest.version;
+                            saved.mc_version = manifest.mc_version;
+                            saved.loader = manifest.loader;
+                            saved.mod_count = manifest.mods.len();
+                            saved.shader_pack_count = manifest.shader_packs.len();
+                            saved.created_at = manifest.created_at;
+                        }
+                    }
+                }
+            }
+        }
+        out.push(saved);
+    }
+    out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn modpack_delete(storage_base: String, file_name: String) -> Result<(), String> {
+    let base = workspace_base(&storage_base)?;
+    let name = safe_file_name(&file_name)?;
+    let target = base.join("modpacks").join(name);
+    if !target.is_file() {
+        return Err(format!("No modpack named {name:?}"));
+    }
+    std::fs::remove_file(&target)
+        .map_err(|e| format!("Failed to delete {}: {e}", target.display()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -945,6 +1028,32 @@ versionRange="[1.21,1.22)"
         let (lo1, hi1) = parse_range("[1.20,1.20.1)");
         let (lo2, hi2) = parse_range("[1.21,1.22)");
         assert!(!ranges_intersect((&lo1.0, lo1.1), (&hi1.0, hi1.1), (&lo2.0, lo2.1), (&hi2.0, hi2.1)));
+    }
+
+    #[test]
+    fn library_lists_exported_packs_and_deletes_by_name() {
+        let base = fake_workspace("library");
+        let result = modpack_export(payload(&base)).unwrap();
+
+        let list = modpack_list(base.to_string_lossy().to_string()).unwrap();
+        assert_eq!(list.len(), 1);
+        let pack = &list[0];
+        assert_eq!(pack.name, "Dark Bundle");
+        assert_eq!(pack.version, "1.0.0");
+        assert_eq!(pack.mc_version, "1.20.1");
+        assert_eq!(pack.mod_count, 1);
+        assert_eq!(pack.shader_pack_count, 1);
+        assert!(pack.file_name.ends_with(".zip"));
+        assert!(pack.size_bytes > 0);
+        assert!(!pack.created_at.is_empty());
+
+        // delete by name; a fake name and traversal are refused
+        modpack_delete(base.to_string_lossy().to_string(), pack.file_name.clone()).unwrap();
+        assert!(modpack_list(base.to_string_lossy().to_string()).unwrap().is_empty());
+        assert!(modpack_delete(base.to_string_lossy().to_string(), "nope.zip".to_string()).is_err());
+        assert!(modpack_delete(base.to_string_lossy().to_string(), "../escape.zip".to_string()).is_err());
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

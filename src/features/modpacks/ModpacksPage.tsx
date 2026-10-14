@@ -13,11 +13,13 @@ import {
   Check,
   Download,
   FileArchive,
+  FolderOpen,
   Globe,
   Package,
   PackageOpen,
   RefreshCw,
   Search,
+  Trash2,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -30,11 +32,14 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useProjectsStore } from "@/stores/projectsStore";
 import {
   checkModpackCompatibility,
+  deleteModpack,
   exportModpack,
   getExportableAssets,
   importModpackInto,
+  listModpacks,
   type ExportableAssets,
   type ModpackCompatibility,
+  type SavedModpack,
 } from "@/services/modpacks/modpackService";
 import {
   downloadModrinthMod,
@@ -59,6 +64,7 @@ export function ModpacksPage() {
   const projects = useProjectsStore((s) => s.projects);
 
   const [assets, setAssets] = useState<ExportableAssets>({ jars: [], shaderPacks: [] });
+  const [savedPacks, setSavedPacks] = useState<SavedModpack[]>([]);
   const [instances, setInstances] = useState<LauncherInstance[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<"export" | "import" | null>(null);
@@ -87,11 +93,13 @@ export function ModpacksPage() {
     if (!basePath) return;
     setLoading(true);
     try {
-      const [a, inst] = await Promise.all([
+      const [a, inst, packs] = await Promise.all([
         getExportableAssets(basePath),
         invoke<LauncherInstance[]>("launcher_overview", { basePath }),
+        listModpacks(basePath),
       ]);
       setAssets(a);
+      setSavedPacks(packs);
       setInstances(inst);
       if (!importTarget && inst.length > 0) setImportTarget(inst[0].slug);
       if (!modTarget && inst.length > 0) setModTarget(inst[0].slug);
@@ -182,6 +190,37 @@ export function ModpacksPage() {
       });
     } finally {
       setAdding(null);
+    }
+  };
+
+  const installSaved = async (pack: SavedModpack) => {
+    if (!basePath || !importTarget) return;
+    setBusy("import");
+    try {
+      const result = await importModpackInto(basePath, pack.fullPath, importTarget);
+      toast.success(`"${result.modpackName}" installed`, {
+        description: `${result.modCount} jar(s) + ${result.shaderCount} shader file(s) → instances/${importTarget}`,
+        duration: 8000,
+      });
+    } catch (error) {
+      toast.error("Install failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const removeSaved = async (pack: SavedModpack) => {
+    if (!basePath) return;
+    try {
+      await deleteModpack(basePath, pack.fileName);
+      toast.success(`Deleted ${pack.name} ${pack.version}`);
+      void refresh();
+    } catch (error) {
+      toast.error("Delete failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
@@ -664,6 +703,71 @@ export function ModpacksPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* ---------------- Your modpacks ---------------- */}
+      {savedPacks.length > 0 && (
+        <Card className="animate-card-rise mt-6 border-border/70 bg-card/60 [animation-delay:200ms]">
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2">
+              <FileArchive className="h-4 w-4 text-primary" />
+              <h2 className="font-semibold">Your modpacks</h2>
+              <span className="text-[10px] text-muted-foreground">
+                manifests read from each zip — live
+              </span>
+            </div>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {savedPacks.map((pack) => (
+                <div
+                  key={pack.fileName}
+                  className="flex items-center gap-3 rounded-lg border border-border/70 bg-card/40 px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 truncate text-sm font-medium">
+                      {pack.name}
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        v{pack.version}
+                      </span>
+                    </p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      MC {pack.mcVersion} · {pack.loader} · {pack.modCount} mod(s) ·{" "}
+                      {pack.shaderPackCount} shader(s) ·{" "}
+                      {(pack.sizeBytes / 1048576).toFixed(1)} MB
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    disabled={!importTarget || busy === "import"}
+                    onClick={() => void installSaved(pack)}
+                    title={`Install into ${importTarget ?? "an instance"}`}
+                  >
+                    <ArrowDownToLine className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => void openInFileManager(pack.fullPath)}
+                    title="Reveal in file manager"
+                  >
+                    <FolderOpen className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 text-destructive hover:border-destructive/60 hover:text-destructive"
+                    onClick={() => void removeSaved(pack)}
+                    title="Delete"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mt-6 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
         <Badge variant="outline">v3 scope</Badge>
