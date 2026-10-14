@@ -578,23 +578,41 @@ pub struct ServerInfoPayload {
 }
 
 /// Objective + in-game commands for a module, faithful to the datapacks we
-/// actually generate (serverModules.ts).
-fn module_docs(id: &str) -> Option<(&'static str, &'static str, &'static str)> {
+/// actually generate (serverModules.ts) — command lists match the
+/// mcfunctions and triggers the pack really registers.
+fn module_docs(id: &str) -> Option<(&'static str, &'static str, Vec<(&'static str, &'static str)>)> {
     Some(match id {
         "economy" => (
             "Economy Coin",
-            "A server-owned currency. Balances live on the scoreboard (nexus_coin), shown on the player sidebar. Players deposit into the shop with /trigger nexus_shop set <amount> and spend at the starter market.",
-            "/trigger nexus_shop set <amount>\n/scoreboard players set * nexus_coin <value> (admin)\nBalances: sidebar (right side)",
+            "A server-owned currency. Balances live on the scoreboard (nexus_coin), shown on the player sidebar. Players deposit into the shop and spend at the starter market.",
+            vec![
+                ("/trigger nexus_shop set <quantia>", "deposita moedas na loja (o assistente de pagamentos do datapack)"),
+                ("/function nexus_economy:balance", "mostra o seu saldo atual"),
+                ("/function nexus_economy:top", "ranking dos maiores saldos do servidor"),
+                ("/function nexus_economy:pay_nearest", "paga o jogador mais próximo de você"),
+                ("/scoreboard players set <nick> nexus_coin <valor>", "(admin) define o saldo de um jogador"),
+            ],
         ),
         "prison" => (
             "Prison Ranks",
-            "Mine-to-rank progression. Rank lives on nexus_rank; warps lead to A/B/C tier mines, rank-ups are announced publicly, and prestige resets the run with a bonus multiplier.",
-            "Follow the warp signs to the mines\nPrestige resets with a multiplier bonus when max rank is reached",
+            "Mine-to-rank progression. Rank lives on nexus_rank; every 10 mined blocks count one point, rank-ups are announced publicly, and prestige resets the run with a bonus multiplier.",
+            vec![
+                ("/trigger nexus_mine", "O COMANDO DE MINERAR: tela de loading personalizada e teleporta o jogador para as minas para minerar — a mina acompanha o rank atual (0-9 Mine A, 10-29 Mine B, 30+ Mine C)"),
+                ("/function nexus_prison:status", "mostra o seu rank, blocos minerados e prestígio"),
+                ("/function nexus_prison:warp_a", "teleporta direto para a Mina A"),
+                ("/function nexus_prison:warp_b", "teleporta direto para a Mina B"),
+                ("/function nexus_prison:warp_c", "teleporta direto para a Mina C"),
+                ("(progressão automática)", "minerar 10 blocos = +1 ponto de rank; 10 pontos = rank-up anunciado; 50 = PRESTÍGIO com bônus"),
+            ],
         ),
         "token" => (
             "Token Chain",
-            "An in-game market wired to the VOXEL Economy panel through a real SHA-256 hash chain. Players pick items with /trigger nexus_token set <1-5>; the intent lands in the server log and the VOXEL panel debits the ledger and delivers the item.",
-            "/trigger nexus_token set <1-5> (buy intent)\nConfirm the purchase in the VOXEL Economy panel — the chain records it",
+            "An in-game market wired to the VOXEL Economy panel through a real SHA-256 hash chain. Players pick items in-game; the intent lands in the server log and the VOXEL panel debits the ledger and delivers the item.",
+            vec![
+                ("/trigger nexus_token set <1-5>", "envia a intenção de compra do item escolhido (o VOXEL Economy panel confirma e entrega)"),
+                ("/function nexus_token:balance", "mostra o seu saldo da chain"),
+                ("(painel VOXEL)", "Economy → Token Chain mostra a chain SHA-256 completa, minta, transfere e verifica"),
+            ],
         ),
         _ => return None,
     })
@@ -649,14 +667,36 @@ fn render_server_readme(payload: &ServerInfoPayload, dir: &std::path::Path) -> S
         out.push_str("## Installed gameplay modules\n\n");
         out.push_str("Mixable datapacks authored by this app (namespaced — they never collide):\n\n");
         for id in &payload.modules {
-            if let Some((title, objective, ingame)) = module_docs(id) {
+            if let Some((title, objective, commands)) = module_docs(id) {
                 out.push_str(&format!("### {} (`nexus_{}` datapack)\n\n", title, id));
                 out.push_str(&format!("**What it does**: {}.\n\n", objective));
-                out.push_str(&format!("**In-game**:\n\n```\n{}\n```\n\n", ingame));
+                out.push_str("**Commands**:\n\n");
+                out.push_str("| Command | What it does |\n");
+                out.push_str("|---|---|\n");
+                for (cmd, desc) in &commands {
+                    out.push_str(&format!("| `{}` | {} |\n", cmd, desc));
+                }
+                out.push('\n');
             }
         }
-        out.push_str("Datapacks live in `world/datapacks/` and activate on the next boot.\n\n");
+        out.push_str("Datapacks live in `world/datapacks/` and activate on the next boot\n");
+        out.push_str("(`/reload` hot-loads them without restarting).\n\n");
     }
+
+    out.push_str("## Server commands (always available)\n\n");
+    out.push_str("The vanilla/admin commands every owner reaches for:\n\n");
+    out.push_str("| Command | What it does |\n");
+    out.push_str("|---|---|\n");
+    out.push_str("| `/op <nick>` | promotes a player to operator |\n");
+    out.push_str("| `/deop <nick>` | removes operator status |\n");
+    out.push_str("| `/gamemode <mode> [nick]` | survival / creative / adventure / spectator |\n");
+    out.push_str("| `/tp <nick> <nick>` | teleports one player to another |\n");
+    out.push_str("| `/time set day` (or `night`) | sets the world time |\n");
+    out.push_str("| `/whitelist add <nick>` | adds to the whitelist (enable it in server.properties) |\n");
+    out.push_str("| `/stop` | saves and stops the server cleanly (the VOXEL button does this) |\n");
+    out.push_str("| `/reload` | hot-reloads datapacks (after editing module files) |\n");
+    out.push_str("\nPlayers run the module commands from the sections above with plain chat —\n");
+    out.push_str("`/trigger` needs no operator rights.\n\n");
 
     out.push_str("## Backups\n\n");
     out.push_str("Backups (world + plugins + config + properties) are made from the VOXEL Servers tab\n");
@@ -739,10 +779,31 @@ mod unit_tests {
         .unwrap();
         let readme = std::fs::read_to_string(&path).unwrap();
         assert!(readme.contains("Economy Coin (`nexus_economy` datapack)"));
-        assert!(readme.contains("/trigger nexus_shop set <amount>"));
+        assert!(readme.contains("/trigger nexus_shop set <quantia>"));
         assert!(readme.contains("Token Chain (`nexus_token` datapack)"));
         assert!(readme.contains("SHA-256 hash chain"));
         assert!(!readme.contains("Prison Ranks"), "only installed modules are documented");
+        // the commands section: module tables + the vanilla admin table
+        assert!(readme.contains("## Server commands (always available)"));
+        assert!(readme.contains("| `/op <nick>` |"));
+        assert!(readme.contains("| `/reload` |"));
+        assert!(readme.contains("| `/trigger nexus_token set <1-5>` |"));
+
+        // and the prison module documents the /mine experience the owner asked for
+        let path = server_write_info(ServerInfoPayload {
+            storage_base: base.to_string_lossy().to_string(),
+            slug: "info-server".to_string(),
+            name: "Info Server".to_string(),
+            software: "vanilla".to_string(),
+            mc_version: "1.20.1".to_string(),
+            ram_mb: 2048,
+            modules: vec!["prison".into()],
+        })
+        .unwrap();
+        let readme = std::fs::read_to_string(&path).unwrap();
+        assert!(readme.contains("| `/trigger nexus_mine` |"));
+        assert!(readme.contains("tela de loading personalizada e teleporta o jogador para as minas"));
+        assert!(readme.contains("| `/function nexus_prison:warp_c` |"));
 
         let _ = std::fs::remove_dir_all(&base);
     }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_MODULE_OPTIONS,
   generateSelectedModules,
   generateModuleFiles,
 } from "./serverModules";
@@ -45,5 +46,51 @@ describe("serverModules", () => {
       files.find((f) => f.path.endsWith("pack.mcmeta"))!.content,
     );
     expect(mcmeta.pack.pack_format).toBe(15);
+  });
+});
+
+describe("prison /mine command (the owner's ask)", () => {
+  it("registers the trigger, plays the loading screen and warps by rank", () => {
+    const files = generateSelectedModules(["prison"], DEFAULT_MODULE_OPTIONS);
+    const byPath = new Map(files.map((f) => [f.path, f.content]));
+
+    const load = byPath.get(
+      "world/datapacks/nexus_prison/data/nexus_prison/functions/load.mcfunction",
+    )!;
+    expect(load).toContain("scoreboard objectives add nexus_mine trigger");
+    expect(load).toContain("scoreboard players enable * nexus_mine");
+
+    const tick = byPath.get(
+      "world/datapacks/nexus_prison/data/nexus_prison/functions/tick.mcfunction",
+    )!;
+    expect(tick).toContain("scores={nexus_mine=1..}");
+    expect(tick).toContain("nexus_prison:mine");
+
+    const mine = byPath.get(
+      "world/datapacks/nexus_prison/data/nexus_prison/functions/mine.mcfunction",
+    )!;
+    // consume the trigger so it can fire again
+    expect(mine).toContain("scoreboard players set @s nexus_mine 0");
+    // the loading screen: title + subtitle + sound + scheduled progress bars
+    expect(mine).toContain("title @s title");
+    expect(mine).toContain("Entrando nas minas...");
+    expect(mine).toContain("schedule function nexus_prison:mine_bar_1 8t");
+
+    const bar1 = byPath.get(
+      "world/datapacks/nexus_prison/data/nexus_prison/functions/mine_bar_1.mcfunction",
+    )!;
+    expect(bar1).toContain("█");
+    expect(bar1).toContain("schedule function nexus_prison:mine_bar_2 20t");
+
+    const warp = byPath.get(
+      "world/datapacks/nexus_prison/data/nexus_prison/functions/mine_warp.mcfunction",
+    )!;
+    // rank-aware destination: 0-9 → A, 10-29 → B, 30+ → C
+    expect(warp).toContain("scores={nexus_rank=..9}");
+    expect(warp).toContain("scores={nexus_rank=10..29}");
+    expect(warp).toContain("scores={nexus_rank=30..}");
+    expect(warp).toContain("tp @s 0 -60 0");
+    expect(warp).toContain("tp @s 64 -60 0");
+    expect(warp).toContain("tp @s 128 -60 0");
   });
 });

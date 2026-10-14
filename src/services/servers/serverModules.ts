@@ -165,12 +165,16 @@ function prisonFiles(options: ModuleInstallOptions): GeneratedFile[] {
 scoreboard objectives add nexus_rank dummy "Prison rank"
 scoreboard objectives add nexus_prestige dummy "Prestige"
 scoreboard objectives add nexus_blocks_mined minecraft.mined:minecraft.stone "Blocks mined (stone family)"
-tellraw @a [{"text":"[VOXEL] ","color":"#a78bfa"},{"text":"Prison ranks active — /function nexus_prison:status","color":"gray"}]`,
+scoreboard objectives add nexus_mine trigger "Mine warp (/trigger nexus_mine)"
+scoreboard players enable * nexus_mine
+tellraw @a [{"text":"[VOXEL] ","color":"#a78bfa"},{"text":"Prison ranks active — /trigger nexus_mine to warp to the mines","color":"gray"}]`,
     },
     {
       path: `world/datapacks/${PRI}/data/${PRI}/functions/tick.mcfunction`,
       content: `# Rank progression by blocks mined (10 blocks per rank point)
-execute as @a[scores={nexus_blocks_mined=10..}] at @s run function ${PRI}:progress`,
+execute as @a[scores={nexus_blocks_mined=10..}] at @s run function ${PRI}:progress
+# The /mine command: any player firing /trigger nexus_mine gets the loading screen + warp
+execute as @a[scores={nexus_mine=1..}] at @s run function ${PRI}:mine`,
     },
     {
       path: `world/datapacks/${PRI}/data/${PRI}/functions/progress.mcfunction`,
@@ -209,6 +213,42 @@ tellraw @s [{"text":"[Prison] ","color":"#fbbf24"},{"text":"warped to Mine B","c
       content: `# Warp to Mine C
 tp @s 128 -60 0
 tellraw @s [{"text":"[Prison] ","color":"#fbbf24"},{"text":"warped to Mine C","color":"gray"}]`,
+    },
+    {
+      // THE /mine COMMAND — personalized loading screen, then a warp to
+      // the mine that matches the player's current rank
+      path: `world/datapacks/${PRI}/data/${PRI}/functions/mine.mcfunction`,
+      content: `# /trigger nexus_mine — consume the trigger, play the loading screen, warp
+scoreboard players set @s nexus_mine 0
+title @s times 0t 100t 20t
+title @s title [{"text":"⛏","color":"#fbbf24"},{"text":" MINAS","color":"#fbbf24","bold":true}]
+title @s subtitle [{"text":"Entrando nas minas...","color":"gray"}]
+playsound minecraft:block.amethyst_block.chime master @s ~ ~ ~ 0.6 0.8
+schedule function ${PRI}:mine_bar_1 8t replace ${PRI}:mine_bar_1`,
+    },
+    {
+      path: `world/datapacks/${PRI}/data/${PRI}/functions/mine_bar_1.mcfunction`,
+      content: `# Loading screen progress bar (part 1/3)
+title @s subtitle [{"text":"[██████████░░░░░░░░░░] ","color":"#22d3ee"},{"text":"carregando mina","color":"gray"}]
+schedule function ${PRI}:mine_bar_2 20t replace ${PRI}:mine_bar_2`,
+    },
+    {
+      path: `world/datapacks/${PRI}/data/${PRI}/functions/mine_bar_2.mcfunction`,
+      content: `# Loading screen progress bar (part 2/3)
+title @s subtitle [{"text":"[████████████████████░░] ","color":"#22d3ee"},{"text":"quase lá","color":"gray"}]
+schedule function ${PRI}:mine_warp 20t replace ${PRI}:mine_warp`,
+    },
+    {
+      path: `world/datapacks/${PRI}/data/${PRI}/functions/mine_warp.mcfunction`,
+      content: `# Loading done — warp to the mine that matches the rank (part 3/3)
+title @s times 0t 40t 20t
+title @s subtitle [{"text":"[██████████████████████] ","color":"#22d3ee"},{"text":"boa mineração!","color":"gray"}]
+# Rank-aware destination: ranks 0-9 → Mine A, 10-29 → Mine B, 30+ → Mine C
+execute as @s[scores={nexus_rank=..9}] run tp @s 0 -60 0
+execute as @s[scores={nexus_rank=10..29}] run tp @s 64 -60 0
+execute as @s[scores={nexus_rank=30..}] run tp @s 128 -60 0
+tellraw @s [{"text":"[Prison] ","color":"#fbbf24"},{"text":"Boa mineração! Sua mina segue seu rank (/function nexus_prison:status para ver).","color":"gray"}]
+playsound minecraft:entity.player.levelup master @s ~ ~ ~ 0.5 1.2`,
     },
     {
       path: `world/datapacks/${PRI}/data/${PRI}/functions/status.mcfunction`,
