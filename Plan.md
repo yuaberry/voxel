@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (32 sessões)
+## 5. Histórico de sessões (33 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 33 | /mine real + comandos nos READMEs | **Prison ganha /trigger nexus_mine** (loading personalizada com barras + tp para a mina do rank atual) + **tabelas de comandos nos READMEs** (por módulo, fidelidade contra as mcfunctions + seção vanilla admin) + v0.4.5 | `#` de mcfunction dentro do JS (esbuild pegou); doc de /function inexistente (shop→balance) |
 | 32 | Documentação viva + research 26.x | **README próprio nos 3 níveis**: servers (fatos do properties + objetivos/comandos dos módulos), modpacks (README no zip + guia por loader + import aceita), mods (guia de instalação ×5 templates) + **era 26.x mapeada** (NeoForgeMDKs/MDK-26.3, MDG 2.0.148, Java 25, Gradle 9.2.1) + v0.4.4 | #[test] duplicado empilhado (harness duplicava o teste → race); import recusava README; push char/str; assert vs markdown |
 | 31 | Dimensions modernas + Library | World Studio **1.21.2-1.21.8** (flatten de int providers por era, testado byte-a-byte) + **Modpack Library** (modpack_list lê manifests dos zips; install 1-clique, reveal, delete guardado) + v0.4.3 | replace python não casou `json!(` (teste pegou); &str vs String; pkill self-match com daemon Java; --quiet escondendo erros de compilação |
 | 30 | Agent structures + World | **Tool generate_structure no agent** (orçamento+snapshot, princípio "make it REAL") + **World Studio v1**: dimensões custom datapack (dimension_type+dimension, 4 presets, 1.21.2+ recusado) + 4ª tab no Studio + v0.4.2 | `serde_json::json!` corrupto por replace; assert torto pré-build |
@@ -248,13 +249,13 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 32, v0.4.4)
+## 8. Estado atual (verificado — Sessão 33, v0.4.5)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
 | Rust unit (59) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (65) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Vitest (66) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -268,7 +269,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.4.4 (latest)** | Desktop: **self-documenting servers/modpacks/mods** + APK mobile 0.3.1 |
+| **v0.4.5 (latest)** | Desktop: **/mine real no Prison + command tables nos READMEs** + APK mobile 0.3.1 |
+| v0.4.4 | Desktop: **self-documenting servers/modpacks/mods** + APK mobile 0.3.1 |
 | v0.4.3 | Desktop: **dimensions 1.20.1-1.21.8 + Modpack Library** + APK mobile 0.3.1 |
 | v0.4.2 | Desktop: **agent structures + World Studio (dimensões reais)** + APK mobile 0.3.1 |
 | v0.4.1 | Desktop: **Structure Studio (.nbt real + preview iso) + polimento visual** + APK mobile 0.3.1 |
@@ -454,7 +456,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 32 — documentação viva: servers (README com fatos do properties + objetivos/comandos dos módulos instalados), modpacks (README no zip com guia por loader) e mods (guia de instalação nos 5 templates). Era 26.x mapeada (NeoForgeMDKs, MDG 2.0.148, Java 25, Gradle 9.2.1). 65/65 + 59/59. Release v0.4.4.*
+*Última atualização: Sessão 33 — /mine REAL no Prison (trigger + loading screen com barras + warp por rank) + tabelas de comandos nos READMEs de todos os servidores (módulos + vanilla admin, fidelidade verificada contra as mcfunctions). 66/66 + 59/59. Release v0.4.5.*
 
 ---
 
@@ -839,3 +841,22 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: typecheck 0 ✓ · lint 0 errors (30 warns) · vitest 65/65 ✓ · cargo **59/59** ✓ · vite build 2m59s ✓ · boot vivo 0 panics ✓. Release v0.4.4.
 
 **Estado pós-sessão**: servers, modpacks e mods documentam a si mesmos com fatos reais. Próximo natural: **template neoforge-26.x** (MDK-26.3-ModDevGradle + API de items 26.x + Java 25 via toolchain + E2E real), depois marketplace local.
+
+---
+
+## 33. Sessão 33 — O comando /mine é REAL + tabelas de comandos nos READMEs
+
+**Pedido do dono**: "atualize o arquivo de servidor… com os comandos dos servidores. Exemplo: (Prison) /mine ou /mineirar — da tela de loading personalizada e teleporta o jogador para as minas para minerar. Etc… faça a parte dos comandos também nos servidores que o usuário fizer."
+
+**1. `/mine` implementado de verdade** (não documentação de desejo): o datapack Prison registra o trigger `nexus_mine` (qualquer player dispara sem OP):
+- **Tela de loading personalizada**: title ⛏ MINAS + "Entrando nas minas…" + som de amethyst, depois DUAS barras de progresso agendadas (`[██████████░░░░░░░░░░] carregando` → `quase lá` → `████… completa!`) via `schedule function` — a experiência completa em datapack vanilla.
+- **Teleporta para A MINA DO RANK ATUAL**: 0-9 → Mina A, 10-29 → Mina B, 30+ → Mina C, com som de level-up e mensagem-guia. Trigger consumido (`scoreboard players set @s nexus_mine 0`) — pode disparar de novo.
+- *Nota honesta*: comandos com nome custom (`/mine` literal) exigem plugin; datapacks vanilla registram `/trigger` — documentado como tal no README.
+
+**2. Tabelas de comandos nos READMEs de TODOS os servidores criados**: cada módulo instalado documenta seus comandos REAIS (fidelidade verificada contra as mcfunctions geradas — um `/function nexus_token:shop` que NÃO existia foi pego e corrigido para `:balance`): economy (deposit/balance/top/pay_nearest), prison (**nexus_mine com a descrição exata do dono**, status, warp_a/b/c, progressão automática), token (intents 1-5, saldo da chain, painel VOXEL). **Nova seção "Server commands (always available)"** com a tabela vanilla de administração (op/deop, gamemode, tp, time, whitelist, stop, /reload) + a nota de que /trigger dispensa OP.
+
+**Bug caçado**: comentário mcfunction (`#`) cravado dentro do objeto JS pelo python-insert (syntax error esbuild pegou).
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (30 warns) · **vitest 66/66** (+1: trigger registrado/consumido, barras agendadas, warps por rank) ✓ · **cargo 59/59** (README renderiza as tabelas, incluindo a linha do /mine com a descrição do dono) ✓ · vite build 1m36s ✓ · boot vivo 0 panics ✓. Release v0.4.5.
+
+**Estado pós-sessão**: os módulos têm UX de gameplay de verdade e os servidores se documentam com comandos. Próximo natural: template neoforge-26.x (research pronta), mais módulos (SkyBlock/Factions/BedWars), marketplace local.
