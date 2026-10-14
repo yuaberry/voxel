@@ -102,3 +102,12 @@ export function listModpacks(storageBase: string): Promise<SavedModpack[]> {
 export function deleteModpack(storageBase: string, fileName: string): Promise<void> {
   return invoke("modpack_delete", { storageBase, fileName });
 }
+
+export function updateModpackManifest(payload: {
+  storageBase: string;
+  fileName: string;
+  name: string;
+  version: string;
+}): Promise<string> {
+  return invoke("modpack_update_manifest", { payload });
+}

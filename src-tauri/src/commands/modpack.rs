@@ -883,6 +883,87 @@ pub fn modpack_delete(storage_base: String, file_name: String) -> Result<(), Str
         .map_err(|e| format!("Failed to delete {}: {e}", target.display()))
 }
 
+// ---------------------------------------------------------------------------
+// Modpack editor — rename/re-version a SAVED pack by rewriting its manifest
+// in place (full re-pack; the mod jars and shaders are copied byte for byte).
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackManifestUpdate {
+    pub storage_base: String,
+    /// the zip inside modpacks/
+    pub file_name: String,
+    pub name: String,
+    pub version: String,
+}
+
+#[tauri::command]
+pub fn modpack_update_manifest(payload: ModpackManifestUpdate) -> Result<String, String> {
+    let base = workspace_base(&payload.storage_base)?;
+    let zip_name = safe_file_name(&payload.file_name)?;
+    if payload.name.trim().is_empty() {
+        return Err("Modpack name cannot be empty".to_string());
+    }
+    if payload.version.trim().is_empty() {
+        return Err("Modpack version cannot be empty".to_string());
+    }
+    let target = base.join("modpacks").join(&zip_name);
+    if !target.is_file() {
+        return Err(format!("No modpack named {zip_name:?}"));
+    }
+
+    // Read the whole pack, then rewrite it with a fresh manifest
+    let file = std::fs::File::open(&target)
+        .map_err(|e| format!("Failed to open {zip_name}: {e}"))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| format!("Not a valid modpack zip: {e}"))?;
+
+    let mut manifest_bytes = Vec::new();
+    {
+        let mut entry = archive
+            .by_name(MANIFEST_NAME)
+            .map_err(|_| "This zip has no modpack.json — only VOXEL exports can be edited".to_string())?;
+        entry.read_to_end(&mut manifest_bytes).map_err(|e| format!("read manifest: {e}"))?;
+    }
+    let mut manifest: ModpackManifest = serde_json::from_slice(&manifest_bytes)
+        .map_err(|e| format!("Invalid manifest: {e}"))?;
+    manifest.name = payload.name.trim().to_string();
+    manifest.version = payload.version.trim().to_string();
+    let new_manifest = serde_json::to_vec_pretty(&manifest)
+        .map_err(|e| format!("Failed to serialize manifest: {e}"))?;
+
+    // Re-pack to a temp sibling, then atomically replace — never corrupt on failure
+    let temp_path = target.with_extension("tmpzip");
+    let out = std::fs::File::create(&temp_path)
+        .map_err(|e| format!("Failed to create temp pack: {e}"))?;
+    let mut writer = zip::ZipWriter::new(out);
+    let options: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    writer.start_file(MANIFEST_NAME, options).map_err(|e| format!("{e}"))?;
+    writer.write_all(&new_manifest).map_err(|e| format!("{e}"))?;
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).map_err(|e| format!("{e}"))?;
+        let name = entry.name().to_string();
+        if name == MANIFEST_NAME || name == "README.md" {
+            continue;
+        }
+        let mut bytes = Vec::new();
+        entry.read_to_end(&mut bytes).map_err(|e| format!("read {name}: {e}"))?;
+        writer.start_file(name, options).map_err(|e| format!("{e}"))?;
+        writer.write_all(&bytes).map_err(|e| format!("{e}"))?;
+    }
+    // README carries the identity too — regenerate it for the new name/version
+    let readme = render_modpack_readme(&manifest);
+    writer.start_file("README.md", options).map_err(|e| format!("{e}"))?;
+    writer.write_all(readme.as_bytes()).map_err(|e| format!("{e}"))?;
+    writer.finish().map_err(|e| format!("{e}"))?;
+
+    std::fs::rename(&temp_path, &target)
+        .map_err(|e| format!("Failed to swap the updated pack in: {e}"))?;
+    Ok(target.to_string_lossy().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1126,6 +1207,61 @@ versionRange="[1.21,1.22)"
         assert!(modpack_delete(base.to_string_lossy().to_string(), "nope.zip".to_string()).is_err());
         assert!(modpack_delete(base.to_string_lossy().to_string(), "../escape.zip".to_string()).is_err());
 
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn manifest_editor_renames_and_preserves_contents() {
+        let base = fake_workspace("editor");
+        modpack_export(payload(&base)).unwrap();
+        let jar_before = std::fs::read(base.join("projects/dark-kingdom/build/libs/dark_kingdom-0.1.0.jar")).unwrap();
+
+        modpack_update_manifest(ModpackManifestUpdate {
+            storage_base: base.to_string_lossy().to_string(),
+            file_name: "dark-bundle-1.0.0.zip".to_string(),
+            name: "Renamed Bundle".to_string(),
+            version: "2.0.0".to_string(),
+        })
+        .unwrap();
+
+        // the library reflects the new identity
+        let list = modpack_list(base.to_string_lossy().to_string()).unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].name, "Renamed Bundle");
+        assert_eq!(list[0].version, "2.0.0");
+
+        // and the mod jar inside is byte-identical
+        let file = std::fs::File::open(base.join("modpacks/dark-bundle-1.0.0.zip")).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+        let mut jar_inside = Vec::new();
+        archive
+            .by_name("mods/dark_kingdom-0.1.0.jar")
+            .unwrap()
+            .read_to_end(&mut jar_inside)
+            .unwrap();
+        assert_eq!(jar_inside, jar_before);
+        // the README followed the rename
+        let mut readme = String::new();
+        archive
+            .by_name("README.md")
+            .unwrap()
+            .read_to_string(&mut readme)
+            .unwrap();
+        assert!(readme.contains("# Renamed Bundle v2.0.0"));
+
+        // editing a missing pack / bad names refused
+        assert!(modpack_update_manifest(ModpackManifestUpdate {
+            storage_base: base.to_string_lossy().to_string(),
+            file_name: "nope.zip".to_string(),
+            name: "x".to_string(),
+            version: "1".to_string(),
+        }).is_err());
+        assert!(modpack_update_manifest(ModpackManifestUpdate {
+            storage_base: base.to_string_lossy().to_string(),
+            file_name: "../escape.zip".to_string(),
+            name: "x".to_string(),
+            version: "1".to_string(),
+        }).is_err());
         let _ = std::fs::remove_dir_all(&base);
     }
 

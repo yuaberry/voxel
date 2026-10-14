@@ -17,6 +17,7 @@ import {
   Globe,
   Package,
   PackageOpen,
+  Pencil,
   RefreshCw,
   Search,
   Trash2,
@@ -37,6 +38,7 @@ import {
   getExportableAssets,
   importModpackInto,
   listModpacks,
+  updateModpackManifest,
   type ExportableAssets,
   type ModpackCompatibility,
   type SavedModpack,
@@ -65,6 +67,10 @@ export function ModpacksPage() {
 
   const [assets, setAssets] = useState<ExportableAssets>({ jars: [], shaderPacks: [] });
   const [savedPacks, setSavedPacks] = useState<SavedModpack[]>([]);
+  const [editing, setEditing] = useState<SavedModpack | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editVersion, setEditVersion] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
   const [instances, setInstances] = useState<LauncherInstance[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<"export" | "import" | null>(null);
@@ -221,6 +227,36 @@ export function ModpacksPage() {
       toast.error("Delete failed", {
         description: error instanceof Error ? error.message : String(error),
       });
+    }
+  };
+
+  const startEdit = (pack: SavedModpack) => {
+    setEditing(pack);
+    setEditName(pack.name);
+    setEditVersion(pack.version);
+  };
+
+  const applyEdit = async () => {
+    if (!editing || !basePath || !editName.trim() || !editVersion.trim()) return;
+    setEditBusy(true);
+    try {
+      await updateModpackManifest({
+        storageBase: basePath,
+        fileName: editing.fileName,
+        name: editName.trim(),
+        version: editVersion.trim(),
+      });
+      toast.success("Modpack updated", {
+        description: `${editName.trim()} v${editVersion.trim()} — manifest rewritten in place`,
+      });
+      setEditing(null);
+      void refresh();
+    } catch (error) {
+      toast.error("Update failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setEditBusy(false);
     }
   };
 
@@ -756,6 +792,15 @@ export function ModpacksPage() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="shrink-0"
+                    onClick={() => startEdit(pack)}
+                    title="Rename / re-version"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
                     className="shrink-0 text-destructive hover:border-destructive/60 hover:text-destructive"
                     onClick={() => void removeSaved(pack)}
                     title="Delete"
@@ -767,6 +812,50 @@ export function ModpacksPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {editing && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+          onClick={() => setEditing(null)}
+        >
+          <Card
+            className="w-full max-w-md border-primary/30 animate-card-rise"
+            onClick={undefined}
+          >
+            <CardContent className="space-y-4" onClick={(e) => e.stopPropagation()}>
+              <div>
+                <h3 className="font-semibold">Edit modpack</h3>
+                <p className="text-[11px] text-muted-foreground">
+                  {editing.fileName} — the manifest is rewritten in place; mod
+                  jars and shaders are preserved byte for byte.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Name</Label>
+                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Version</Label>
+                  <Input value={editVersion} onChange={(e) => setEditVersion(e.target.value)} />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEditing(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!editName.trim() || !editVersion.trim() || editBusy}
+                  onClick={() => void applyEdit()}
+                >
+                  {editBusy ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <div className="mt-6 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">

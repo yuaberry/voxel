@@ -80,6 +80,7 @@ pub fn run() {
             commands::modpack::modpack_check_compatibility,
             commands::modpack::modpack_list,
             commands::modpack::modpack_delete,
+            commands::modpack::modpack_update_manifest,
             commands::modrinth::modrinth_download,
             commands::structures::structure_generate,
             commands::worldgen::worldgen_create_dimension,
