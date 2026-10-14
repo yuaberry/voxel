@@ -19,6 +19,63 @@ use std::path::{Component, Path, PathBuf};
 
 const MANIFEST_NAME: &str = "modpack.json";
 
+/// The README every exported pack carries: identity, contents, and an
+/// installation guide that matches the manifest's real loader.
+fn render_modpack_readme(manifest: &ModpackManifest) -> String {
+    let mut out = String::new();
+    out.push_str(&format!("# {} v{}\n\n", manifest.name, manifest.version));
+    out.push_str(&format!(
+        "A modpack exported by **VOXEL {}** on {} for **Minecraft {}** ({}) — the mods\nbelow were built by this workspace and the shaderpacks authored in it.\n\n",
+        env!("CARGO_PKG_VERSION"),
+        manifest.created_at,
+        manifest.mc_version,
+        manifest.loader
+    ));
+
+    out.push_str("## Contents\n\n");
+    out.push_str(&format!("**Mods ({})**:\n\n", manifest.mods.len()));
+    for m in &manifest.mods {
+        out.push_str(&format!("- `{}` — from project **{}**\n", m.file_name, m.project_slug.replace('-', " ")));
+    }
+    if !manifest.shader_packs.is_empty() {
+        out.push_str(&format!("\n**Shaderpacks ({})**: {}\n", manifest.shader_packs.len(), manifest.shader_packs.join(", ")));
+    }
+    out.push_str("\n\n");
+
+    out.push_str("## How to install\n\n");
+    match manifest.loader.as_str() {
+        "fabric" => {
+            out.push_str("1. Install the **Fabric Loader** for Minecraft ");
+            out.push_str(&format!("{} from fabricmc.net/use (the official installer).\n", manifest.mc_version));
+            out.push_str("2. Put every file from `mods/` into your `.minecraft/mods` folder.\n");
+            out.push_str("3. Shaderpacks (if any): put the packs from `shaderpacks/` into `.minecraft/shaderpacks`.\n");
+            out.push_str("4. Launch the game with the Fabric profile.\n");
+        }
+        "forge" => {
+            out.push_str("1. Install **Forge** for Minecraft ");
+            out.push_str(&format!("{} from files.minecraftforge.net (the official installer).\n", manifest.mc_version));
+            out.push_str("2. Put every file from `mods/` into your `.minecraft/mods` folder.\n");
+            out.push_str("3. Shaderpacks (if any): `.minecraft/shaderpacks`.\n");
+            out.push_str("4. Launch the game with the Forge profile.\n");
+        }
+        "neoforge" => {
+            out.push_str("1. Install **NeoForge** for Minecraft ");
+            out.push_str(&format!("{} from neoforged.net (the official installer).\n", manifest.mc_version));
+            out.push_str("2. Put every file from `mods/` into your `.minecraft/mods` folder.\n");
+            out.push_str("3. Shaderpacks (if any): `.minecraft/shaderpacks`.\n");
+            out.push_str("4. Launch the game with the NeoForge profile.\n");
+        }
+        other => {
+            out.push_str(&format!("1. Prepare a game profile running **{other}** on Minecraft {}.\n", manifest.mc_version));
+            out.push_str("2. Put every file from `mods/` into your profile's `mods` folder.\n");
+        }
+    }
+    out.push_str("\n**With VOXEL**: the Modpacks tab installs this zip into any prepared\ninstance in one click (the manifest is verified and every file was already\nchecksum-checked at download time).\n\n");
+
+    out.push_str("---\n\nVOXEL is an independent third-party creation platform and is not affiliated with\nMojang Studios or Microsoft.\n");
+    out
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModpackModIn {
@@ -194,6 +251,12 @@ pub fn modpack_export(payload: ModpackExportPayload) -> Result<ModpackExportResu
         .map_err(|e| format!("Failed to serialize manifest: {e}"))?;
     zip.write_all(&manifest_bytes).map_err(|e| format!("{e}"))?;
 
+    // The owner's ask: the pack carries its own documentation — identity,
+    // contents, and a real installation guide per loader.
+    let readme = render_modpack_readme(&manifest);
+    zip.start_file("README.md", options).map_err(|e| format!("{e}"))?;
+    zip.write_all(readme.as_bytes()).map_err(|e| format!("{e}"))?;
+
     for (jar, src) in &mod_files {
         zip.start_file(format!("mods/{jar}"), options).map_err(|e| format!("{e}"))?;
         let bytes = fs::read(src).map_err(|e| format!("read {}: {e}", src.display()))?;
@@ -297,7 +360,7 @@ pub fn modpack_import_into(
         let name = entry.name().to_string();
         safe_zip_entry(&name)?;
 
-        if name == MANIFEST_NAME {
+        if name == MANIFEST_NAME || name == "README.md" {
             continue;
         }
 
@@ -874,6 +937,16 @@ mod tests {
         let names: Vec<String> = (0..archive.len())
             .map(|i| archive.by_index(i).unwrap().name().to_string())
             .collect();
+        assert!(names.contains(&"README.md".to_string()), "the pack documents itself");
+        let mut readme_entry = archive.by_name("README.md").unwrap();
+        let mut readme = String::new();
+        std::io::Read::read_to_string(&mut readme_entry, &mut readme).unwrap();
+        assert!(readme.contains("# Dark Bundle v1.0.0"));
+        assert!(readme.contains("Minecraft 1.20.1"));
+        assert!(readme.contains("(fabric)"));
+        assert!(readme.contains("dark_kingdom-0.1.0.jar"));
+        assert!(readme.contains("fabricmc.net/use"));
+        assert!(readme.contains("Modpacks tab installs this zip"));
         assert!(names.contains(&"mods/dark_kingdom-0.1.0.jar".to_string()));
         assert!(names.contains(&"shaderpacks/complementary-ish/shaders/composite.fsh".to_string()));
         let _ = fs::remove_dir_all(&base);

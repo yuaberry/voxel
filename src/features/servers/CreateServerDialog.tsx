@@ -42,6 +42,7 @@ import {
   type ServerStylePreset,
 } from "@/services/servers/serverPresets";
 import { cn } from "@/lib/utils";
+import { invoke } from "@tauri-apps/api/core";
 
 const RAM_OPTIONS = [1024, 2048, 4096, 8192];
 
@@ -164,6 +165,21 @@ export function CreateServerDialog({
           await writeProjectFile(basePath, `servers/${slug}/${file.path}`, file.content);
         }
       }
+      // The server README documents exactly what got installed (objectives
+      // + in-game commands per module) — rewritten with the real facts
+      await invoke("server_write_info", {
+        payload: {
+          storageBase: basePath,
+          slug,
+          name: name.trim(),
+          software,
+          mcVersion,
+          ramMb: ram,
+          modules: selected,
+        },
+      }).catch(() => {
+        // documentation is best-effort — the server itself is already real
+      });
 
       const now = new Date().toISOString();
       const record: ServerRecord = {

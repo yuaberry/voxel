@@ -85,6 +85,7 @@ pub fn run() {
             commands::worldgen::worldgen_create_dimension,
             commands::modpack::modpack_import_into,
             commands::servers::server_create,
+            commands::servers::server_write_info,
             commands::servers::server_start,
             commands::servers::server_stop,
             commands::servers::server_status,

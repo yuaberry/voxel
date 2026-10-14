@@ -19,3 +19,13 @@ The compiled jar lands in `build/libs/`.
 
 Open this folder in any IDE with Gradle support (IntelliJ, VS Code + Java ext).
 Run `./gradlew genSources` for decompiled Minecraft sources.
+
+## How to install the compiled jar
+
+1. Build the mod: `./gradlew build` — the jar lands in `build/libs/`.
+2. **With VOXEL**: open the project → Run prepares an instance, and the app can copy
+   the jar into `instances/<slug>/mods/` for you (the Build drawer does it).
+3. **Manually**: copy the jar from `build/libs/` into your game's `mods/` folder
+   (`.minecraft/mods` on vanilla launchers) and launch the game with the
+   matching loader profile installed.
+
