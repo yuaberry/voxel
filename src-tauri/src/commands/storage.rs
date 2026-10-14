@@ -399,3 +399,172 @@ mod snapshot_tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 }
+
+
+// ---------------------------------------------------------------------------
+// Snapshot restore — the guided way back. NEVER overwrites: entries that
+// already exist in the workspace are skipped and reported, so a restore can
+// only ADD authored work, never destroy it.
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceRestoreResult {
+    pub restored: Vec<String>,
+    pub skipped: Vec<String>,
+    pub snapshot_created_at: String,
+}
+
+#[tauri::command]
+pub fn workspace_import_snapshot(
+    base_path: String,
+    zip_path: String,
+) -> Result<WorkspaceRestoreResult, String> {
+    let base = std::path::PathBuf::from(&base_path)
+        .canonicalize()
+        .map_err(|e| format!("Storage base not accessible: {e}"))?;
+
+    let zip_path = std::path::PathBuf::from(&zip_path)
+        .canonicalize()
+        .map_err(|e| format!("Snapshot not accessible: {e}"))?;
+    let file = std::fs::File::open(&zip_path)
+        .map_err(|e| format!("Failed to open snapshot: {e}"))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| format!("Not a valid snapshot zip: {e}"))?;
+
+    // Only VOXEL snapshots restore through here — the manifest is the contract
+    let mut manifest_raw = String::new();
+    {
+        let mut entry = archive
+            .by_name("SNAPSHOT.json")
+            .map_err(|_| "This zip has no SNAPSHOT.json — only VOXEL workspace snapshots are supported".to_string())?;
+        use std::io::Read as _;
+        entry.read_to_string(&mut manifest_raw).map_err(|e| format!("{e}"))?;
+    }
+    let manifest: serde_json::Value = serde_json::from_str(&manifest_raw)
+        .map_err(|e| format!("Invalid snapshot manifest: {e}"))?;
+    let created_at = manifest
+        .get("createdAt")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    let mut restored: Vec<String> = Vec::new();
+    let mut skipped: Vec<String> = Vec::new();
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).map_err(|e| format!("{e}"))?;
+        let name = entry.name().to_string();
+        if name == "SNAPSHOT.json" {
+            continue;
+        }
+        // only the snapshot's known sections restore — nothing else rides along
+        let section = name.split('/').next().unwrap_or("");
+        if !["projects", "shaderpacks", "modpacks"].contains(&section) {
+            return Err(format!("Unexpected entry in snapshot: {name}"));
+        }
+        // zip-slip guard: relative paths only
+        for seg in name.split(['/', '\\']) {
+            if seg == ".." {
+                return Err(format!("Refused snapshot entry: {name}"));
+            }
+        }
+        let target = base.join(&name);
+        if target.exists() {
+            skipped.push(name);
+            continue;
+        }
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
+        }
+        let mut bytes = Vec::new();
+        use std::io::Read as _;
+        entry.read_to_end(&mut bytes).map_err(|e| format!("read {name}: {e}"))?;
+        std::fs::write(&target, &bytes).map_err(|e| format!("write {}: {e}", target.display()))?;
+        restored.push(name);
+    }
+
+    Ok(WorkspaceRestoreResult {
+        restored,
+        skipped,
+        snapshot_created_at: created_at,
+    })
+}
+
+#[cfg(test)]
+mod restore_tests {
+    use super::*;
+
+    fn workspace_with_assets(tag: &str) -> std::path::PathBuf {
+        let base = std::env::temp_dir().join(format!("voxel-restore-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("projects/kingdom/src")).unwrap();
+        std::fs::create_dir_all(base.join("shaderpacks/cool/style")).unwrap();
+        std::fs::create_dir_all(base.join("modpacks")).unwrap();
+        std::fs::write(base.join("projects/kingdom/src/Main.java"), b"authored").unwrap();
+        std::fs::write(base.join("shaderpacks/cool/style/composite.fsh"), b"void main(){}").unwrap();
+        std::fs::write(base.join("modpacks/bundle.zip"), b"PK").unwrap();
+        base
+    }
+
+    #[test]
+    fn restore_round_trips_and_never_overwrites() {
+        let base = workspace_with_assets("full");
+        let snap = workspace_export_snapshot(base.to_string_lossy().to_string()).unwrap();
+
+        // fresh workspace: everything restores
+        let fresh = std::env::temp_dir().join(format!("voxel-restore-fresh-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&fresh);
+        std::fs::create_dir_all(&fresh).unwrap();
+        let result = workspace_import_snapshot(fresh.to_string_lossy().to_string(), snap.zip_path.clone()).unwrap();
+        assert!(result.restored.contains(&"projects/kingdom/src/Main.java".to_string()));
+        assert!(result.restored.contains(&"shaderpacks/cool/style/composite.fsh".to_string()));
+        assert!(result.restored.contains(&"modpacks/bundle.zip".to_string()));
+        assert!(result.skipped.is_empty());
+        assert_eq!(
+            std::fs::read_to_string(fresh.join("projects/kingdom/src/Main.java")).unwrap(),
+            "authored"
+        );
+
+        // same workspace again: everything is skipped, NOTHING overwritten
+        let mut king = fresh.join("projects/kingdom/src/Main.java");
+        std::fs::write(&king, b"NEWER LOCAL WORK").unwrap();
+        let result = workspace_import_snapshot(fresh.to_string_lossy().to_string(), snap.zip_path.clone()).unwrap();
+        assert!(result.restored.is_empty());
+        assert!(result.skipped.contains(&"projects/kingdom/src/Main.java".to_string()));
+        assert_eq!(std::fs::read_to_string(&king).unwrap(), "NEWER LOCAL WORK");
+
+        let _ = std::fs::remove_dir_all(&base);
+        let _ = std::fs::remove_dir_all(&fresh);
+    }
+
+    #[test]
+    fn refuses_foreign_zips_and_slip() {
+        let base = std::env::temp_dir().join(format!("voxel-restore-guard-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+
+        // a zip without SNAPSHOT.json is honestly refused
+        let foreign = base.join("foreign.zip");
+        let file = std::fs::File::create(&foreign).unwrap();
+        let mut w = zip::ZipWriter::new(file);
+        w.start_file("random.txt", zip::write::SimpleFileOptions::default()).unwrap();
+        use std::io::Write as _;
+        w.write_all(b"hello").unwrap();
+        w.finish().unwrap();
+        assert!(workspace_import_snapshot(base.to_string_lossy().to_string(), foreign.to_string_lossy().to_string()).is_err());
+
+        // a snapshot with an unexpected section is refused
+        let sneaky = base.join("sneaky.zip");
+        let file = std::fs::File::create(&sneaky).unwrap();
+        let mut w = zip::ZipWriter::new(file);
+        w.start_file("SNAPSHOT.json", zip::write::SimpleFileOptions::default()).unwrap();
+        w.write_all(br#"{"createdAt":"x"}"#).unwrap();
+        w.start_file("instances/evil.jar", zip::write::SimpleFileOptions::default()).unwrap();
+        w.write_all(b"x").unwrap();
+        w.finish().unwrap();
+        assert!(workspace_import_snapshot(base.to_string_lossy().to_string(), sneaky.to_string_lossy().to_string()).is_err());
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}

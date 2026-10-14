@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Camera, FolderOpen, Loader2, MapPin } from "lucide-react";
+import { ArchiveRestore, ArrowRight, Camera, FolderOpen, Loader2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,43 @@ export function StorageSettings() {
 
   const [legacy, setLegacy] = useState<{ exists: boolean; path: string } | null>(null);
   const [snapshotted, setSnapshotted] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+
+  const restoreSnapshot = async () => {
+    if (!basePath || restoring) return;
+    setRestoring(true);
+    try {
+      const picked = await open({
+        multiple: false,
+        filters: [{ name: "VOXEL workspace snapshot", extensions: ["zip"] }],
+      });
+      if (typeof picked !== "string") return;
+      const result = await invoke<{
+        restored: string[];
+        skipped: string[];
+        snapshotCreatedAt: string;
+      }>("workspace_import_snapshot", { basePath, zipPath: picked });
+      const restoredN = result.restored.length;
+      const skippedN = result.skipped.length;
+      if (restoredN === 0 && skippedN > 0) {
+        toast.info("Nothing restored", {
+          description: `${skippedN} item(s) already exist here — restores never overwrite. The snapshot is from ${result.snapshotCreatedAt}.`,
+          duration: 9000,
+        });
+      } else {
+        toast.success("Snapshot restored", {
+          description: `${restoredN} file(s) restored${skippedN > 0 ? `, ${skippedN} skipped (already exist — nothing is ever overwritten)` : ""} · snapshot from ${result.snapshotCreatedAt}`,
+          duration: 10000,
+        });
+      }
+    } catch (error) {
+      toast.error("Restore failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const exportSnapshot = async () => {
     if (!basePath) return;
@@ -135,10 +172,16 @@ export function StorageSettings() {
         hint="One zip with your AUTHORED work — projects (sources + .voxel memory), shaderpacks and modpacks. Downloaded instances and server worlds are excluded: they are re-creatable products, and the snapshot manifest says so."
       >
         <div className="max-w-md">
-          <Button variant="outline" size="sm" disabled={!basePath || snapshotted} onClick={() => void exportSnapshot()}>
-            <Camera className="mr-2 h-3.5 w-3.5" />
-            {snapshotted ? "Creating…" : "Export workspace snapshot"}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={!basePath || snapshotted} onClick={() => void exportSnapshot()}>
+              <Camera className="mr-2 h-3.5 w-3.5" />
+              {snapshotted ? "Creating…" : "Export snapshot"}
+            </Button>
+            <Button variant="outline" size="sm" disabled={!basePath || restoring} onClick={() => void restoreSnapshot()}>
+              <ArchiveRestore className="mr-2 h-3.5 w-3.5" />
+              {restoring ? "Restoring…" : "Restore snapshot…"}
+            </Button>
+          </div>
         </div>
       </Field>
 
