@@ -244,3 +244,158 @@ pub fn open_auth_url(url: String) -> Result<(), String> {
         Err("Browser failed to open".to_string())
     }
 }
+
+
+// ---------------------------------------------------------------------------
+// Workspace snapshot — the authorship assets (projects, shaderpacks,
+// modpacks) in one honest zip. Downloaded instances and server worlds are
+// NOT included: they are re-creatable products, not authored work, and the
+// snapshot's manifest says so.
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceSnapshotResult {
+    pub zip_path: String,
+    pub file_count: usize,
+    pub bytes: u64,
+    pub projects: usize,
+    pub shader_packs: usize,
+    pub modpacks: usize,
+}
+
+fn zip_tree<W: std::io::Write + std::io::Seek>(
+    writer: &mut zip::ZipWriter<W>,
+    dir: &std::path::Path,
+    prefix: &str,
+    options: zip::write::SimpleFileOptions,
+) -> Result<usize, String> {
+    use std::io::Write as _;
+    let mut count = 0usize;
+    let entries = std::fs::read_dir(dir).map_err(|e| format!("read {}: {e}", dir.display()))?;
+    for entry in entries.filter_map(|e| e.ok()) {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let path = entry.path();
+        // snapshots carry authored work only — build outputs and caches never
+        if name == "build" || name == ".gradle" || name.starts_with('.') {
+            continue;
+        }
+        let rel = format!("{prefix}/{name}");
+        if path.is_dir() {
+            count += zip_tree(writer, &path, &rel, options)?;
+        } else if path.is_file() {
+            let bytes = std::fs::read(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
+            writer.start_file(rel.clone(), options).map_err(|e| format!("{e}"))?;
+            writer.write_all(&bytes).map_err(|e| format!("{e}"))?;
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+#[tauri::command]
+pub fn workspace_export_snapshot(base_path: String) -> Result<WorkspaceSnapshotResult, String> {
+    use std::io::Write as _;
+    let base = std::path::PathBuf::from(&base_path)
+        .canonicalize()
+        .map_err(|e| format!("Storage base not accessible: {e}"))?;
+
+    let timestamp = {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let days = now / 86400;
+        let secs = now % 86400;
+        let (y, mo, dd) = crate::commands::git::civil_from_days(days as i64);
+        format!("{y:04}{mo:02}{dd:02}-{h:02}{m:02}{s:02}",
+            h = secs / 3600, m = (secs % 3600) / 60, s = secs % 60)
+    };
+
+    let snapshots = base.join("backups/snapshots");
+    std::fs::create_dir_all(&snapshots).map_err(|e| format!("mkdir: {e}"))?;
+    let zip_path = snapshots.join(format!("voxel-workspace-{timestamp}.zip"));
+    let file = std::fs::File::create(&zip_path)
+        .map_err(|e| format!("Failed to create snapshot: {e}"))?;
+    let mut writer = zip::ZipWriter::new(file);
+    let options: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+
+    let manifest = serde_json::json!({
+        "generator": format!("VOXEL {}", env!("CARGO_PKG_VERSION")),
+        "createdAt": timestamp,
+        "includes": ["projects (sources + .voxel memory)", "shaderpacks", "modpacks"],
+        "excludes": ["instances (re-creatable launcher products)", "server worlds", "build outputs"],
+        "restore": "unzip inside a VOXEL workspace to restore the authored assets"
+    });
+    writer.start_file("SNAPSHOT.json", options).map_err(|e| format!("{e}"))?;
+    writer
+        .write_all(serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?.as_slice())
+        .map_err(|e| format!("{e}"))?;
+
+    let mut count = 1usize;
+    for section in ["projects", "shaderpacks", "modpacks"] {
+        let dir = base.join(section);
+        if dir.is_dir() {
+            count += zip_tree(&mut writer, &dir, section, options)?;
+        }
+    }
+    writer.finish().map_err(|e| format!("finalize: {e}"))?;
+    let bytes = std::fs::metadata(&zip_path).map(|m| m.len()).unwrap_or(0);
+
+    let count_dirs = |name: &str| {
+        std::fs::read_dir(base.join(name))
+            .map(|entries| entries.filter_map(|e| e.ok()).filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false)).count())
+            .unwrap_or(0)
+    };
+    Ok(WorkspaceSnapshotResult {
+        zip_path: zip_path.to_string_lossy().to_string(),
+        file_count: count,
+        bytes,
+        projects: count_dirs("projects"),
+        shader_packs: count_dirs("shaderpacks"),
+        modpacks: std::fs::read_dir(base.join("modpacks")).map(|entries| entries.filter_map(|e| e.ok()).filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false)).count()).unwrap_or(0),
+    })
+}
+
+#[cfg(test)]
+mod snapshot_tests {
+    use super::*;
+
+    #[test]
+    fn snapshot_carries_authored_work_and_skips_products() {
+        let base = std::env::temp_dir().join(format!("voxel-snap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("projects/kingdom/src")).unwrap();
+        std::fs::create_dir_all(base.join("projects/kingdom/build")).unwrap();
+        std::fs::create_dir_all(base.join("shaderpacks/cool/style")).unwrap();
+        std::fs::create_dir_all(base.join("modpacks")).unwrap();
+        std::fs::create_dir_all(base.join("instances/huge")).unwrap();
+        std::fs::write(base.join("projects/kingdom/src/Main.java"), b"// authored").unwrap();
+        std::fs::write(base.join("projects/kingdom/build/output.jar"), b"PRODUCT").unwrap();
+        std::fs::write(base.join("shaderpacks/cool/style/composite.fsh"), b"void main(){}").unwrap();
+        std::fs::write(base.join("modpacks/bundle.zip"), b"PK").unwrap();
+        std::fs::write(base.join("instances/huge/client.jar"), b"HUGE PRODUCT").unwrap();
+
+        let result = workspace_export_snapshot(base.to_string_lossy().to_string()).unwrap();
+        assert_eq!(result.projects, 1);
+        assert_eq!(result.shader_packs, 1);
+        assert_eq!(result.modpacks, 1);
+        assert!(result.zip_path.contains("voxel-workspace-"));
+        assert!(result.file_count >= 4);
+
+        let file = std::fs::File::open(&result.zip_path).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+        let names: Vec<String> = (0..archive.len())
+            .map(|i| archive.by_index(i).unwrap().name().to_string())
+            .collect();
+        assert!(names.contains(&"SNAPSHOT.json".to_string()));
+        assert!(names.contains(&"projects/kingdom/src/Main.java".to_string()));
+        assert!(names.contains(&"shaderpacks/cool/style/composite.fsh".to_string()));
+        assert!(names.contains(&"modpacks/bundle.zip".to_string()));
+        assert!(!names.iter().any(|n| n.contains("instances/")));
+        assert!(!names.iter().any(|n| n.contains("build/")));
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}

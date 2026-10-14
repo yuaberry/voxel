@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, FolderOpen, Loader2, MapPin } from "lucide-react";
+import { ArrowRight, Camera, FolderOpen, Loader2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 import { STORAGE_SUBDIRS } from "@/lib/constants";
 import { Field, SectionHeader } from "../SettingsBits";
 import type { StorageInfo } from "@/types";
+import { invoke } from "@tauri-apps/api/core";
 
 export function StorageSettings() {
   const basePath = useSettingsStore((s) => s.settings.storage.basePath);
@@ -24,6 +25,33 @@ export function StorageSettings() {
   const [busy, setBusy] = useState(false);
 
   const [legacy, setLegacy] = useState<{ exists: boolean; path: string } | null>(null);
+  const [snapshotted, setSnapshotted] = useState(false);
+
+  const exportSnapshot = async () => {
+    if (!basePath) return;
+    setSnapshotted(true);
+    try {
+      const result = await invoke<{
+        zipPath: string;
+        fileCount: number;
+        projects: number;
+        shaderPacks: number;
+        modpacks: number;
+        bytes: number;
+      }>("workspace_export_snapshot", { basePath });
+      toast.success("Workspace snapshot created", {
+        description: `${result.fileCount} files (${result.projects} projects · ${result.shaderPacks} shaders · ${result.modpacks} modpacks) · ${(result.bytes / 1048576).toFixed(1)} MB`,
+        duration: 9000,
+      });
+      void openInFileManager(result.zipPath);
+    } catch (error) {
+      toast.error("Snapshot failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setSnapshotted(false);
+    }
+  };
   const [migrating, setMigrating] = useState(false);
 
   useEffect(() => {
@@ -101,6 +129,18 @@ export function StorageSettings() {
           </Button>
         </div>
       )}
+
+      <Field
+        label="Workspace snapshot"
+        hint="One zip with your AUTHORED work — projects (sources + .voxel memory), shaderpacks and modpacks. Downloaded instances and server worlds are excluded: they are re-creatable products, and the snapshot manifest says so."
+      >
+        <div className="max-w-md">
+          <Button variant="outline" size="sm" disabled={!basePath || snapshotted} onClick={() => void exportSnapshot()}>
+            <Camera className="mr-2 h-3.5 w-3.5" />
+            {snapshotted ? "Creating…" : "Export workspace snapshot"}
+          </Button>
+        </div>
+      </Field>
 
       <Field
         label="Workspace folder"

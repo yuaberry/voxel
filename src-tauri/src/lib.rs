@@ -44,6 +44,7 @@ pub fn run() {
             commands::storage::workspace_migrate_legacy,
             commands::storage::workspace_legacy_status,
             commands::storage::open_in_file_manager,
+            commands::storage::workspace_export_snapshot,
             commands::storage::open_auth_url,
             commands::secrets::secrets_set,
             commands::secrets::secrets_get,
