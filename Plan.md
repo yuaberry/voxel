@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (35 sessões)
+## 5. Histórico de sessões (36 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 36 | Marketplace + editor | **Marketplace local** (modpacks/shaders com swatch real/mods com Play) + **editor de modpack salvo** (manifest re-pack atômico, byte-identical) + agent /place guidance + v0.5.2 | linha de rascunho inválida; read_to_end API; Rgb vs number[] |
 | 35 | Era 26.x + presets reais | **6º template** (MDK-26.3-ModDevGradle, MDG 2.0.148, Gradle 9.2.1, Java 25, items/*.json) **E2E com jar real** (SwordItem não existe em 26.x — pescado pelo E2E) + presets skyblock-isles/pvp-arena com os módulos NOVOS de verdade + v0.5.1 | — |
 | 34 | 3 módulos de gameplay | **SkyBlock Islands** (16 ilhas construídas, chest NBT, slots literais + cap honesto) + **Factions War** (3 times, kills via statistic real) + **BedWars Lite** (kit/arena/contagem/cama via statistic) + READMEs com tabelas + v0.5.0 | rascunho semi-feito do skyblock detectado na revisão e refeito; replace não casou com dispatch real |
 | 33 | /mine real + comandos nos READMEs | **Prison ganha /trigger nexus_mine** (loading personalizada com barras + tp para a mina do rank atual) + **tabelas de comandos nos READMEs** (por módulo, fidelidade contra as mcfunctions + seção vanilla admin) + v0.4.5 | `#` de mcfunction dentro do JS (esbuild pegou); doc de /function inexistente (shop→balance) |
@@ -251,12 +252,12 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 35, v0.5.1)
+## 8. Estado atual (verificado — Sessão 36, v0.5.2)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (60) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Rust unit (61) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (69) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
@@ -271,7 +272,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.5.1 (latest)** | Desktop: **era 26.x (6º template E2E) + presets com módulos reais** + APK mobile 0.3.1 |
+| **v0.5.2 (latest)** | Desktop: **Marketplace local + modpack editor + agent /place guidance** + APK mobile 0.3.1 |
+| v0.5.1 | Desktop: **era 26.x (6º template E2E) + presets com módulos reais** + APK mobile 0.3.1 |
 | v0.5.0 | Desktop: **SkyBlock + Factions + BedWars Lite** + APK mobile 0.3.1 |
 | v0.4.5 | Desktop: **/mine real no Prison + command tables nos READMEs** + APK mobile 0.3.1 |
 | v0.4.4 | Desktop: **self-documenting servers/modpacks/mods** + APK mobile 0.3.1 |
@@ -298,7 +300,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 60 unit
+cd src-tauri && cargo test          # 61 unit
 cargo test -- --ignored --nocapture # 10 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -460,7 +462,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 35 — a era 26.x: 6º template (MDG 2.0.148, Gradle 9.2.1, Java 25, item model definitions) E2E-provado com jar real em neoforge:26.3.0.76 (o E2E pescou: SwordItem não existe — data components). Presets SkyBlock/PvP com módulos reais. 69/69 + 60/60. Release v0.5.1.*
+*Última atualização: Sessão 36 — Marketplace local (vitrine real: modpacks com fatos do manifest, shaderpacks com swatch de céu da própria paleta, mods com status vivo + Play) + editor de modpack salvo (re-pack atômico, byte-identical) + agent /place guidance. 69/69 + 61/61. Release v0.5.2.*
 
 ---
 
@@ -900,3 +902,25 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (30 warns) · vitest **69/69** ✓ · cargo **60/60** (+1 render 26.x) ✓ · vite build 1m27s ✓ · boot vivo 0 panics ✓. Release v0.5.1.
 
 **Estado pós-sessão**: **6 templates E2E** (Fabric, Forge, NeoForge ×4 eras até 26.3), 6 módulos de gameplay, 10+ presets reais. Próximos naturais: marketplace local, editor de modpack salvo, o agent usando as estruturas .nbt nos worlds, mais eras de módulos com estrutura+datapack combinados.
+
+---
+
+## 36. Sessão 36 — Marketplace local + Editor de modpack + guidance do agent
+
+**Pedido do dono**: "sim continue, quero que faça tudo."
+
+**1. Marketplace local (`/marketplace`, sidebar Store, Ctrl+K)** — hub de vitrine com TUDO real do workspace:
+- **Modpacks**: cards com os fatos do manifest (versão, data, loader, MC, contagens, tamanho) + install 1-clique na primeira instância preparada + reveal.
+- **Shaderpacks**: cards com **swatches de céu REAIS** — o gradiente é a paleta do próprio estilo (skyTop → horizonte misturado) com o sol da paleta brilhando no canto — + install 1-clique.
+- **Your mods**: projetos buildados com o dot de status vivo e **Play** (LaunchDialog provado).
+- Empty states com a arte da marca roteando pro lugar certo. Zero listagem falsa: tudo vem de commands reais.
+
+**2. Editor de modpack salvo**: `modpack_update_manifest` reescreve o manifest DENTRO do zip (re-pack completo: README acompanha a nova identidade, **jars/shaders preservados byte a byte**, swap atômico via temp sibling + rename — falha nunca corrompe pack existente). A Library ganha o lápis → dialog de name/version. Testes: round-trip com byte-identical, guards (pack ausente, traversal, campos vazios).
+
+**3. Agent**: guidance atualizada — estruturas geradas são carregáveis in-game com `/place template <mod_id>:<id>` (o datapack do mod).
+
+**Bugs da sessão**: rascunho de validação inválido no update (linha perdida); `Read::read_to_end` da ZipFile pede buffer por referência (API std) — 3 erros de compilação corrigidos cirurgicamente; tipos Rgb vs number[] no swatch (spread resolveu).
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (31 warns) · vitest 69/69 ✓ · cargo **61/61** (+1 editor) ✓ · vite build 12m24s (máquina carregada) ✓ · boot vivo 0 panics ✓. Release v0.5.2.
+
+**Estado pós-sessão**: marketplace local + editor + agent guidance entregues. Próximos naturais: módulos estrutura+datapack (monuments para SERVIDORES), mais assets visuais (32x32? blocks com variação), publicação/backup do workspace inteiro, push externo.
