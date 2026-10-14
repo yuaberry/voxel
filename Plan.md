@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (31 sessões)
+## 5. Histórico de sessões (32 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 32 | Documentação viva + research 26.x | **README próprio nos 3 níveis**: servers (fatos do properties + objetivos/comandos dos módulos), modpacks (README no zip + guia por loader + import aceita), mods (guia de instalação ×5 templates) + **era 26.x mapeada** (NeoForgeMDKs/MDK-26.3, MDG 2.0.148, Java 25, Gradle 9.2.1) + v0.4.4 | #[test] duplicado empilhado (harness duplicava o teste → race); import recusava README; push char/str; assert vs markdown |
 | 31 | Dimensions modernas + Library | World Studio **1.21.2-1.21.8** (flatten de int providers por era, testado byte-a-byte) + **Modpack Library** (modpack_list lê manifests dos zips; install 1-clique, reveal, delete guardado) + v0.4.3 | replace python não casou `json!(` (teste pegou); &str vs String; pkill self-match com daemon Java; --quiet escondendo erros de compilação |
 | 30 | Agent structures + World | **Tool generate_structure no agent** (orçamento+snapshot, princípio "make it REAL") + **World Studio v1**: dimensões custom datapack (dimension_type+dimension, 4 presets, 1.21.2+ recusado) + 4ª tab no Studio + v0.4.2 | `serde_json::json!` corrupto por replace; assert torto pré-build |
 | 29 | Structure Studio + Visual | **Estruturas .nbt reais** (NBT writer próprio, 4 templates determinísticos, DataVersion por era, pasta por versão) + **preview isométrico canvas** + tab Structure no Studio + **títulos brand-gradient em todas as páginas + EmptyState com arte pixel** + v0.4.1 | chaminé fora do size (bound assert); u32→i32 negativo no rubble; compiler de novo (useCallback desfeito) |
@@ -247,12 +248,12 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 31, v0.4.3)
+## 8. Estado atual (verificado — Sessão 32, v0.4.4)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (58) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Rust unit (59) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (65) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
@@ -267,7 +268,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.4.3 (latest)** | Desktop: **dimensions 1.20.1-1.21.8 + Modpack Library** + APK mobile 0.3.1 |
+| **v0.4.4 (latest)** | Desktop: **self-documenting servers/modpacks/mods** + APK mobile 0.3.1 |
+| v0.4.3 | Desktop: **dimensions 1.20.1-1.21.8 + Modpack Library** + APK mobile 0.3.1 |
 | v0.4.2 | Desktop: **agent structures + World Studio (dimensões reais)** + APK mobile 0.3.1 |
 | v0.4.1 | Desktop: **Structure Studio (.nbt real + preview iso) + polimento visual** + APK mobile 0.3.1 |
 | v0.4.0 | Desktop: **era ModDevGradle (1.21.4-1.21.8) — 5º template E2E** + APK mobile 0.3.1 |
@@ -290,7 +292,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 58 unit
+cd src-tauri && cargo test          # 59 unit
 cargo test -- --ignored --nocapture # 9 E2E (compilação ×5 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -452,7 +454,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 31 — World Studio cobrindo 1.20.1-1.21.8 (int provider flatten de 24w40a aplicado por era, provado byte-a-byte) + Modpack Library (manifests lidos dos zips, install 1-clique/reveal/delete). 65/65 + 58/58. Release v0.4.3.*
+*Última atualização: Sessão 32 — documentação viva: servers (README com fatos do properties + objetivos/comandos dos módulos instalados), modpacks (README no zip com guia por loader) e mods (guia de instalação nos 5 templates). Era 26.x mapeada (NeoForgeMDKs, MDG 2.0.148, Java 25, Gradle 9.2.1). 65/65 + 59/59. Release v0.4.4.*
 
 ---
 
@@ -816,3 +818,24 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: typecheck 0 ✓ · lint 0 errors (30 warns família) · vitest 65/65 ✓ · cargo **58/58** (+1) ✓ · vite build 1m54s ✓ · boot vivo 0 panics ✓. Release v0.4.3.
 
 **Estado pós-sessão**: World Studio cobre 1.20.1-1.21.8; modpacks têm ciclo completo (export→library→install/delete). Próximos naturais: era 26.x (research), editor DENTRO do zip (editar manifest/re-pack), resource packs completos (pack.mcmeta + pasta), marketplace local.
+
+---
+
+## 32. Sessão 32 — Documentação viva nos três níveis + research da era 26.x
+
+**Pedido do dono**: "continue com todos, também quero que na pasta dos servidores e mods ou modpacks, faça um arquivo com todas as informações, objetivos, como instalar" → documentação própria em TODOS os níveis de entrega.
+
+**1. Servers — README.md na pasta do servidor**: escrito pelo `server_create` **ANTES do download do jar** (existe aconteça o que acontecer) com fatos lidos do `server.properties` REAL da pasta (port, MOTD, online-mode — nunca de memória): identidade, software/versão, RAM (com o comando java literal), como rodar (VOXEL + manual), backups, túnel playit.gg, nota legal. O **wizard reescreve com os módulos instalados**: para cada módulo, OBJETIVO fiel ao datapack gerado (economy: scoreboard nexus_coin + /trigger nexus_shop; prison: nexus_rank + warps + prestige; token: /trigger nexus_token set 1-5 → painel debita a SHA-256 chain) — **só documenta o que está instalado**.
+- **Bug caçado (exótico)**: `#[test]` duplicado empilhado registrava o teste 2× no harness → duas execuções paralelas corriam o mesmo temp-dir (a race da sessão 12 disfarçada de flaky de lógica). O `--list` revelou; fix na macro.
+
+**2. Modpacks — README.md dentro do zip**: identidade, conteúdo completo (mods com projeto de origem, shaders), **guia de instalação por loader** (links dos instaladores oficiais fabricmc.net/files.minecraftforge.net/neoforged.net, pastas mods/shaderpacks) + o caminho de 1 clique do VOXEL. O import passou a aceitar README.md como documentação do pack.
+
+**3. Mods — os 5 templates ganham "How to install the compiled jar"** (caminho VOXEL + manual .minecraft/mods).
+
+**4. Research da era 26.x (o "continue com todos")**: **descoberta — a organização `NeoForgeMDKs` publica mirrors por versão** (o repo neoforged/MDK agora aponta pra lá). MDK-26.3-ModDevGradle estudado: **ModDevGradle 2.0.148, Java 25, Gradle 9.2.1**, lang `itemGroup.` igual, estrutura de templates igual, `neo_version 26.3.0.69-beta`, range `[26.3]`. O template 26.x é a próxima sessão (a API de items mudou demais para enfiar sem estudo — E2E real obrigatório).
+
+**Bugs da sessão**: #[test] duplicado (harness duplicando execução); import recusava README.md (pegado pelo round-trip); `push("\n")` char vs str; assert que não sobrevivia aos próprios `**` do markdown.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (30 warns) · vitest 65/65 ✓ · cargo **59/59** ✓ · vite build 2m59s ✓ · boot vivo 0 panics ✓. Release v0.4.4.
+
+**Estado pós-sessão**: servers, modpacks e mods documentam a si mesmos com fatos reais. Próximo natural: **template neoforge-26.x** (MDK-26.3-ModDevGradle + API de items 26.x + Java 25 via toolchain + E2E real), depois marketplace local.
