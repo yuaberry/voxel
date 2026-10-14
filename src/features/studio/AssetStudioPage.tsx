@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Brush, Dice5, Eye, Package, Save, Sparkles } from "lucide-react";
+import { Brush, Dice5, Eye, Globe2, Package, Save, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,6 +29,12 @@ import {
   type StructureKindId,
 } from "@/services/assets/structureService";
 import { IsoStructureCanvas } from "@/features/studio/IsoStructureCanvas";
+import {
+  createDimension,
+  dimensionSchemaSupported,
+  WORLD_PRESETS,
+  type WorldPresetId,
+} from "@/services/assets/worldgenService";
 import { cn } from "@/lib/utils";
 
 const PRESET_PALETTES: { name: string; primary: string; secondary: string }[] = [
@@ -40,12 +46,13 @@ const PRESET_PALETTES: { name: string; primary: string; secondary: string }[] = 
   { name: "Abyss", primary: "#1f3b73", secondary: "#9bb7d4" },
 ];
 
-type StudioTab = AssetKind | "structure";
+type StudioTab = AssetKind | "structure" | "world";
 
 const TABS: { id: StudioTab; label: string }[] = [
   { id: "item", label: "Item" },
   { id: "block", label: "Block face" },
   { id: "structure", label: "Structure" },
+  { id: "world", label: "World" },
 ];
 
 export function AssetStudioPage() {
@@ -70,7 +77,16 @@ export function AssetStudioPage() {
   const [structureResult, setStructureResult] = useState<StructureGenResult | null>(null);
   const [structureBusy, setStructureBusy] = useState(false);
 
-  const stylesForTab = tab === "structure" ? [] : STYLES_BY_KIND[tab as AssetKind];
+  // world state
+  const [worldPreset, setWorldPreset] = useState<WorldPresetId>("eternal_realm");
+  const [worldBusy, setWorldBusy] = useState(false);
+  const [worldResult, setWorldResult] = useState<{
+    traits: string[];
+    typePath: string;
+  } | null>(null);
+
+  const stylesForTab =
+    tab === "structure" || tab === "world" ? [] : STYLES_BY_KIND[tab as AssetKind];
   const activeStyle = stylesForTab.includes(style)
     ? style
     : (stylesForTab[0] as ItemStyle);
@@ -88,13 +104,15 @@ export function AssetStudioPage() {
   useEffect(() => {
     if (tab === "structure" && itemId === "darksteel_ingot") setItemId("watch_post");
     if (tab !== "structure" && itemId === "watch_post") setItemId("darksteel_ingot");
+    if (tab === "world" && itemId === "darksteel_ingot") setItemId("dark_realm");
+    if (tab !== "world" && itemId === "dark_realm") setItemId("darksteel_ingot");
   }, [tab, itemId]);
 
   const invalidId = itemId.trim().length > 0 && !/^[a-z][a-z0-9_]*$/.test(itemId.trim());
 
   // ---------------- item/block preview (no manual memo: the compiler owns it) ----------------
   useEffect(() => {
-    if (tab === "structure") return;
+    if (tab === "structure" || tab === "world") return;
     if (!basePath || !project || !itemId.trim()) {
       setPreview(null);
       return;
@@ -189,6 +207,34 @@ export function AssetStudioPage() {
     }
   };
 
+  const handleWriteWorld = async () => {
+    if (!basePath || !project || !itemId.trim()) return;
+    setWorldBusy(true);
+    try {
+      const result = await createDimension({
+        storageBase: basePath,
+        projectRel: `projects/${project.slug}`,
+        dimensionId: itemId.trim(),
+        preset: worldPreset,
+        mcVersion: project.minecraft_version,
+      });
+      setWorldResult({
+        traits: result.traits,
+        typePath: result.dimensionTypePath,
+      });
+      toast.success("Dimension created", {
+        description: result.dimensionTypePath,
+        duration: 9000,
+      });
+    } catch (error) {
+      toast.error("Dimension failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setWorldBusy(false);
+    }
+  };
+
   const handleWriteStructure = async () => {
     if (!basePath || !project || !itemId.trim()) return;
     setStructureBusy(true);
@@ -217,6 +263,7 @@ export function AssetStudioPage() {
   };
 
   const isStructure = tab === "structure";
+  const isWorld = tab === "world";
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-10">
@@ -227,13 +274,17 @@ export function AssetStudioPage() {
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Real assets, generated in the security perimeter: pixel-art item and
-            block textures, and procedural <code>.nbt</code> structures a
-            structure block loads — with the isometric preview showing the exact
-            bytes you save.
+            block textures, procedural <code>.nbt</code> structures a structure
+            block loads, and custom dimensions written straight into the mod's
+            datapack — every preview shows exactly what gets saved.
           </p>
         </div>
         <Badge variant="outline">
-          {isStructure ? "structure · .nbt" : "16x16 · vanilla-style"}
+          {isStructure
+            ? "structure · .nbt"
+            : tab === "world"
+              ? "dimension · datapack"
+              : "16x16 · vanilla-style"}
         </Badge>
       </header>
 
@@ -255,7 +306,22 @@ export function AssetStudioPage() {
                   isStructure ? "h-64 w-full" : "p-8",
                 )}
               >
-                {isStructure ? (
+                {isWorld ? (
+                  worldResult ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
+                      <Globe2 className="h-10 w-10 text-primary drop-shadow-[0_0_14px_rgba(145,85,255,0.5)]" />
+                      {worldResult.traits.map((t) => (
+                        <p key={t} className="text-[11px] text-muted-foreground">
+                          · {t} ·
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-muted-foreground">
+                      <Globe2 className="h-8 w-8 opacity-40" />
+                    </div>
+                  )
+                ) : isStructure ? (
                   structureResult ? (
                     <IsoStructureCanvas
                       blocks={structureResult.blocks}
@@ -283,11 +349,18 @@ export function AssetStudioPage() {
                     {structureResult.size.join("×")} · {structureResult.blockCount} blocks
                   </span>
                 )}
+                {isWorld && worldResult && (
+                  <span className="absolute bottom-2 right-2 rounded-full bg-background/80 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                    {itemId} · {project?.minecraft_version}
+                  </span>
+                )}
               </div>
               <p className="text-center text-[11px] text-muted-foreground">
                 {isStructure
                   ? "Isometric preview of the exact block list — the .nbt contains these and only these."
-                  : "Live preview — nothing is written until you save."}
+                  : isWorld
+                    ? "The realm's physics and generator, era-factual for 1.20.1-1.21.1."
+                    : "Live preview — nothing is written until you save."}
               </p>
             </CardContent>
           </Card>
@@ -311,10 +384,10 @@ export function AssetStudioPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{isStructure ? "Structure id" : "Item id"}</Label>
+                  <Label>{isStructure ? "Structure id" : isWorld ? "Dimension id" : "Item id"}</Label>
                   <Input
                     className={cn(invalidId && "border-destructive")}
-                    placeholder={isStructure ? "watch_post" : "darksteel_ingot"}
+                    placeholder={isStructure ? "watch_post" : isWorld ? "dark_realm" : "darksteel_ingot"}
                     value={itemId}
                     onChange={(e) => setItemId(e.target.value)}
                   />
@@ -331,7 +404,7 @@ export function AssetStudioPage() {
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                   Asset type
                 </Label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   {TABS.map((t) => (
                     <button
                       key={t.id}
@@ -350,7 +423,55 @@ export function AssetStudioPage() {
                 </div>
               </div>
 
-              {isStructure ? (
+              {isWorld ? (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Realm preset
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {WORLD_PRESETS.map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setWorldPreset(preset)}
+                          className={cn(
+                            "rounded-lg border px-2 py-1.5 text-xs font-medium transition-all active:scale-[0.96]",
+                            worldPreset === preset
+                              ? "border-primary/70 bg-primary/15 text-primary shadow-[0_0_10px_rgba(145,85,255,0.2)]"
+                              : "border-border/70 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                          )}
+                        >
+                          {preset.replace("_", " ")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {dimensionSchemaSupported(project?.minecraft_version ?? "") ? (
+                    <>
+                      <Button
+                        className="w-full"
+                        disabled={!itemId.trim() || invalidId || worldBusy}
+                        onClick={() => void handleWriteWorld()}
+                      >
+                        <Save className="mr-2 h-4 w-4" />
+                        {worldBusy ? "Writing…" : "Write dimension into project"}
+                      </Button>
+                      <p className="text-center text-[10px] text-muted-foreground">
+                        Two era-factual JSONs land in the mod datapack
+                        (dimension_type + dimension). Build the jar and travel
+                        in-game — <code>/execute in {project?.slug.replace(/-/g, "_")}:{itemId} run tp @s ~ ~ ~</code>.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="rounded-lg border border-dashed border-border/70 p-3 text-[11px] text-muted-foreground">
+                      The dimension datapack schema changed in 1.21.2+ — this
+                      generator covers 1.20.1-1.21.1 honestly. Your project is
+                      on MC {project?.minecraft_version ?? "?"}.
+                    </p>
+                  )}
+                </>
+              ) : isStructure ? (
                 <>
                   <div className="space-y-2">
                     <Label className="text-xs uppercase tracking-wide text-muted-foreground">
