@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (34 sessões)
+## 5. Histórico de sessões (35 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 35 | Era 26.x + presets reais | **6º template** (MDK-26.3-ModDevGradle, MDG 2.0.148, Gradle 9.2.1, Java 25, items/*.json) **E2E com jar real** (SwordItem não existe em 26.x — pescado pelo E2E) + presets skyblock-isles/pvp-arena com os módulos NOVOS de verdade + v0.5.1 | — |
 | 34 | 3 módulos de gameplay | **SkyBlock Islands** (16 ilhas construídas, chest NBT, slots literais + cap honesto) + **Factions War** (3 times, kills via statistic real) + **BedWars Lite** (kit/arena/contagem/cama via statistic) + READMEs com tabelas + v0.5.0 | rascunho semi-feito do skyblock detectado na revisão e refeito; replace não casou com dispatch real |
 | 33 | /mine real + comandos nos READMEs | **Prison ganha /trigger nexus_mine** (loading personalizada com barras + tp para a mina do rank atual) + **tabelas de comandos nos READMEs** (por módulo, fidelidade contra as mcfunctions + seção vanilla admin) + v0.4.5 | `#` de mcfunction dentro do JS (esbuild pegou); doc de /function inexistente (shop→balance) |
 | 32 | Documentação viva + research 26.x | **README próprio nos 3 níveis**: servers (fatos do properties + objetivos/comandos dos módulos), modpacks (README no zip + guia por loader + import aceita), mods (guia de instalação ×5 templates) + **era 26.x mapeada** (NeoForgeMDKs/MDK-26.3, MDG 2.0.148, Java 25, Gradle 9.2.1) + v0.4.4 | #[test] duplicado empilhado (harness duplicava o teste → race); import recusava README; push char/str; assert vs markdown |
@@ -250,18 +251,18 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 34, v0.5.0)
+## 8. Estado atual (verificado — Sessão 35, v0.5.1)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (59) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Rust unit (60) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (69) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
 | E2E SLP multi-server | ✅ Hypixel + CubeCraft + **Minemen via SRV** (reprodução do bug do dono) |
-| **E2E compilação ×5 templates** | ✅ **fabric 158s · forge 339s · neo-legacy 170s · neo-NG7 854s · neo-MDG 64s — todos produzem dark_kingdom-0.1.0.jar real** (Sessões 22-28) |
+| **E2E compilação ×6 templates** | ✅ **fabric 158s · forge 339s · neo-legacy 170s · neo-NG7 854s · neo-MDG 64s · neo-26.x 71s(warm)/19min(1ª) — todos produzem dark_kingdom-0.1.0.jar real** (Sessões 22-35) |
 | Typecheck / ESLint | ✅ 0 errors (warns set-state-in-effect = backlog família conhecida) |
 | Mobile typecheck | ✅ `pnpm --filter @voxel/mobile typecheck` (CI verde) |
 | Vite build | ✅ resolve @voxel/core via workspace |
@@ -270,7 +271,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.5.0 (latest)** | Desktop: **SkyBlock + Factions + BedWars Lite** + APK mobile 0.3.1 |
+| **v0.5.1 (latest)** | Desktop: **era 26.x (6º template E2E) + presets com módulos reais** + APK mobile 0.3.1 |
+| v0.5.0 | Desktop: **SkyBlock + Factions + BedWars Lite** + APK mobile 0.3.1 |
 | v0.4.5 | Desktop: **/mine real no Prison + command tables nos READMEs** + APK mobile 0.3.1 |
 | v0.4.4 | Desktop: **self-documenting servers/modpacks/mods** + APK mobile 0.3.1 |
 | v0.4.3 | Desktop: **dimensions 1.20.1-1.21.8 + Modpack Library** + APK mobile 0.3.1 |
@@ -296,8 +298,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 59 unit
-cargo test -- --ignored --nocapture # 9 E2E (compilação ×5 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
+cd src-tauri && cargo test          # 60 unit
+cargo test -- --ignored --nocapture # 10 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
 ```
@@ -458,7 +460,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 34 — três módulos de gameplay REAIS: SkyBlock Islands (16 ilhas construídas no load, baú com kit NBT, slots honestos), Factions War (3 times, kills via statistic vanilla) e BedWars Lite (kit, arena, contagem, cama via statistic de mineração). 26.x = decisão sênior documentada (sessão dedicada). 69/69 + 59/59. Release v0.5.0.*
+*Última atualização: Sessão 35 — a era 26.x: 6º template (MDG 2.0.148, Gradle 9.2.1, Java 25, item model definitions) E2E-provado com jar real em neoforge:26.3.0.76 (o E2E pescou: SwordItem não existe — data components). Presets SkyBlock/PvP com módulos reais. 69/69 + 60/60. Release v0.5.1.*
 
 ---
 
@@ -880,3 +882,21 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (30 warns) · **vitest 69/69** (+3 módulos: setblock counts, chest NBT, warps por slot, cap message, teams/kills, kit/arena/cama) ✓ · **cargo 59/59** ✓ · vite build 6m53s ✓ · boot vivo 0 panics ✓. Release **v0.5.0** (minor: módulos de gameplay).
 
 **Estado pós-sessão**: 6 módulos de gameplay (economy/prison/token/skyblock/factions/bedwars), todos com README e comandos reais. Próximos naturais: template neoforge-26.x (research pronta, sessão dedicada), marketplace local, editor de modpack, mais presets de servidor com os módulos novos.
+
+---
+
+## 35. Sessão 35 — A era 26.x: 6º template E2E-provado + presets com módulos reais
+
+**Pedido do dono**: "sim faça tudo" → a sessão dedicada da era 26.x (decisão sênior da S34) + presets com os módulos novos.
+
+**1. Template `neoforge-26.x-mod` (30 arquivos)** — derivado do mirror oficial **`NeoForgeMDKs/MDK-26.3-ModDevGradle`**: MDG **2.0.148**, wrapper **Gradle 9.2.1**, **Java 25** (o toolchain foojay baixa sob demanda), `loader_version_range [4,)`.
+- **O E2E provou a maior verdade da era ANTES de qualquer usuário**: `SwordItem` NÃO EXISTE em 26.x — stats de arma viraram data components. O template registra a identidade da lâmina honestamente (épica, fire-immune, com NOTE apontando a era de components) + **item model definitions** (`assets/<ns>/items/*.json`, formato 1.21.4+) ligados aos models/textures/lang clássicos.
+- **Sem data files no template da era** — recipes/advancements ficam a cargo do agent com a versão na mão; nada de chute.
+- Catalog: disponibilidade NeoForge estendida a **26.1-26.3** (4 eras no templateId), `javaReleaseFor` mapeia 26.x→**25** (aceito no guard Rust). Wizard explica as 4 eras.
+- **E2E REAL**: `dark_kingdom-0.1.0.jar` compilado com **neoforge:26.3.0.76** e toolchain Java 25 — 19 min na primeira (NeoForm decompile + download do JDK), **71s morno**. **6/6 templates E2E**.
+
+**2. Presets com os módulos REAIS**: o preset `skyblock-isles` (S15) finalmente merece o nome — datapack constrói as 16 ilhas + `/trigger nexus_skyblock`; o `pvp-arena` embarca **Factions War + BedWars Lite**. Allowlist de módulos no teste segue.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (30 warns) · vitest **69/69** ✓ · cargo **60/60** (+1 render 26.x) ✓ · vite build 1m27s ✓ · boot vivo 0 panics ✓. Release v0.5.1.
+
+**Estado pós-sessão**: **6 templates E2E** (Fabric, Forge, NeoForge ×4 eras até 26.3), 6 módulos de gameplay, 10+ presets reais. Próximos naturais: marketplace local, editor de modpack salvo, o agent usando as estruturas .nbt nos worlds, mais eras de módulos com estrutura+datapack combinados.
