@@ -161,7 +161,10 @@ export function CreateServerDialog({
       const selected = [...modules];
       if (selected.length > 0) {
         const { writeProjectFile } = await import("@/services/projects/projectsService");
-        const files = generateSelectedModules(selected, DEFAULT_MODULE_OPTIONS);
+        const files = generateSelectedModules(selected, {
+          ...DEFAULT_MODULE_OPTIONS,
+          mcVersion,
+        });
         for (const file of files) {
           await writeProjectFile(basePath, `servers/${slug}/${file.path}`, file.content);
         }

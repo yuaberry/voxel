@@ -215,3 +215,50 @@ describe("monuments module", () => {
     });
   });
 });
+
+describe("custom realm module (server dimensions)", () => {
+  it("writes era-factual dimension pair for 1.20.1", () => {
+    const files = generateSelectedModules(["realm"], { ...DEFAULT_MODULE_OPTIONS, mcVersion: "1.20.1" });
+    const byPath = new Map(files.map((f) => [f.path, f.content]));
+
+    const typeJson = JSON.parse(
+      byPath.get("world/datapacks/nexus_realm/data/nexus_realm/dimension_type/eternal_realm.json")!,
+    ) as Record<string, unknown>;
+    expect(typeJson.fixed_time).toBe(13000);
+    expect(typeJson.bed_works).toBe(true);
+    expect(typeJson.height).toBe(384);
+    // 1.20.1 keeps the wrapped int provider
+    expect((typeJson.monster_spawn_light_level as Record<string, unknown>).value).toEqual({
+      min_inclusive: 0,
+      max_inclusive: 7,
+    });
+
+    const dimJson = JSON.parse(
+      byPath.get("world/datapacks/nexus_realm/data/nexus_realm/dimension/eternal_realm.json")!,
+    ) as Record<string, unknown>;
+    expect(dimJson.type).toBe("nexus_realm:eternal_realm");
+
+    const readme = byPath.get("world/datapacks/nexus_realm/README.md")!;
+    expect(readme).toContain("/execute in nexus_realm:eternal_realm");
+  });
+
+  it("flattens the int providers for 1.21.2+ and refuses 26.x honestly", () => {
+    const modern = generateSelectedModules(["realm"], { ...DEFAULT_MODULE_OPTIONS, mcVersion: "1.21.4" });
+    const typeJson = JSON.parse(
+      modern
+        .map((f) => [f.path, f.content] as const)
+        .find(([p]) => p.endsWith("dimension_type/eternal_realm.json"))![1],
+    ) as Record<string, unknown>;
+    expect((typeJson.monster_spawn_light_level as Record<string, unknown>).value).toBeUndefined();
+    expect(typeJson.monster_spawn_light_level).toEqual({
+      type: "minecraft:uniform",
+      min_inclusive: 0,
+      max_inclusive: 7,
+    });
+
+    const tooNew = generateSelectedModules(["realm"], { ...DEFAULT_MODULE_OPTIONS, mcVersion: "26.3" });
+    expect(
+      tooNew.some((f) => f.path.endsWith("UNSUPPORTED.txt")),
+    ).toBe(true);
+  });
+});

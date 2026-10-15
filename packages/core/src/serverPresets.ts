@@ -11,7 +11,7 @@
  * keys, `online-mode` is never overridable.
  */
 
-export type ServerModuleId = "economy" | "prison" | "token" | "skyblock" | "factions" | "bedwars" | "monuments";
+export type ServerModuleId = "economy" | "prison" | "token" | "skyblock" | "factions" | "bedwars" | "monuments" | "realm";
 
 export type ServerPresetCategory = "official" | "community";
 
@@ -33,20 +33,20 @@ export const SERVER_STYLE_PRESETS: readonly ServerStylePreset[] = [
   {
     id: "vanilla-survival",
     name: "Vanilla Survival",
-    tagline: "The pure classic",
+    tagline: "The pure classic, plus a second world",
     description:
-      "The unmodified survival experience — normal difficulty, protected spawn, command blocks on. Exactly what a fresh vanilla install should feel like.",
+      "The unmodified survival experience — normal difficulty, protected spawn, command blocks on — with a bonus dimension: the Eternal Realm, an eternal-dusk overworld just one command away.",
     category: "official",
     software: "vanilla",
     ramMb: 2048,
     properties: {
-      motd: "A VOXEL vanilla survival server",
+      motd: "A VOXEL vanilla survival — a Eternal Realm espera",
       difficulty: "normal",
       gamemode: "survival",
       "spawn-protection": "16",
       pvp: "true",
     },
-    modules: [],
+    modules: ["realm"],
   },
   {
     id: "paper-survival",
