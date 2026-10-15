@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (38 sessões)
+## 5. Histórico de sessões (39 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 39 | Snapshots agendados + seeds | **snapshot_auto_check** (cadência Off/Diário/Semanal, last-auto.json portátil, boot hook) + seed de monuments do dono no wizard + v0.5.5 | off-by-one de horas (24 vs 23 — o teste ensinou); modules é Set |
 | 38 | Restore guiado + presets | **workspace_import_snapshot** (só VOXEL, seções conhecidas, nunca sobrescreve — restore só adiciona) + Creative Workshop+Monuments, Hardcore Realm+Factions + v0.5.4 | import plugin-dialog duplicado |
 | 37 | Monuments + Snapshots | **Módulo Monuments** (.nbt reais no datapack do server, /place template via trigger, wizard gera via Rust) + **Workspace Snapshots** (autoria zipada com manifest includes/excludes) + v0.5.3 | guard de output_kind só na escrita (preview vazava); Write trait ausente; imports dupes |
 | 36 | Marketplace + editor | **Marketplace local** (modpacks/shaders com swatch real/mods com Play) + **editor de modpack salvo** (manifest re-pack atômico, byte-identical) + agent /place guidance + v0.5.2 | linha de rascunho inválida; read_to_end API; Rgb vs number[] |
@@ -254,12 +255,12 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 38, v0.5.4)
+## 8. Estado atual (verificado — Sessão 39, v0.5.5)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (65) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Rust unit (66) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (70) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
@@ -274,7 +275,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.5.4 (latest)** | Desktop: **restauração guiada de snapshot + presets com módulos novos** + APK mobile 0.3.1 |
+| **v0.5.5 (latest)** | Desktop: **snapshots automáticos + monument seed do dono** + APK mobile 0.3.1 |
+| v0.5.4 | Desktop: **restauração guiada de snapshot + presets com módulos novos** + APK mobile 0.3.1 |
 | v0.5.3 | Desktop: **Monuments (.nbt nos servidores) + Workspace Snapshots** + APK mobile 0.3.1 |
 | v0.5.2 | Desktop: **Marketplace local + modpack editor + agent /place guidance** + APK mobile 0.3.1 |
 | v0.5.1 | Desktop: **era 26.x (6º template E2E) + presets com módulos reais** + APK mobile 0.3.1 |
@@ -304,7 +306,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 65 unit
+cd src-tauri && cargo test          # 66 unit
 cargo test -- --ignored --nocapture # 10 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -466,7 +468,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 38 — restauração guiada de snapshot (só VOXEL, seções conhecidas, NUNCA sobrescreve — provado byte a byte) + Creative Workshop com Monuments e Hardcore Realm com Factions War. 70/70 + 65/65. Release v0.5.4.*
+*Última atualização: Sessão 39 — snapshots AUTOMÁTICOS (cadência em Settings→Storage, last-auto.json ao lado dos zips, boot hook silencioso) + seed de monuments personalizada por servidor. 70/70 + 66/66. Release v0.5.5.*
 
 ---
 
@@ -964,3 +966,19 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (31 warns) · vitest 70/70 ✓ · cargo **65/65** ✓ · vite build 2m52s ✓ · boot vivo 0 panics ✓. Release v0.5.4.
 
 **Estado pós-sessão**: snapshot com ciclo completo (export→restore nunca destrutivo), 4 dos 10+ presets usando os 7 módulos. Próximos naturais: backup automático agendado, push externo (backend), mais estilos de módulo monument (custom seeds pelo painel), world presets.
+
+---
+
+## 39. Sessão 39 — Snapshots agendados + seed de monuments do dono
+
+**Pedido do dono**: "sim quero que faça todos."
+
+**1. Snapshots automáticos (`snapshot_auto_check`)**: o app aberto + cadência ligada (Off/Diário/Semanal em Settings→Storage) + último run stale → **snapshot completo dispara sozinho** com toast discreto. O timestamp do último run vive **ao lado dos snapshots** (`last-auto.json`) — sobrevive a resets do DB e viaja com o workspace. Boot hook pós-hydrate, silencioso quando off ou em dia. *Push externo (FCM/APNs) documentado como precisa de backend — não inventado.*
+
+**2. Seed de monuments do dono**: com o módulo Monuments marcado, o wizard mostra o input de seed ("mesmo seed, mesmo skyline") — todos os .nbt daquele servidor nascem da seed escolhida em vez do default.
+
+**Bugs**: off-by-one de horas restantes no teste (24h reais vs 23 do assert — o teste ensinou a matemática); `modules` é Set (`.has`, não `.includes`) e o state do seed não casou na 1ª tentativa.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (31 warns) · vitest 70/70 ✓ · cargo **66/66** (+1 auto) ✓ · vite build 2m19s ✓ · boot vivo 0 panics ✓. Release v0.5.5.
+
+**Estado pós-sessão**: snapshot com ciclo completo E agendamento; monuments personalizados por servidor. Próximos naturais: push externo (backend quando o dono decidir), world presets para servidores, módulos 2.0 (estrutura+economia combinados), mais eras de research (26.4+ quando existirem).
