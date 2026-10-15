@@ -75,6 +75,7 @@ export function CreateServerDialog({
   const [ram, setRam] = useState(2048);
   const [acceptEula, setAcceptEula] = useState(false);
   const [modules, setModules] = useState<Set<ServerModuleId>>(new Set());
+  const [monumentSeed, setMonumentSeed] = useState<number>(1337);
   const [busy, setBusy] = useState(false);
 
   const slug = useMemo(() => slugify(name), [name]);
@@ -166,7 +167,8 @@ export function CreateServerDialog({
         }
       }
       // Monuments ships REAL .nbt structures — the Rust generator writes
-      // them straight into the module's datapack (era-factual, server version)
+      // them straight into the module's datapack (era-factual, server
+      // version, owner-chosen seed for a personal skyline)
       if (selected.includes("monuments")) {
         const { MONUMENT_STRUCTURES } = await import("@/services/servers/serverModules");
         const { generateStructure } = await import("@/services/assets/structureService");
@@ -176,7 +178,7 @@ export function CreateServerDialog({
             projectRel: `servers/${slug}`,
             structureId: monument.structureId,
             kind: monument.kind,
-            seed: 1337 + monument.structureId.length,
+            seed: monumentSeed,
             mcVersion: mcVersion,
             previewOnly: false,
             outputKind: "server_module",
@@ -445,6 +447,25 @@ export function CreateServerDialog({
                 );
               })}
             </div>
+            {modules.has("monuments") && (
+              <div className="mt-2 flex items-center gap-2 rounded-lg border border-border/70 bg-card/40 px-3 py-2">
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  Monument seed
+                </span>
+                <input
+                  type="number"
+                  className="h-7 w-24 rounded-md border border-border bg-card/60 px-2 text-xs outline-none focus:border-primary"
+                  value={monumentSeed}
+                  onChange={(e) =>
+                    setMonumentSeed(Math.max(0, Number(e.target.value) || 0))
+                  }
+                />
+                <span className="text-[10px] text-muted-foreground">
+                  same seed, same skyline — every monument on this server
+                  builds from it
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
