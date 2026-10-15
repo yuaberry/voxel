@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (41 sessões)
+## 5. Histórico de sessões (42 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 42 | PT-BR + agent handoff | **i18n honesto** (fallback inglês, setting Auto/EN/PT-BR, nav+títulos+seções traduzidas) + **chat de alterações no Studio** (handoff pro AI Creator, nunca auto-envia) + v0.5.8 | replace de uiStore não casou; togglePalette 0-arg |
 | 41 | Correções do dono | Botão criar nunca-morto (feedback do requisito), delete dentro do projeto, **Community servers ao vivo** (SLP 45s + nerdzone.gg), túnel público no wizard, inferência prison/coin/chain + v0.5.7 | botão disabled silencioso; delete escondido no ⋮ |
 | 40 | Custom Realm | **8º módulo**: dimensão custom real no datapack do server (era-factual, tests com parse do JSON, UNSUPPORTED honesto p/ 26.x) + Vanilla Survival + realm + v0.5.6 | — |
 | 39 | Snapshots agendados + seeds | **snapshot_auto_check** (cadência Off/Diário/Semanal, last-auto.json portátil, boot hook) + seed de monuments do dono no wizard + v0.5.5 | off-by-one de horas (24 vs 23 — o teste ensinou); modules é Set |
@@ -257,13 +258,13 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 41, v0.5.7)
+## 8. Estado atual (verificado — Sessão 42, v0.5.8)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
 | Rust unit (66) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (74) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Vitest (77) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -277,7 +278,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.5.7 (latest)** | Desktop: **correções do dono + community servers ao vivo + túnel no wizard** + APK mobile 0.3.1 |
+| **v0.5.8 (latest)** | Desktop: **Português (Brasil) no app + chat do agente no Studio** + APK mobile 0.3.1 |
+| v0.5.7 | Desktop: **correções do dono + community servers ao vivo + túnel no wizard** + APK mobile 0.3.1 |
 | v0.5.6 | Desktop: **Custom Realm (dimensões nos servers)** + APK mobile 0.3.1 |
 | v0.5.5 | Desktop: **snapshots automáticos + monument seed do dono** + APK mobile 0.3.1 |
 | v0.5.4 | Desktop: **restauração guiada de snapshot + presets com módulos novos** + APK mobile 0.3.1 |
@@ -472,7 +474,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 41 — correções do dono: botão de criar nunca-morto com feedback, delete visível dentro do projeto, seção Community servers AO VIVO (SLP real 45s, nerdzone.gg com 1220 players), túnel público no wizard e inferência prison/coin/chain (nerdzone→prison+economy+token). 74/74 + 66/66. Release v0.5.7.*
+*Última atualização: Sessão 42 — Português (Brasil) no app (t() com fallback inglês, setting Auto/EN/PT-BR, navegação+títulos+seções traduzidas) + chat do agente no Asset Studio (handoff com projeto e prompt pré-carregados, nunca auto-envia). 77/77. Release v0.5.8.*
 
 ---
 
@@ -1022,3 +1024,21 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Ficam para a S42 (documentado)**: i18n PT-BR completo do app, chat de alterações no Asset Studio (reuso do agente), UX do build (progresso), conexão projeto↔servidor (deploy).
 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (31 warns) · vite build 2m07s ✓ · boot vivo 0 panics ✓. Release v0.5.7.
+
+---
+
+## 42. Sessão 42 — Português (Brasil) no app inteiro + chat do agente no Studio
+
+**Pedido do dono** (da S41, documentado): tradução PT-BR do app inteiro + chat para pedir alterações no Asset Studio.
+
+**1. i18n honesto por construção**: `t("English text")` consulta o dicionário ativo (pt-BR completo) e **cai de volta no próprio inglês** quando uma string ainda não tem tradução — a UI nunca mostra key quebrada e a cobertura cresce incrementalmente. Setting em Settings→General (Auto/English/Português), aplicado no hydrate e nas trocas (sem restart). Detector de idioma do SO para o Auto.
+- **Superfícies traduzidas**: navegação completa (sidebar, breadcrumb, command palette), títulos, seção Community servers ao vivo, seções de modpacks/marketplace/studio, header do workspace, ações comuns (criar/excluir/cancelar/jogar/instalar), labels do Studio.
+- Strings residuais migram por incremento (o sistema aceita crescer sem quebrar nada).
+
+**2. Chat de alterações no Asset Studio**: o box "Want a change, improvement or something new?" — descreva ("add a ruby sword with red glow") e o pedido **vai para o AI Creator com ESTE projeto pré-selecionado e o prompt pré-carregado** (nunca auto-envia: o usuário revisa e dispara — nada roda às cegas). Handoff via uiStore (`aiHandoff`), consumido no mount e limpo.
+
+**Bugs**: replace de uiStore que não casou com o real (edit direto corrigiu); togglePalette mudou de assinatura num refactor antigo (0-arg) — teste de atalho pescou.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (33 warns família) · **vitest 77/77** (+3 i18n: dicionário são, tradução real, fallback) ✓ · vite build 1m39s ✓ · boot vivo 0 panics ✓. Release v0.5.8.
+
+**Estado pós-sessão**: app bilíngue (EN/PT-BR com detector de SO), Studio fala com o agente. Próximos naturais: ampliar a cobertura de strings do pt-BR para os diálogos profundos (wizard completo, toasts), UX do build (progresso), conexão projeto↔servidor (deploy de datapack/estrutura no servidor alvo).
