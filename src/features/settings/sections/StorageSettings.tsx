@@ -18,7 +18,8 @@ import type { StorageInfo } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
 
 export function StorageSettings() {
-  const basePath = useSettingsStore((s) => s.settings.storage.basePath);
+  const settings = useSettingsStore((s) => s.settings);
+  const basePath = settings.storage.basePath;
   const update = useSettingsStore((s) => s.update);
   const [suggested, setSuggested] = useState<string>("");
   const [info, setInfo] = useState<StorageInfo | null>(null);
@@ -166,6 +167,25 @@ export function StorageSettings() {
           </Button>
         </div>
       )}
+
+      <Field
+        label="Automatic snapshots"
+        hint="A workspace snapshot can run by itself when the app opens — the last-run timestamp lives next to the snapshots, so it survives resets and moves with the workspace."
+      >
+        <div className="max-w-md space-y-1.5">
+          <select
+            className="h-8 rounded-md border border-border bg-card/60 px-2 text-xs outline-none focus:border-primary"
+            value={String(settings.storage.autoSnapshotDays ?? 0)}
+            onChange={(e) =>
+              void update("storage", { autoSnapshotDays: Number(e.target.value) })
+            }
+          >
+            <option value="0">Off</option>
+            <option value="1">Daily (on first open of the day)</option>
+            <option value="7">Weekly</option>
+          </select>
+        </div>
+      </Field>
 
       <Field
         label="Workspace snapshot"

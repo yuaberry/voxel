@@ -34,6 +34,30 @@ export default function App() {
     import("@/services/minecraft/versionCatalog")
       .then((m) => m.ensureCatalog().catch(() => {}))
       .catch(() => {});
+    // Scheduled workspace snapshots — after settings hydrate, once per open
+    const store = useSettingsStore;
+    const t = setTimeout(() => {
+      const { basePath, autoSnapshotDays } = store.getState().settings.storage;
+      if (!basePath || !autoSnapshotDays) return;
+      import("@tauri-apps/api/core")
+        .then(({ invoke }) =>
+          invoke<{ created: { fileCount: number } | null } | null>(
+            "snapshot_auto_check",
+            { basePath, cadenceDays: autoSnapshotDays },
+          ).catch(() => null),
+        )
+        .then((result) => {
+          if (result?.created) {
+            import("sonner").then(({ toast }) =>
+              toast.success("Automatic workspace snapshot", {
+                description: `${result.created!.fileCount} authored files backed up (daily cadence).`,
+              }),
+            );
+          }
+        })
+        .catch(() => {});
+    }, 4000);
+    return () => clearTimeout(t);
   }, [hydrate, hydrateProjects]);
 
   const projectsLoaded = useProjectsStore((s) => s.loaded);

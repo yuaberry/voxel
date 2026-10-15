@@ -568,3 +568,148 @@ mod restore_tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 }
+
+
+// ---------------------------------------------------------------------------
+// Scheduled snapshots — the automatic safety net. The cadence lives in the
+// settings (0 = off, 1 = daily, 7 = weekly) and the last-run timestamp lives
+// NEXT TO the snapshots (last-auto.json), so it survives DB resets and moves
+// with the workspace. The app calls snapshot_auto_check once at boot.
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoSnapshotCheck {
+    /// None when nothing was due
+    pub created: Option<WorkspaceSnapshotResult>,
+    pub last_run_at: Option<String>,
+    pub next_due_in_hours: Option<u64>,
+}
+
+fn last_auto_path(base: &std::path::Path) -> std::path::PathBuf {
+    base.join("backups/snapshots/last-auto.json")
+}
+
+fn read_last_auto(base: &std::path::Path) -> Option<u64> {
+    let raw = std::fs::read_to_string(last_auto_path(base)).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    v.get("at").and_then(|t| t.as_u64())
+}
+
+fn write_last_auto(base: &std::path::Path) -> Result<(), String> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let dir = base.join("backups/snapshots");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir: {e}"))?;
+    std::fs::write(
+        last_auto_path(base),
+        serde_json::json!({ "at": now, "generator": format!("VOXEL {}", env!("CARGO_PKG_VERSION")) })
+            .to_string(),
+    )
+    .map_err(|e| format!("write last-auto: {e}"))
+}
+
+#[tauri::command]
+pub fn snapshot_auto_check(
+    base_path: String,
+    cadence_days: u32,
+) -> Result<AutoSnapshotCheck, String> {
+    let base = std::path::PathBuf::from(&base_path)
+        .canonicalize()
+        .map_err(|e| format!("Storage base not accessible: {e}"))?;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let last = read_last_auto(&base);
+    let last_str = last.map(|t| t.to_string());
+
+    if cadence_days == 0 {
+        return Ok(AutoSnapshotCheck {
+            created: None,
+            last_run_at: last_str,
+            next_due_in_hours: None,
+        });
+    }
+
+    let interval = cadence_days as u64 * 86400;
+    let due = match last {
+        None => true,
+        Some(t) => now.saturating_sub(t) >= interval,
+    };
+
+    if !due {
+        let elapsed = now.saturating_sub(last.unwrap_or(now));
+        let remaining = interval.saturating_sub(elapsed);
+        return Ok(AutoSnapshotCheck {
+            created: None,
+            last_run_at: last_str,
+            next_due_in_hours: Some(remaining / 3600),
+        });
+    }
+
+    let created = workspace_export_snapshot(base_path)?;
+    write_last_auto(&base)?;
+    Ok(AutoSnapshotCheck {
+        created: Some(created),
+        last_run_at: Some(now.to_string()),
+        next_due_in_hours: Some(interval / 3600),
+    })
+}
+
+#[cfg(test)]
+mod auto_tests {
+    use super::*;
+
+    fn workspace(tag: &str) -> std::path::PathBuf {
+        let base = std::env::temp_dir().join(format!("voxel-auto-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("projects/king")).unwrap();
+        std::fs::write(base.join("projects/king/Main.java"), b"x").unwrap();
+        base
+    }
+
+    #[test]
+    fn auto_snapshot_fires_when_stale_and_respects_cadence() {
+        let base = workspace("fire");
+        let bp = base.to_string_lossy().to_string();
+
+        // never ran + daily cadence -> fires now
+        let check = snapshot_auto_check(bp.clone(), 1).unwrap();
+        assert!(check.created.is_some());
+        assert!(base.join("backups/snapshots/last-auto.json").is_file());
+
+        // immediately again -> not due, reports remaining hours
+        let check = snapshot_auto_check(bp.clone(), 1).unwrap();
+        assert!(check.created.is_none());
+        assert_eq!(check.next_due_in_hours, Some(24));
+
+        // cadence off -> never due
+        let check = snapshot_auto_check(bp.clone(), 0).unwrap();
+        assert!(check.created.is_none());
+        assert!(check.next_due_in_hours.is_none());
+
+        // stale marker: simulate 2 days ago -> fires on weekly cadence
+        std::fs::write(
+            last_auto_path(&base),
+            serde_json::json!({ "at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() - 2 * 86400 }).to_string(),
+        )
+        .unwrap();
+        let check = snapshot_auto_check(bp.clone(), 7).unwrap();
+        assert!(check.created.is_none(), "2 days < 7 day cadence");
+
+        std::fs::write(
+            last_auto_path(&base),
+            serde_json::json!({ "at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() - 8 * 86400 }).to_string(),
+        )
+        .unwrap();
+        let check = snapshot_auto_check(bp, 7).unwrap();
+        assert!(check.created.is_some(), "8 days > 7 day cadence");
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}

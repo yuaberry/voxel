@@ -32,6 +32,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   storage: {
     basePath: "",
+    autoSnapshotDays: 0,
   },
   launcher: {
     clientId: "",

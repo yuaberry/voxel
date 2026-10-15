@@ -46,6 +46,7 @@ pub fn run() {
             commands::storage::open_in_file_manager,
             commands::storage::workspace_export_snapshot,
             commands::storage::workspace_import_snapshot,
+            commands::storage::snapshot_auto_check,
             commands::storage::open_auth_url,
             commands::secrets::secrets_set,
             commands::secrets::secrets_get,

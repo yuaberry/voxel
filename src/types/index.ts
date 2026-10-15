@@ -49,6 +49,8 @@ export interface JavaSettings {
 
 export interface StorageSettings {
   basePath: string;
+  /** Automatic workspace snapshots at boot: 0 = off, 1 = daily, 7 = weekly */
+  autoSnapshotDays: number;
 }
 
 export interface GithubSettings {
