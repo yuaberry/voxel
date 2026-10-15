@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
-import { ChevronRight, Github, Loader2, Play, Save, X } from "lucide-react";
+import { ChevronRight, Github, Loader2, Play, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import { SnapshotPanel } from "./SnapshotPanel";
 import { BuildDrawer } from "./BuildDrawer";
 import { LaunchDialog } from "./LaunchDialog";
 import { PublishDialog } from "./PublishDialog";
+import { DeleteProjectDialog } from "./DeleteProjectDialog";
 import type { ProjectFileEntry } from "@/types";
 
 interface OpenTab {
@@ -45,6 +46,7 @@ export function ProjectWorkspacePage() {
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [launchOpen, setLaunchOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [files, setFiles] = useState<ProjectFileEntry[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
@@ -216,6 +218,16 @@ export function ProjectWorkspacePage() {
           <Button
             size="sm"
             variant="outline"
+            className="text-destructive hover:border-destructive/50 hover:text-destructive"
+            onClick={() => setDeleteOpen(true)}
+            title="Delete this project permanently"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => setPublishOpen(true)}
             title="Publish to GitHub"
           >
@@ -373,6 +385,13 @@ export function ProjectWorkspacePage() {
 
       {/* Publish to GitHub */}
       <PublishDialog project={project} open={publishOpen} onOpenChange={setPublishOpen} />
+
+      {/* Permanent delete — the owner kept looking for it INSIDE the project */}
+      <DeleteProjectDialog
+        project={deleteOpen ? project : null}
+        onClose={() => setDeleteOpen(false)}
+        redirectTo="/projects"
+      />
 
       {/* Build drawer — terminal, Error Center, Auto-Fix */}
       <BuildDrawer
