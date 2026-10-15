@@ -50,6 +50,9 @@ export interface CreateServerInitials {
   preset: ServerStylePreset | null;
   name: string | null;
   properties: Record<string, string>;
+  /** community address whose live style pre-fills the wizard (from the cards) */
+  importedAddress?: string;
+  modules?: ServerModuleId[];
 }
 
 export function CreateServerDialog({
@@ -74,6 +77,7 @@ export function CreateServerDialog({
   const [port, setPort] = useState("25565");
   const [ram, setRam] = useState(2048);
   const [acceptEula, setAcceptEula] = useState(false);
+  const [makePublic, setMakePublic] = useState(false);
   const [modules, setModules] = useState<Set<ServerModuleId>>(new Set());
   const [monumentSeed, setMonumentSeed] = useState<number>(1337);
   const [busy, setBusy] = useState(false);
@@ -90,6 +94,26 @@ export function CreateServerDialog({
       setPresetId(initials.preset?.id ?? null);
       setStyleProperties(initials.properties);
       if (initials.name) setName(initials.name);
+      // Community card flow: ping the real server and infer the style live
+      if (initials.importedAddress) {
+        import("@/services/servers/serverPingService")
+          .then(async ({ pingServer }) => {
+            const ping = await pingServer(initials.importedAddress!);
+            const { inferPresetFromPing } = await import("@/services/servers/inferStyle");
+            const preset = inferPresetFromPing(ping);
+            setPresetId(preset.id);
+            setModules(new Set(preset.modules));
+            toast.success(`Style imported from ${initials.importedAddress}`, {
+              description: `Detected "${preset.name}" — modules and properties pre-filled from the live ping.`,
+              duration: 9000,
+            });
+          })
+          .catch((e) => {
+            toast.warning("Could not ping that address", {
+              description: `${String(e)} — pick a preset manually instead.`,
+            });
+          });
+      }
       if (initials.preset) {
         setSoftware(initials.preset.software);
         setRam(initials.preset.ramMb);
@@ -133,13 +157,40 @@ export function CreateServerDialog({
     });
   };
 
+  const missingRequirement = (): string | null => {
+    if (!basePath) return "storage";
+    if (slug.length < 2) return "slug";
+    if (!mcVersion) return "mcVersion";
+    if (!/^\d{4,5}$/.test(port)) return "port";
+    if (!acceptEula) return "eula";
+    return null;
+  };
+
   const handleCreate = async () => {
-    if (!canCreate || !basePath) {
-      if (!basePath) {
+    if (busy) return;
+    const missing = missingRequirement();
+    if (missing) {
+      if (missing === "storage") {
         toast.error("Configure your storage location first", {
           description: "Settings → Storage",
         });
         navigate("/settings/storage");
+      } else if (missing === "eula") {
+        toast.warning("Accept the Minecraft EULA to enable creation", {
+          description:
+            "The checkbox is right below the version picker — the server refuses to boot without it (Mojang's rule, not ours).",
+          duration: 8000,
+        });
+      } else if (missing === "port") {
+        toast.warning("Pick a valid port (4-5 digits)", {
+          description: `Port "${port}" is not a valid port number (1024-65535).`,
+        });
+      } else if (missing === "slug") {
+        toast.warning("Name your server first", {
+          description: "Type a name — the id (slug) is generated from it.",
+        });
+      } else {
+        toast.warning("Pick the Minecraft version first");
       }
       return;
     }
@@ -219,6 +270,24 @@ export function CreateServerDialog({
         updated_at: now,
       };
       await insertServer(record);
+
+      // ONLINE: free public address (playit.gg) — the address shows in the console
+      if (makePublic) {
+        try {
+          const { tunnelSetup, tunnelStart } = await import("@/services/servers/economyService");
+          await tunnelSetup(basePath);
+          await tunnelStart({ basePath, slug, port: Number(port) });
+          toast.success("Public tunnel started", {
+            description: `Your server is reachable from anywhere in ~30s — the *.playit.gg address appears in the Economy/tunnel panel and the console header.`,
+            duration: 12000,
+          });
+        } catch (error) {
+          toast.warning("Tunnel could not start now", {
+            description: `${error instanceof Error ? error.message : String(error)} — the server itself is running locally; start the tunnel from the console anytime.`,
+            duration: 10000,
+          });
+        }
+      }
 
       // Initialize the token chain ledger when the module is selected
       if (selected.includes("token")) {
@@ -410,6 +479,18 @@ export function CreateServerDialog({
             </p>
           </div>
 
+          <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-card/40 px-3 py-2.5">
+            <Switch checked={makePublic} onCheckedChange={setMakePublic} />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold">Make it public (free playit.gg address)</p>
+              <p className="text-[10px] leading-relaxed text-muted-foreground">
+                LOCAL by default. Check this to start a free public tunnel after
+                creation — friends connect from anywhere via a *.playit.gg address
+                (the address appears in the console).
+              </p>
+            </div>
+          </div>
+
           <div className="space-y-1.5">
             <Label>Gameplay modules (mix freely)</Label>
             <div className="grid gap-2">
@@ -487,7 +568,8 @@ export function CreateServerDialog({
           <Button
             variant="gradient"
             onClick={() => void handleCreate()}
-            disabled={busy || !canCreate}
+            disabled={busy}
+            title={canCreate ? "" : "Click to see what's missing"}
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {busy ? "Creating…" : "Create server"}

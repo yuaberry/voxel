@@ -10,8 +10,11 @@ import { ImportServerPanel } from "./ImportServerPanel";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { listServers } from "@/services/db/repositories/serversRepository";
 import { serverIsRunning } from "@/services/servers/serverService";
+import { pingServer } from "@/services/servers/serverPingService";
+import { PUBLIC_SERVER_REFS } from "@voxel/core/publicServers";
 import { formatRelativeTime } from "@/lib/utils";
 import type { ServerRecord } from "@/types";
+import type { ServerPingData } from "@voxel/core/serverPing";
 
 export function ServersPage() {
   const [servers, setServers] = useState<ServerRecord[]>([]);
@@ -20,6 +23,7 @@ export function ServersPage() {
   const [wizardInitials, setWizardInitials] = useState<CreateServerInitials | null>(null);
   const [consoleServer, setConsoleServer] = useState<ServerRecord | null>(null);
   const [runningSet, setRunningSet] = useState<Set<string>>(new Set());
+  const [publicPings, setPublicPings] = useState<Record<string, ServerPingData | null>>({});
 
   const basePath = useSettingsStore((s) => s.settings.storage.basePath);
 
@@ -45,6 +49,29 @@ export function ServersPage() {
     const interval = setInterval(() => void refresh(), 5000);
     return () => clearInterval(interval);
   }, [refresh]);
+
+  // Community servers ping their real state — offline shows offline, never a lie
+  useEffect(() => {
+    let cancelled = false;
+    const pingAll = async () => {
+      const results: Record<string, ServerPingData | null> = {};
+      for (const ref of PUBLIC_SERVER_REFS) {
+        try {
+          results[ref.id] = await pingServer(ref.address);
+        } catch {
+          results[ref.id] = null;
+        }
+        if (cancelled) return;
+      }
+      if (!cancelled) setPublicPings(results);
+    };
+    void pingAll();
+    const interval = setInterval(() => void pingAll(), 45000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-10">
@@ -148,6 +175,76 @@ export function ServersPage() {
             setWizardOpen(true);
           }}
         />
+      </section>
+
+      {/* -------- Community servers, live -------- */}
+      <section className="mt-10">
+        <div className="mb-3 flex items-center gap-2">
+          <Radar className="h-4 w-4 text-primary" />
+          <h2 className="font-semibold">Community servers — live</h2>
+          <span className="text-[11px] text-muted-foreground">
+            real SLP pings every 45s · import any style below
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {PUBLIC_SERVER_REFS.map((ref) => {
+            const ping = publicPings[ref.id];
+            const online = ping !== null;
+            return (
+              <Card
+                key={ref.id}
+                className="animate-card-rise border-border/70 bg-card/60 transition-colors hover:border-primary/40"
+              >
+                <CardContent className="space-y-2 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{ref.name}</p>
+                      <p className="truncate font-mono text-[10px] text-muted-foreground">
+                        {ref.address}
+                      </p>
+                    </div>
+                    <span
+                      className={
+                        "mt-1 h-2.5 w-2.5 shrink-0 rounded-full " +
+                        (online
+                          ? "animate-pulse-soft bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]"
+                          : "bg-muted-foreground/40")
+                      }
+                      title={online ? "online" : "offline"}
+                    />
+                  </div>
+                  {online && ping ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge variant="secondary">{ping.playersOnline} online</Badge>
+                      <Badge variant="outline">{ping.version.split(" ")[0]}</Badge>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground/70">offline right now</p>
+                  )}
+                  <p className="text-[10px] leading-relaxed text-muted-foreground">
+                    {ref.note}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() =>
+                      setWizardInitials({
+                        preset: null,
+                        name: ref.name + " (my version)",
+                        properties: {},
+                        importedAddress: ref.address,
+                      })
+                    }
+                    title="Create a local server in this style"
+                  >
+                    Use this style
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </section>
 
       <CreateServerDialog

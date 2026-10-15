@@ -170,3 +170,32 @@ describe("style inference", () => {
     ).rejects.toThrow(/JSON/);
   });
 });
+
+describe("style inference — the owner's nerdzone flow", () => {
+  const ping = (motd: string, version = "Paper 1.20.1") =>
+    ({
+      host: "nerdzone.gg",
+      port: 25565,
+      motd,
+      version,
+      protocol: 763,
+      playersOnline: 120,
+      playersMax: 500,
+      favicon: null,
+      modsJson: null,
+      rawMotd: motd,
+    }) as Parameters<typeof inferPresetFromPing>[0];
+
+  it("a prison MOTD infers the prison preset — with its real modules", () => {
+    const preset = inferPresetFromPing(ping("NERDZONE PRISON — mine, rank up, prestige!"));
+    expect(preset.id).toBe("prison-break");
+    expect(preset.modules).toContain("prison");
+    expect(preset.modules).toContain("economy");
+    expect(preset.modules).toContain("token");
+  });
+
+  it("coin/chain/crypto MOTDs infer the economy preset", () => {
+    expect(inferPresetFromPing(ping("Crypto prison — coin + chain market")).id).toBe("prison-break");
+    expect(inferPresetFromPing(ping("Trade coins in our economy town")).id).toBe("economy-town");
+  });
+});

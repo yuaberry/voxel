@@ -18,9 +18,9 @@ interface Heuristic {
 }
 
 const HEURISTICS: Heuristic[] = [
-  { presetId: "prison-break", keywords: ["prison", "mine your way", "rank up", "prestige"] },
+  { presetId: "prison-break", keywords: ["prison", "prision", "cell", "rank up", "prestige", "mine your way", "minerar", "penitenciaria"] },
   { presetId: "skyblock-isles", keywords: ["skyblock", "sky block", "island", "oneblock"] },
-  { presetId: "economy-town", keywords: ["economy", "towny", "shop", "trade", "market"] },
+  { presetId: "economy-town", keywords: ["economy", "economia", "towny", "shop", "loja", "trade", "market", "coin", "moeda", "crypto", "cripto", "chain", "blockchain"] },
   { presetId: "pvp-arena", keywords: ["pvp", "practice", "duel", "arena", "uhc", "kit"] },
   { presetId: "family-craft", keywords: ["family friendly", "family-friendly", "kids", "whitelist"] },
   { presetId: "hardcore-realm", keywords: ["hardcore", "one life"] },
@@ -81,7 +81,7 @@ export async function designStyleWithAi(
     "Design a local server style inspired by it. Answer ONLY with JSON:",
     `{"styleName":string,"description":string,"software":"vanilla"|"paper",`,
     `"properties":{key:value strings for server.properties},`,
-    `"modules":Array<"economy"|"prison"|"token">,"rationale":string}`,
+    `"modules":Array<"economy"|"prison"|"token"|"skyblock"|"factions"|"bedwars"|"monuments"|"realm">,"rationale":string}`,
     "Rules: never set online-mode. Keep properties valid for vanilla/Paper.",
     "Prefer 2-8 properties. modules only from the allowed list.",
   ].join(" ");

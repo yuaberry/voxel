@@ -368,7 +368,9 @@ mod tests {
     #[ignore = "e2e: pings real public servers (network)"]
     #[test]
     fn e2e_ping_public_server() {
-        for host in ["mc.hypixel.net", "play.cubecraft.net", "minemen.club"] {
+        // nerdzone.gg: the owner's reference for the prison/chain style —
+        // offline results are honest per-host (liveness is the assertion)
+        for host in ["mc.hypixel.net", "play.cubecraft.net", "minemen.club", "nerdzone.gg"] {
             let ping = server_ping(host.into(), None)
                 .unwrap_or_else(|e| panic!("{host} failed: {e}"));
             println!(

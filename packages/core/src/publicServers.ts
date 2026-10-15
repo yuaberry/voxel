@@ -41,6 +41,16 @@ export const PUBLIC_SERVER_REFS: readonly PublicServerRef[] = [
     category: "community",
   },
   {
+    id: "nerdzone",
+    name: "NerdZone",
+    address: "nerdzone.gg",
+    website: "https://nerdzone.gg",
+    style: "Prison + crypto chain style",
+    kind: "server",
+    note: "The YouTuber's prison-style server — the reference for coin + chain progression (import it below to build yours).",
+    category: "community",
+  },
+  {
     id: "minemen",
     name: "Minemen Club",
     address: "minemen.club",
