@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { t } from "@/i18n";
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { useUiStore } from "@/stores/uiStore";
@@ -33,7 +34,7 @@ const ROUTE_LABELS: Array<{ pattern: RegExp; label: string }> = [
 ];
 
 function currentBreadcrumb(pathname: string): string {
-  return ROUTE_LABELS.find((r) => r.pattern.test(pathname))?.label ?? "VOXEL";
+  return t(ROUTE_LABELS.find((r) => r.pattern.test(pathname))?.label ?? "VOXEL");
 }
 
 export function Topbar() {

@@ -7,6 +7,8 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { t } from "@/i18n";
 import { toast } from "sonner";
 import { Brush, Dice5, Eye, Globe2, Package, Save, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,7 @@ const TABS: { id: StudioTab; label: string }[] = [
 ];
 
 export function AssetStudioPage() {
+  const navigate = useNavigate();
   const basePath = useSettingsStore((s) => s.settings.storage.basePath);
   const projects = useProjectsStore((s) => s.projects);
 
@@ -76,6 +79,7 @@ export function AssetStudioPage() {
   );
   const [structureResult, setStructureResult] = useState<StructureGenResult | null>(null);
   const [structureBusy, setStructureBusy] = useState(false);
+  const [agentPrompt, setAgentPrompt] = useState("");
 
   // world state
   const [worldPreset, setWorldPreset] = useState<WorldPresetId>("eternal_realm");
@@ -263,6 +267,18 @@ export function AssetStudioPage() {
   };
 
   const isStructure = tab === "structure";
+
+  // Hand the request to the AI Creator (project pre-selected, prompt pre-filled —
+  // the user reviews and sends; nothing runs without them seeing it)
+  const askAgent = async () => {
+    if (!project || !agentPrompt.trim()) return;
+    const { useUiStore } = await import("@/stores/uiStore");
+    useUiStore.getState().setAiHandoff({
+      projectId: project.id,
+      prompt: agentPrompt.trim(),
+    });
+    navigate("/ai-creator");
+  };
   const isWorld = tab === "world";
 
   return (
@@ -270,7 +286,7 @@ export function AssetStudioPage() {
       <header className="mb-8 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">
-            Asset Studio
+            {t("Asset Studio")}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Real assets, generated in the security perimeter: pixel-art item and
@@ -287,6 +303,38 @@ export function AssetStudioPage() {
               : "16x16 · vanilla-style"}
         </Badge>
       </header>
+
+      <Card className="mb-6 border-primary/25 bg-primary/5">
+        <CardContent className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Want a change, improvement or something new?</p>
+            <p className="text-[11px] text-muted-foreground">
+              Describe it and the AI agent edits THIS project for real — textures,
+              blocks, structures, dimensions and code, with the same audit trail.
+            </p>
+          </div>
+          <div className="flex w-full gap-2 sm:w-auto">
+            <Input
+              placeholder="e.g. add a ruby sword with red glow"
+              value={agentPrompt}
+              onChange={(e) => setAgentPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void askAgent();
+              }}
+            />
+            <Button
+              size="sm"
+              variant="gradient"
+              className="shrink-0"
+              disabled={!project || !agentPrompt.trim()}
+              onClick={() => void askAgent()}
+            >
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              Ask the agent
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {projects.length === 0 ? (
         <Card className="border-border/70 bg-card/60">
@@ -402,7 +450,7 @@ export function AssetStudioPage() {
               {/* Asset type */}
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Asset type
+                  {t("Asset type")}
                 </Label>
                 <div className="grid grid-cols-4 gap-2">
                   {TABS.map((t) => (

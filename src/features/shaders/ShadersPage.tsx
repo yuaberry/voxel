@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { t } from "@/i18n";
 import { toast } from "sonner";
 import {
   Check,
@@ -207,7 +208,7 @@ export function ShadersPage() {
     <div className="mx-auto max-w-6xl px-8 py-10">
       {/* Header */}
       <div className="pb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">Shader Studio</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">{t("Shader Studio")}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           32 iconic looks as style presets — every pack is 100% original
           VOXEL GLSL (Iris / OptiFire compatible), previewed live before

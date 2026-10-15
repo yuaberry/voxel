@@ -1,14 +1,16 @@
 import { create } from "zustand";
+import { setLanguage } from "@/i18n";
 import {
   loadAllSettings,
   saveSettingsSection,
 } from "@/services/db/repositories/settingsRepository";
-import type { AppSettings } from "@/types";
+import type { AppSettings, GeneralSettings } from "@/types";
 
 const DEFAULT_SETTINGS: AppSettings = {
   general: {
     authorName: "",
     defaultLicense: "MIT",
+    language: "auto",
   },
   appearance: {
     accent: "purple",
@@ -67,6 +69,9 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   hydrate: async () => {
     try {
       const raw = await loadAllSettings();
+      setLanguage(
+        (raw.general as { language?: "auto" | "en" | "pt-BR" } | undefined)?.language ?? "auto",
+      );
       const settings: AppSettings = {
         general: mergeSection(DEFAULT_SETTINGS.general, raw.general),
         appearance: mergeSection(DEFAULT_SETTINGS.appearance, raw.appearance),
@@ -88,6 +93,10 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   },
 
   update: async (section, patch) => {
+    if (section === "general") {
+      const lang = (patch as Partial<GeneralSettings>).language;
+      if (lang !== undefined) setLanguage(lang);
+    }
     const current = get().settings;
     const next: AppSettings = {
       ...current,

@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { t } from "@/i18n";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   Command,
@@ -154,7 +155,7 @@ export function CommandPalette() {
                   <PaletteItem
                     key={target.to}
                     icon={target.icon}
-                    label={target.label}
+                    label={t(target.label)}
                     onSelect={() => go(target.to)}
                   />
                 ))}
@@ -167,7 +168,7 @@ export function CommandPalette() {
                   <PaletteItem
                     key={target.to}
                     icon={target.icon}
-                    label={target.label}
+                    label={t(target.label)}
                     onSelect={() => go(target.to)}
                   />
                 ))}

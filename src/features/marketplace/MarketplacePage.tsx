@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { t } from "@/i18n";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowDownToLine, FolderOpen, Package, Palette, Play, Sparkles } from "lucide-react";
@@ -175,7 +176,7 @@ export function MarketplacePage() {
       <header className="mb-8 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">
-            Marketplace
+            {t("Marketplace")}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Your own assets, showcased: exported modpacks, authored shaderpacks
@@ -190,7 +191,7 @@ export function MarketplacePage() {
       <section className="mb-10">
         <div className="mb-3 flex items-center gap-2">
           <Package className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold">Modpacks</h2>
+          <h2 className="font-semibold">{t("Modpacks")}</h2>
           <span className="text-[11px] text-muted-foreground">
             facts read from each zip's manifest
           </span>
@@ -258,7 +259,7 @@ export function MarketplacePage() {
       <section className="mb-10">
         <div className="mb-3 flex items-center gap-2">
           <Palette className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold">Shaderpacks</h2>
+          <h2 className="font-semibold">{t("Shaderpacks")}</h2>
           <span className="text-[11px] text-muted-foreground">
             the sky swatch is the pack's real style palette
           </span>
@@ -306,7 +307,7 @@ export function MarketplacePage() {
       <section>
         <div className="mb-3 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold">Your mods</h2>
+          <h2 className="font-semibold">{t("Your mods")}</h2>
           <span className="text-[11px] text-muted-foreground">
             live build status · Play launches the real instance
           </span>
@@ -339,7 +340,7 @@ export function MarketplacePage() {
                   </div>
                   <Button size="sm" onClick={() => setRunProject(project)} title="Play">
                     <Play className="mr-1.5 h-3.5 w-3.5" />
-                    Play
+                    {t("Play")}
                   </Button>
                 </CardContent>
               </Card>

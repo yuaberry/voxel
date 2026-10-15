@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { t } from "@/i18n";
 import { toast } from "sonner";
 import {
   ArrowDownToLine,
@@ -377,7 +378,7 @@ export function ModpacksPage() {
     <div className="mx-auto max-w-5xl px-8 py-10">
       <header className="mb-8 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">Modpack Creator</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">{t("Modpack Creator")}</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Bundle what this workspace produced — compiled mod jars and authored
             shaderpacks — into a shareable zip, or install a VOXEL modpack into
@@ -396,7 +397,7 @@ export function ModpacksPage() {
           <CardContent className="space-y-5">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-primary" />
-              <h2 className="font-semibold">Export a modpack</h2>
+              <h2 className="font-semibold">{t("Export a modpack")}</h2>
               <Badge variant="outline">
                 MC {manifestFacts.mcVersion} · {manifestFacts.loader}
               </Badge>
@@ -563,7 +564,7 @@ export function ModpacksPage() {
           <CardContent className="space-y-5">
             <div className="flex items-center gap-2">
               <PackageOpen className="h-4 w-4 text-primary" />
-              <h2 className="font-semibold">Install a modpack</h2>
+              <h2 className="font-semibold">{t("Install a modpack")}</h2>
             </div>
 
             <div className="space-y-1.5">
@@ -649,7 +650,7 @@ export function ModpacksPage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Globe className="h-4 w-4 text-primary" />
-              <h2 className="font-semibold">Add from Modrinth</h2>
+              <h2 className="font-semibold">{t("Add from Modrinth")}</h2>
               <Badge variant="outline">official API · SHA-1 verified</Badge>
             </div>
             <div className="flex items-center gap-2">
@@ -746,7 +747,7 @@ export function ModpacksPage() {
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2">
               <FileArchive className="h-4 w-4 text-primary" />
-              <h2 className="font-semibold">Your modpacks</h2>
+              <h2 className="font-semibold">{t("Your modpacks")}</h2>
               <span className="text-[10px] text-muted-foreground">
                 manifests read from each zip — live
               </span>

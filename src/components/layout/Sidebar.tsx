@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { t } from "@/i18n";
 import {
   Boxes,
   ChevronsLeft,
@@ -187,7 +188,7 @@ function NavItemButton({ item, collapsed }: { item: NavItem; collapsed: boolean 
             />
           )}
           <Icon className="h-4 w-4" />
-          {!collapsed && <span className="ml-3">{item.label}</span>}
+          {!collapsed && <span className="ml-3">{t(item.label)}</span>}
         </>
       )}
     </NavLink>
@@ -198,7 +199,7 @@ function NavItemButton({ item, collapsed }: { item: NavItem; collapsed: boolean 
       <TooltipTrigger asChild>
         <span className="block">{link}</span>
       </TooltipTrigger>
-      <TooltipContent side="right">{item.label}</TooltipContent>
+      <TooltipContent side="right">{t(item.label)}</TooltipContent>
     </Tooltip>
   );
 }

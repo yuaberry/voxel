@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { t } from "@/i18n";
 import { useNavigate } from "react-router-dom";
 import {
   Boxes,
@@ -241,7 +242,7 @@ export function HomePage() {
                     first minute, versioned by git snapshots.
                   </p>
                   <Button variant="gradient" size="sm" onClick={() => setWizardOpen(true)}>
-                    Create project
+                    {t("Create project")}
                   </Button>
                 </div>
               ) : (

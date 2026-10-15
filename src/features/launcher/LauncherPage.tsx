@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { t } from "@/i18n";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { FolderOpen, Package, Palette, Rocket, RefreshCw } from "lucide-react";
@@ -61,7 +62,7 @@ export function LauncherPage() {
     <div className="mx-auto max-w-5xl px-8 py-10">
       <div className="flex items-center justify-between pb-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">Launcher</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">{t("Launcher")}</h1>
           <p className="text-sm text-muted-foreground">
             Play directly from VOXEL — your prepared instances, the mods and
             shaders installed in each one, and the jar each project built last.

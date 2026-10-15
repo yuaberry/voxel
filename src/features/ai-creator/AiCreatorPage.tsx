@@ -106,6 +106,17 @@ export function AiCreatorPage() {
     if (!projectId && projects.length > 0) setProjectId(projects[0].id);
   }, [projectId, projects]);
 
+  // Studio handoff: pre-select the project and pre-fill the prompt (never auto-send)
+  const [handoffDraft, setHandoffDraft] = useState<string | null>(null);
+  const setAiHandoff = useUiStore((s) => s.setAiHandoff);
+  useEffect(() => {
+    const handoff = useUiStore.getState().aiHandoff;
+    if (!handoff) return;
+    setProjectId(handoff.projectId);
+    setHandoffDraft(handoff.prompt);
+    setAiHandoff(null);
+  }, [setAiHandoff]);
+
   useEffect(() => {
     if (basePath) void setReferenceStorageBase(basePath);
   }, [basePath]);
@@ -533,6 +544,7 @@ export function AiCreatorPage() {
           onAttachImage={handleAttachImageFromChat}
           onStop={handleStop}
           onNewChat={handleNewChat}
+          initialDraft={handoffDraft}
         />
         <SpecPreview
           context={context}

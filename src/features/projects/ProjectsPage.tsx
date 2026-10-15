@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { t } from "@/i18n";
 import { useNavigate } from "react-router-dom";
 import { Boxes, FolderOpen, MoreVertical, Plus, Trash2, Clock, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
@@ -75,7 +76,7 @@ export function ProjectsPage() {
     <div className="mx-auto max-w-5xl px-8 py-10">
       <div className="flex items-center justify-between pb-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">Projects</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">{t("Projects")}</h1>
           <p className="text-sm text-muted-foreground">
             Real workspaces on disk — git-versioned, ready for the AI Creator.
           </p>

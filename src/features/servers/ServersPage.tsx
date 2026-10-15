@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { t } from "@/i18n";
 import { toast } from "sonner";
 import { Loader2, Plus, Radar, Server as ServerIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -77,7 +78,7 @@ export function ServersPage() {
     <div className="mx-auto max-w-5xl px-8 py-10">
       <div className="flex items-center justify-between pb-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">Server Studio</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-brand-gradient">{t("Server Studio")}</h1>
           <p className="text-sm text-muted-foreground">
             Local Minecraft servers — vanilla or Paper, real console, world-safe
             stop, timestamped backups.
@@ -103,7 +104,7 @@ export function ServersPage() {
           </div>
           <Button variant="gradient" onClick={() => setWizardOpen(true)}>
             <Plus className="h-4 w-4" />
-            Create server
+            {t("Create server")}
           </Button>
         </div>
       ) : (
@@ -181,7 +182,7 @@ export function ServersPage() {
       <section className="mt-10">
         <div className="mb-3 flex items-center gap-2">
           <Radar className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold">Community servers — live</h2>
+          <h2 className="font-semibold">{t("Community servers — live")}</h2>
           <span className="text-[11px] text-muted-foreground">
             real SLP pings every 45s · import any style below
           </span>

@@ -89,6 +89,8 @@ interface Props {
   onNewChat: () => void;
   /** Attach an image to the next message (composer clip button) */
   onAttachImage: () => Promise<void>;
+  /** Pre-filled prompt (the Studio/agent handoff) — applied once, never auto-sent */
+  initialDraft?: string | null;
 }
 
 export function ChatPanel({
@@ -105,8 +107,16 @@ export function ChatPanel({
   onStop,
   onNewChat,
   onAttachImage,
+  initialDraft,
 }: Props) {
   const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    if (initialDraft && draft === "") {
+      setDraft(initialDraft);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDraft]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

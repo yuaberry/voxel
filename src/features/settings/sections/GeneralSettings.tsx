@@ -33,6 +33,27 @@ export function GeneralSettings() {
         description="Application identity and defaults for new projects."
       />
 
+      <Field
+        label="Language"
+        hint="Follows the system language when set to Auto — English and Português (Brasil) ship today."
+      >
+        <div className="max-w-xs">
+          <select
+            className="h-9 w-full rounded-md border border-border bg-card/60 px-2 text-sm outline-none focus:border-primary"
+            value={settings.general.language}
+            onChange={(e) =>
+              void update("general", {
+                language: e.target.value as "auto" | "en" | "pt-BR",
+              })
+            }
+          >
+            <option value="auto">Auto (system)</option>
+            <option value="en">English</option>
+            <option value="pt-BR">Português (Brasil)</option>
+          </select>
+        </div>
+      </Field>
+
       <Field label="App version" hint="Shown here and in the About dialog.">
         <div className="text-sm text-muted-foreground">VOXEL v{appVersion}</div>
       </Field>

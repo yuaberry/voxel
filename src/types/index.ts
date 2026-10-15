@@ -10,6 +10,8 @@ export type AccentColor = "purple" | "cyan" | "blue" | "emerald" | "amber" | "ro
 export interface GeneralSettings {
   authorName: string;
   defaultLicense: string;
+  /** UI language — "auto" follows the OS, otherwise an exact locale */
+  language: "auto" | "en" | "pt-BR";
 }
 
 export interface AppearanceSettings {
