@@ -643,6 +643,15 @@ fn module_docs(id: &str) -> Option<(&'static str, &'static str, Vec<(&'static st
                 ("/function nexus_bedwars:stats", "mostra quantas camas você já quebrou"),
             ],
         ),
+        "realm" => (
+            "Custom Realm",
+            "A REAL custom dimension installed in the server's datapack — the Eternal Realm: fixed 13:00 dusk, sky above, beds work, 384 tall, overworld biomes. Era-factual for 1.20.1-1.21.8.",
+            vec![
+                ("/execute in nexus_realm:eternal_realm run tp @s ~ ~ ~", "teleporta você para o Eternal Realm (op)"),
+                ("(dimension vanilla)", "a dimensão é gerada pelo datapack — igual a qualquer dimensão do jogo, com física própria (crepúsculo eterno, camas funcionam)"),
+                ("(build spawn)", "construa infraestrutura de spawn lá como em qualquer dimensão — ele persiste no world"),
+            ],
+        ),
         "monuments" => (
             "Monuments",
             "Four procedurally built structures — REAL .nbt files shipped inside the module's datapack (watchtower, cottage, obelisk, ruin) — raised where you stand with a build-up title.",
@@ -853,10 +862,12 @@ mod unit_tests {
             software: "vanilla".to_string(),
             mc_version: "1.20.1".to_string(),
             ram_mb: 2048,
-            modules: vec!["skyblock".into(), "factions".into(), "bedwars".into()],
+            modules: vec!["skyblock".into(), "factions".into(), "bedwars".into(), "realm".into()],
         })
         .unwrap();
         let readme = std::fs::read_to_string(&path).unwrap();
+        assert!(readme.contains("Custom Realm (`nexus_realm` datapack)"));
+        assert!(readme.contains("| `/execute in nexus_realm:eternal_realm run tp @s ~ ~ ~` |"));
         assert!(readme.contains("SkyBlock Islands (`nexus_skyblock` datapack)"));
         assert!(readme.contains("| `/trigger nexus_skyblock` |"));
         assert!(readme.contains("| `/trigger nexus_factions set 2` |"));

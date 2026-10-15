@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (39 sessões)
+## 5. Histórico de sessões (40 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 40 | Custom Realm | **8º módulo**: dimensão custom real no datapack do server (era-factual, tests com parse do JSON, UNSUPPORTED honesto p/ 26.x) + Vanilla Survival + realm + v0.5.6 | — |
 | 39 | Snapshots agendados + seeds | **snapshot_auto_check** (cadência Off/Diário/Semanal, last-auto.json portátil, boot hook) + seed de monuments do dono no wizard + v0.5.5 | off-by-one de horas (24 vs 23 — o teste ensinou); modules é Set |
 | 38 | Restore guiado + presets | **workspace_import_snapshot** (só VOXEL, seções conhecidas, nunca sobrescreve — restore só adiciona) + Creative Workshop+Monuments, Hardcore Realm+Factions + v0.5.4 | import plugin-dialog duplicado |
 | 37 | Monuments + Snapshots | **Módulo Monuments** (.nbt reais no datapack do server, /place template via trigger, wizard gera via Rust) + **Workspace Snapshots** (autoria zipada com manifest includes/excludes) + v0.5.3 | guard de output_kind só na escrita (preview vazava); Write trait ausente; imports dupes |
@@ -255,13 +256,13 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 39, v0.5.5)
+## 8. Estado atual (verificado — Sessão 40, v0.5.6)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
 | Rust unit (66) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (70) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Vitest (72) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -275,7 +276,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.5.5 (latest)** | Desktop: **snapshots automáticos + monument seed do dono** + APK mobile 0.3.1 |
+| **v0.5.6 (latest)** | Desktop: **Custom Realm (dimensões nos servers)** + APK mobile 0.3.1 |
+| v0.5.5 | Desktop: **snapshots automáticos + monument seed do dono** + APK mobile 0.3.1 |
 | v0.5.4 | Desktop: **restauração guiada de snapshot + presets com módulos novos** + APK mobile 0.3.1 |
 | v0.5.3 | Desktop: **Monuments (.nbt nos servidores) + Workspace Snapshots** + APK mobile 0.3.1 |
 | v0.5.2 | Desktop: **Marketplace local + modpack editor + agent /place guidance** + APK mobile 0.3.1 |
@@ -325,7 +327,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 4. **Mobile polish** (§59) — secure-store do token, biometria, APK com keystore de release (Play Store), TestFlight quando houver conta Apple
 5. **Modpack Creator** → v1 (S24: export/import) · v2 (S25: score) · v3 (S26: catálogo Modrinth SHA-1) · **v4 ENTREGUE (S27): grafo transitivo required**. Restam: CurseForge (precisa API key do dono) e um editor visual de modpack salvo
 6. ~~Resource Pack / World / Structure Studios~~ → items (S25), blocks (S27), structures .nbt + preview iso (S29), **agent tool de structures + custom dimensions (S30)** entregues. Restam: schema de dimensions 1.21.2+, resource packs completos
-7. **Módulos de servidor** → **7 entregues**: Economy/Prison/Token (S11) + SkyBlock/Factions/BedWars (S34) + **Monuments (S37: .nbt reais + /place)**. Próximas fatias: presets usando os novos módulos, restauração guiada de snapshot
+7. **Módulos de servidor** → **8 entregues**: Economy/Prison/Token (S11) + SkyBlock/Factions/BedWars (S34) + Monuments (S37) + **Custom Realm (S40: dimensão real)**. Próximas fatias: módulos 2.0 combinados (realm+monuments), push externo
 8. **Docker + Deployment Providers** (§44-45) — VPS/SSH/cloud (`DeploymentProvider` reservada)
 9. **Marketplace** (§48) e **Cloud opcional (Supabase)** (§85) — arquiteturas preparadas
 10. **Backlog de qualidade**: migrar warns `set-state-in-effect` (~20), auto-refresh de sessão MSA/GitHub, `@tauri-apps/api` mismatch (CLI de dev reescreve Cargo.toml com `features = []` — neutro; reverter após `tauri dev`)
@@ -468,7 +470,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 39 — snapshots AUTOMÁTICOS (cadência em Settings→Storage, last-auto.json ao lado dos zips, boot hook silencioso) + seed de monuments personalizada por servidor. 70/70 + 66/66. Release v0.5.5.*
+*Última atualização: Sessão 40 — módulo Custom Realm (8º): dimensão real no datapack do servidor (era-factual por versão, UNSUPPORTED honesto para 26.x) + Vanilla Survival ganha o segundo mundo. 72/72 + 66/66. Release v0.5.6.*
 
 ---
 
@@ -982,3 +984,20 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (31 warns) · vitest 70/70 ✓ · cargo **66/66** (+1 auto) ✓ · vite build 2m19s ✓ · boot vivo 0 panics ✓. Release v0.5.5.
 
 **Estado pós-sessão**: snapshot com ciclo completo E agendamento; monuments personalizados por servidor. Próximos naturais: push externo (backend quando o dono decidir), world presets para servidores, módulos 2.0 (estrutura+economia combinados), mais eras de research (26.4+ quando existirem).
+
+---
+
+## 40. Sessão 40 — Módulo Custom Realm: dimensões nos servidores
+
+**Pedido do dono**: "continue" → o world preset para servidores.
+
+**Módulo `realm` (o 8º)** — uma dimensão custom REAL no datapack do servidor: `dimension_type` (física: crepúsculo eterno 13:00, céu, camas, 384 alto) + `dimension` (noise generator com biomas overworld), o MESMO schema era-factual do World Studio para mods:
+- A versão do servidor entra em `ModuleInstallOptions` e decide o formato do int provider (wrapped <1.21.2, flattened ≥1.21.2) — provado por testes que FAZEM PARSE do JSON real
+- 26.x → nota UNSUPPORTED honesta em vez de dimensão que pode não carregar
+- Pack com README próprio (o comando /execute in)
+- **Preset Vanilla Survival adota o realm** — o clássico puro, mais um segundo mundo a um comando de distância
+- README do servidor documenta o realm + comando de viagem
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (31 warns) · vitest **72/72** (+2) ✓ · cargo **66/66** ✓ · vite build 1m53s ✓ · boot vivo 0 panics ✓. Release v0.5.6.
+
+**Estado pós-sessão (40 sessões, 8 módulos)**: a plataforma cobre criação de mods (6 eras), 8 sistemas de gameplay para servidores (incluindo dimensões e estruturas .nbt), marketplace/snapshots com ciclo completo e agendamento, mobile completo. Próximos naturais: push externo (backend), módulos 2.0 combinados (realm+monuments: monumentos NA dimensão), QA pass geral dos 31 warns set-state-in-effect.
