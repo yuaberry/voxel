@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (42 sessões)
+## 5. Histórico de sessões (43 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 43 | Deploy↔build↔pt-BR | **project_deploy_datapack** (datapack do mod no servidor, formato lido do pack real, replace atômico, versões compatíveis) + elapsed no BuildDrawer + pt-BR amp + v0.5.9 | escapes no mcmeta; Date.now() impuro (compiler); building antes da declaração |
 | 42 | PT-BR + agent handoff | **i18n honesto** (fallback inglês, setting Auto/EN/PT-BR, nav+títulos+seções traduzidas) + **chat de alterações no Studio** (handoff pro AI Creator, nunca auto-envia) + v0.5.8 | replace de uiStore não casou; togglePalette 0-arg |
 | 41 | Correções do dono | Botão criar nunca-morto (feedback do requisito), delete dentro do projeto, **Community servers ao vivo** (SLP 45s + nerdzone.gg), túnel público no wizard, inferência prison/coin/chain + v0.5.7 | botão disabled silencioso; delete escondido no ⋮ |
 | 40 | Custom Realm | **8º módulo**: dimensão custom real no datapack do server (era-factual, tests com parse do JSON, UNSUPPORTED honesto p/ 26.x) + Vanilla Survival + realm + v0.5.6 | — |
@@ -258,12 +259,12 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 42, v0.5.8)
+## 8. Estado atual (verificado — Sessão 43, v0.5.9)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (66) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Rust unit (67) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (77) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
@@ -278,7 +279,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.5.8 (latest)** | Desktop: **Português (Brasil) no app + chat do agente no Studio** + APK mobile 0.3.1 |
+| **v0.5.9 (latest)** | Desktop: **deploy projeto↔servidor + build elapsed + pt-BR amp** + APK mobile 0.3.1 |
+| v0.5.8 | Desktop: **Português (Brasil) no app + chat do agente no Studio** + APK mobile 0.3.1 |
 | v0.5.7 | Desktop: **correções do dono + community servers ao vivo + túnel no wizard** + APK mobile 0.3.1 |
 | v0.5.6 | Desktop: **Custom Realm (dimensões nos servers)** + APK mobile 0.3.1 |
 | v0.5.5 | Desktop: **snapshots automáticos + monument seed do dono** + APK mobile 0.3.1 |
@@ -312,7 +314,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 66 unit
+cd src-tauri && cargo test          # 67 unit
 cargo test -- --ignored --nocapture # 10 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -474,7 +476,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 42 — Português (Brasil) no app (t() com fallback inglês, setting Auto/EN/PT-BR, navegação+títulos+seções traduzidas) + chat do agente no Asset Studio (handoff com projeto e prompt pré-carregados, nunca auto-envia). 77/77. Release v0.5.8.*
+*Última atualização: Sessão 43 — deploy projeto↔servidor (datapack do mod no world/datapacks com formato lido do próprio servidor, replace atômico, versões compatíveis) + tempo real do build (tick state) + pt-BR amp. 77/77 + 67/67. Release v0.5.9.*
 
 ---
 
@@ -1042,3 +1044,25 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (33 warns família) · **vitest 77/77** (+3 i18n: dicionário são, tradução real, fallback) ✓ · vite build 1m39s ✓ · boot vivo 0 panics ✓. Release v0.5.8.
 
 **Estado pós-sessão**: app bilíngue (EN/PT-BR com detector de SO), Studio fala com o agente. Próximos naturais: ampliar a cobertura de strings do pt-BR para os diálogos profundos (wizard completo, toasts), UX do build (progresso), conexão projeto↔servidor (deploy de datapack/estrutura no servidor alvo).
+
+---
+
+## 43. Sessão 43 — Deploy projeto↔servidor + tempo real do build + pt-BR amp
+
+**Pedido do dono**: "continue" (os próximos naturais da S42).
+
+**1. A conexão projeto↔servidor (o "servidores conectados com os projetos em tempo real")**: **`project_deploy_datapack`** — copia o datapack do projeto (estruturas .nbt, dimensões, advancements — tudo sob `data/`) para `world/datapacks/project_<slug>/` do servidor escolhido: o que o agente constrói no mod fica **carregável in-game no SEU servidor**.
+- pack.mcmeta com o formato lido do **próprio pack de módulo do servidor** (manifest real, nunca adivinhado)
+- Re-deploy do mesmo projeto **substitui atomicamente** (staging + rename; antigo pro lixo) — outros packs **nunca tocados** (teste prova o módulo sobrevivendo intacto)
+- Botão **Deploy** no header do workspace com picker de servers **da MESMA versão** (formatos são era-bound; incompatíveis explicam o porquê)
+- Toast factual: nº de arquivos + o que detectou (structures/dimensions) + como carregar (restart ou /reload)
+
+**2. UX do build**: tempo decorrido no drawer — **contador vivo enquanto builda** (tick state: `Date.now()` fora do render — o React Compiler pegou a chamada impura e eu refatorei pro padrão certo) + segundos finais ao lado do badge de status.
+
+**3. pt-BR amp**: wizard de servidor (nome/porta/RAM/módulos/CTA), dialog de deploy, box do agent no Studio, hints de import.
+
+**Bugs**: mcmeta com escapes quebrados (reescrito com serde_json::json!); anchor de teste com nome antigo; `Date.now()` impuro no render (compiler); `building` usado antes da declaração (reordenado).
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (33 warns) · vitest 77/77 ✓ · cargo **67/67** (+1 deploy) ✓ · vite build 1m26s ✓ · boot vivo 0 panics ✓. Release v0.5.9.
+
+**Estado pós-sessão**: o ciclo completo existe: criar mod → agent constrói (texturas/estruturas/dimensões) → **deploy no seu servidor** → jogar. Próximos naturais: auto-deploy pós-build (setting), mais strings pt-BR nos diálogos profundos, monitor de servidor no workspace (console embutido no projeto com deploy alvo).

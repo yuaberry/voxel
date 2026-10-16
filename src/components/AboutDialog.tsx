@@ -11,7 +11,7 @@ import { NexusMark } from "@/components/brand/NexusLogo";
 import { useUiStore } from "@/stores/uiStore";
 import { APP_TAGLINE, LEGAL_DISCLAIMER } from "@/lib/constants";
 
-export const APP_VERSION = "0.5.8";
+export const APP_VERSION = "0.5.9";
 
 export function AboutDialog() {
   const open = useUiStore((s) => s.aboutOpen);
