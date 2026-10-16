@@ -912,7 +912,14 @@ fn list_names(dir: &Path) -> Vec<String> {
 }
 
 #[tauri::command]
-pub fn launcher_overview(base_path: String) -> Result<Vec<LauncherInstance>, String> {
+pub async fn launcher_overview(base_path: String) -> Result<Vec<LauncherInstance>, String> {
+    tauri::async_runtime::spawn_blocking(move || launcher_overview_impl(base_path))
+        .await
+        .map_err(|e| format!("overview worker failed: {e}"))?
+}
+
+/// Sync impl (disk I/O over instances/) — tests call this directly.
+pub fn launcher_overview_impl(base_path: String) -> Result<Vec<LauncherInstance>, String> {
     let base = std::path::PathBuf::from(&base_path)
         .canonicalize()
         .map_err(|e| format!("Storage base not accessible: {e}"))?;

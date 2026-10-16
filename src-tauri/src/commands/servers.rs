@@ -332,8 +332,12 @@ pub fn server_start(
 }
 
 #[tauri::command]
-pub fn server_status(slug: String) -> bool {
-    process::is_running(&format!("server/{slug}"))
+pub async fn server_status(slug: String) -> bool {
+    // registry lookups are cheap, but this fires every 5s per server —
+    // keep it off the main thread like every other poll
+    tauri::async_runtime::spawn_blocking(move || process::is_running(&format!("server/{slug}")))
+        .await
+        .unwrap_or(false)
 }
 
 /// Graceful stop — sends `stop` through the server console (world-safe).

@@ -33,44 +33,86 @@ export function ServersPage() {
       const list = await listServers();
       setServers(list);
       setLoaded(true);
-      const running = new Set<string>();
-      for (const server of list) {
-        if (await serverIsRunning(server.slug).catch(() => false)) {
-          running.add(server.slug);
-        }
-      }
-      setRunningSet(running);
+      // parallel: one round-trip instead of server-count sequential awaits
+      const states = await Promise.all(
+        list.map((server) => serverIsRunning(server.slug).catch(() => false)),
+      );
+      setRunningSet(new Set(list.filter((_, i) => states[i]).map((server) => server.slug)));
     } catch (error) {
       toast.error("Could not load servers", { description: String(error) });
     }
   }, []);
 
   useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (!timer) timer = setInterval(() => void refresh(), 5000);
+    };
+    const stop = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+    const onVisibility = () => {
+      // status polling pauses while the window is hidden — zero background cost
+      if (document.hidden) stop();
+      else {
+        void refresh();
+        start();
+      }
+    };
     void refresh();
-    const interval = setInterval(() => void refresh(), 5000);
-    return () => clearInterval(interval);
+    start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [refresh]);
 
-  // Community servers ping their real state — offline shows offline, never a lie
+  // Community servers ping their real state — offline shows offline, never a lie.
+  // Pings run in PARALLEL off the main thread (the Rust command is async),
+  // and the whole loop PAUSES while the window is hidden — no background cost.
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
     const pingAll = async () => {
+      if (document.hidden) return; // paused — nothing runs in the background
+      const settled = await Promise.allSettled(
+        PUBLIC_SERVER_REFS.map((ref) => pingServer(ref.address)),
+      );
+      if (cancelled) return;
       const results: Record<string, ServerPingData | null> = {};
-      for (const ref of PUBLIC_SERVER_REFS) {
-        try {
-          results[ref.id] = await pingServer(ref.address);
-        } catch {
-          results[ref.id] = null;
-        }
-        if (cancelled) return;
-      }
-      if (!cancelled) setPublicPings(results);
+      PUBLIC_SERVER_REFS.forEach((ref, i) => {
+        results[ref.id] =
+          settled[i].status === "fulfilled"
+            ? (settled[i] as PromiseFulfilledResult<ServerPingData>).value
+            : null;
+      });
+      setPublicPings(results);
     };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+      } else if (!timer) {
+        void pingAll();
+        timer = setInterval(() => void pingAll(), 45000);
+      }
+    };
+
     void pingAll();
-    const interval = setInterval(() => void pingAll(), 45000);
+    timer = setInterval(() => void pingAll(), 45000);
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      if (timer) clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 

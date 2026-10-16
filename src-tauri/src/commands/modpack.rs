@@ -820,7 +820,14 @@ pub struct SavedModpack {
 }
 
 #[tauri::command]
-pub fn modpack_list(storage_base: String) -> Result<Vec<SavedModpack>, String> {
+pub async fn modpack_list(storage_base: String) -> Result<Vec<SavedModpack>, String> {
+    tauri::async_runtime::spawn_blocking(move || modpack_list_impl(storage_base))
+        .await
+        .map_err(|e| format!("list worker failed: {e}"))?
+}
+
+/// Sync impl (zip reads) — tests call this directly.
+pub fn modpack_list_impl(storage_base: String) -> Result<Vec<SavedModpack>, String> {
     let base = workspace_base(&storage_base)?;
     let dir = base.join("modpacks");
     let mut out = Vec::new();
@@ -1189,7 +1196,7 @@ versionRange="[1.21,1.22)"
         let base = fake_workspace("library");
         let result = modpack_export(payload(&base)).unwrap();
 
-        let list = modpack_list(base.to_string_lossy().to_string()).unwrap();
+        let list = modpack_list_impl(base.to_string_lossy().to_string()).unwrap();
         assert_eq!(list.len(), 1);
         let pack = &list[0];
         assert_eq!(pack.name, "Dark Bundle");
@@ -1203,7 +1210,7 @@ versionRange="[1.21,1.22)"
 
         // delete by name; a fake name and traversal are refused
         modpack_delete(base.to_string_lossy().to_string(), pack.file_name.clone()).unwrap();
-        assert!(modpack_list(base.to_string_lossy().to_string()).unwrap().is_empty());
+        assert!(modpack_list_impl(base.to_string_lossy().to_string()).unwrap().is_empty());
         assert!(modpack_delete(base.to_string_lossy().to_string(), "nope.zip".to_string()).is_err());
         assert!(modpack_delete(base.to_string_lossy().to_string(), "../escape.zip".to_string()).is_err());
 
@@ -1225,7 +1232,7 @@ versionRange="[1.21,1.22)"
         .unwrap();
 
         // the library reflects the new identity
-        let list = modpack_list(base.to_string_lossy().to_string()).unwrap();
+        let list = modpack_list_impl(base.to_string_lossy().to_string()).unwrap();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].name, "Renamed Bundle");
         assert_eq!(list[0].version, "2.0.0");

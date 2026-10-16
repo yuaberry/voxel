@@ -493,7 +493,7 @@ struct PingBody {
 }
 
 async fn ping_server(Json(body): Json<PingBody>) -> Result<Json<Value>, String> {
-    let ping = serverping::server_ping(body.address, body.port)?;
+    let ping = serverping::server_ping(body.address, body.port).await?;
     Ok(Json(serde_json::to_value(ping).map_err(|e| format!("{e}"))?))
 }
 

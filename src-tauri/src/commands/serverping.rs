@@ -190,6 +190,16 @@ fn parse_status(host: &str, port: u16, latency_ms: u128, raw: &[u8]) -> Result<S
     })
 }
 
+/// ASYNC command: sync commands run on the MAIN THREAD in Tauri 2, and an
+/// 8-10s network ping froze the whole app (the owner's report). The impl is
+/// moved to the blocking pool — the UI stays responsive while pings run.
+#[tauri::command]
+pub async fn server_ping(host: String, port: Option<u16>) -> Result<ServerPing, String> {
+    tauri::async_runtime::spawn_blocking(move || server_ping_impl(host, port))
+        .await
+        .map_err(|e| format!("ping worker failed: {e}"))?
+}
+
 /// Flattens a legacy string or a chat component tree into plain text.
 fn flatten_chat(value: &Value) -> String {
     match value {
@@ -214,8 +224,9 @@ fn flatten_chat(value: &Value) -> String {
 // Command
 // ---------------------------------------------------------------------------
 
-#[tauri::command]
-pub fn server_ping(host: String, port: Option<u16>) -> Result<ServerPing, String> {
+/// Sync impl (network: DNS + SRV + TCP with up-to-10s timeouts) — called by
+/// tests directly; the COMMAND below wraps it off the main thread.
+fn server_ping_impl(host: String, port: Option<u16>) -> Result<ServerPing, String> {
     let host = host.trim().trim_start_matches("http://").trim_start_matches("https://");
     let host = host.split('/').next().unwrap_or("").trim();
     if host.is_empty() {
@@ -371,7 +382,7 @@ mod tests {
         // nerdzone.gg: the owner's reference for the prison/chain style —
         // offline results are honest per-host (liveness is the assertion)
         for host in ["mc.hypixel.net", "play.cubecraft.net", "minemen.club", "nerdzone.gg"] {
-            let ping = server_ping(host.into(), None)
+            let ping = server_ping_impl(host.into(), None)
                 .unwrap_or_else(|e| panic!("{host} failed: {e}"));
             println!(
                 "{} → {} players v{} [{}]",
