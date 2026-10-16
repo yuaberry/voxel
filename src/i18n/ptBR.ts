@@ -161,6 +161,23 @@ export const ptBR: Record<string, string> = {
   "Mobile": "Celular",
   "About": "Sobre",
 
+  // ------- Server wizard -------
+  "Vanilla or Paper — the official jars": "Vanilla ou Paper — os jars oficiais",
+  "The port friends connect to (change it if 25565 is busy)": "A porta que os amigos usam (mude se a 25565 estiver ocupada)",
+  "MB of RAM for the server process": "MB de RAM para o processo do servidor",
+  "LOCAL by default. Check this to start a free public tunnel after creation — friends connect from anywhere via a *.playit.gg address (the address appears in the console).": "LOCAL por padrão. Marque para subir um túnel público grátis após a criação — amigos conectam de qualquer lugar via um endereço *.playit.gg (o endereço aparece no console).",
+  "Monument seed": "Seed dos monumentos",
+  "same seed, same skyline — every monument on this server builds from it": "mesma seed, mesmo skyline — todos os monumentos deste servidor nascem dela",
+  "Deploy to a server": "Deploy num servidor",
+  "Deploy datapack": "Deploy do datapack",
+  "Deploying…": "Deploying…",
+  "Deploy": "Deploy",
+  "Ask the agent": "Pedir ao agente",
+  "Want a change, improvement or something new?": "Quer uma alteração, melhoria ou algo novo?",
+  "Describe it and the AI agent edits THIS project for real — textures, blocks, structures, dimensions and code, with the same audit trail.": "Descreva e o agente de IA edita ESTE projeto de verdade — texturas, blocos, estruturas, dimensões e código, com a mesma auditoria.",
+  "Import the vibe of any live server": "Importe a vibe de qualquer servidor ao vivo",
+  "Ping a real address": "Pingue um endereço real",
+
   // ------- Common -------
   "Refresh": "Atualizar",
   "Close": "Fechar",

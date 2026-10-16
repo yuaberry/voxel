@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
-import { ChevronRight, Github, Loader2, Play, Save, Trash2, X } from "lucide-react";
+import { ChevronRight, Github, Loader2, Play, Save, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ import { BuildDrawer } from "./BuildDrawer";
 import { LaunchDialog } from "./LaunchDialog";
 import { PublishDialog } from "./PublishDialog";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
+import { DeployToServerDialog } from "./DeployToServerDialog";
 import type { ProjectFileEntry } from "@/types";
 
 interface OpenTab {
@@ -48,6 +49,7 @@ export function ProjectWorkspacePage() {
   const [launchOpen, setLaunchOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [deployOpen, setDeployOpen] = useState(false);
   const [files, setFiles] = useState<ProjectFileEntry[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [tabs, setTabs] = useState<OpenTab[]>([]);
@@ -228,6 +230,15 @@ export function ProjectWorkspacePage() {
           <Button
             size="sm"
             variant="outline"
+            onClick={() => setDeployOpen(true)}
+            title="Deploy this project's datapack to one of your servers"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Deploy
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => setPublishOpen(true)}
             title="Publish to GitHub"
           >
@@ -385,6 +396,13 @@ export function ProjectWorkspacePage() {
 
       {/* Publish to GitHub */}
       <PublishDialog project={project} open={publishOpen} onOpenChange={setPublishOpen} />
+
+      {/* Deploy the project's datapack to a server — the project↔server link */}
+      <DeployToServerDialog
+        project={project}
+        open={deployOpen}
+        onOpenChange={setDeployOpen}
+      />
 
       {/* Permanent delete — the owner kept looking for it INSIDE the project */}
       <DeleteProjectDialog

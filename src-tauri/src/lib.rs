@@ -90,6 +90,7 @@ pub fn run() {
             commands::modpack::modpack_import_into,
             commands::servers::server_create,
             commands::servers::server_write_info,
+            commands::servers::project_deploy_datapack,
             commands::servers::server_start,
             commands::servers::server_stop,
             commands::servers::server_status,

@@ -62,6 +62,15 @@ export function BuildDrawer({ project, open, onToggle, buildStatus }: Props) {
 
   const [run, setRun] = useState<BuildRun | null>(null);
   const [building, setBuilding] = useState(false);
+  // Live elapsed seconds while building — a tick state keeps Date.now() out
+  // of the render (React Compiler rule), and the interval only runs when busy
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (!building) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [building]);
+
   const [autoFix, setAutoFix] = useState<AutoFixState | null>(null);
   const abortRef = useRef(false);
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -262,6 +271,16 @@ export function BuildDrawer({ project, open, onToggle, buildStatus }: Props) {
             <Badge variant={run.status === "success" ? "success" : run.status === "failed" ? "destructive" : "secondary"}>
               {run.status} {run.exitCode !== null ? `(${run.exitCode})` : ""}
             </Badge>
+          )}
+          {run && !building && run.endedAt !== null && (
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {((run.endedAt - run.startedAt) / 1000).toFixed(1)}s
+            </span>
+          )}
+          {building && run && (
+            <span className="font-mono text-[10px] text-primary/80">
+              {((nowTick - run.startedAt) / 1000).toFixed(0)}s…
+            </span>
           )}
           {autoFix && (
             <Badge variant="default" className="gap-1">

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { t } from "@/i18n";
 import { useNavigate } from "react-router-dom";
 import { Download, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
@@ -492,7 +493,7 @@ export function CreateServerDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Gameplay modules (mix freely)</Label>
+            <Label>{t("Gameplay modules (mix freely)")}</Label>
             <div className="grid gap-2">
               {SERVER_MODULES.map((module) => {
                 const checked = modules.has(module.id);

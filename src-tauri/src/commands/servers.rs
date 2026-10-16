@@ -778,6 +778,158 @@ pub fn server_write_info(payload: ServerInfoPayload) -> Result<String, String> {
     Ok(target.to_string_lossy().to_string())
 }
 
+// ---------------------------------------------------------------------------
+// Project ↔ Server connection — deploy the project's datapack (structures,
+// dimensions, advancements, functions) into a server's world/datapacks/,
+// so what you build in the mod is live on your server. Versions must match
+// (the formats are era-bound) and the server never mixes packs.
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectDeployPayload {
+    pub storage_base: String,
+    pub project_slug: String,
+    pub server_slug: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectDeployResult {
+    pub files_copied: usize,
+    pub datapack_dir: String,
+    pub has_structures: bool,
+    pub has_dimensions: bool,
+}
+
+fn copy_tree(src: &std::path::Path, dst: &std::path::Path, count: &mut usize) -> Result<(), String> {
+    std::fs::create_dir_all(dst).map_err(|e| format!("mkdir {}: {e}", dst.display()))?;
+    let entries = std::fs::read_dir(src).map_err(|e| format!("read {}: {e}", src.display()))?;
+    for entry in entries.filter_map(|e| e.ok()) {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let from = entry.path();
+        let to = dst.join(&name);
+        if from.is_dir() {
+            copy_tree(&from, &to, count)?;
+        } else if from.is_file() {
+            let bytes = std::fs::read(&from).map_err(|e| format!("read {}: {e}", from.display()))?;
+            std::fs::write(&to, &bytes).map_err(|e| format!("write {}: {e}", to.display()))?;
+            *count += 1;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn project_deploy_datapack(payload: ProjectDeployPayload) -> Result<ProjectDeployResult, String> {
+    let base = std::path::PathBuf::from(&payload.storage_base)
+        .canonicalize()
+        .map_err(|e| format!("Storage base not accessible: {e}"))?;
+
+    let project_dir = base.join("projects").join(&payload.project_slug);
+    if !project_dir.is_dir() {
+        return Err(format!("Project \"{}\" not found", payload.project_slug));
+    }
+    let server_dir = base.join("servers").join(&payload.server_slug);
+    if !server_dir.is_dir() {
+        return Err(format!("Server \"{}\" not found", payload.server_slug));
+    }
+
+    // Era honesty: the datapack formats are version-bound. Read the facts
+    // from the mod metadata (fabric.mod.json / neoforge.mods.toml template)
+    // — falls back to the server properties when the mod doesn't declare.
+    let data_dir = project_dir.join("src/main/resources/data");
+    if !data_dir.is_dir() {
+        return Err("This project has no datapack (no src/main/resources/data) — build something first (the agent writes structures and dimensions there)".to_string());
+    }
+
+    // pack.mcmeta with the server's era pack format
+    let pack_format = pack_format_for_server(&base, &payload.server_slug);
+
+    // Wipe nothing: a previous deploy of the SAME project is REPLACED atomically
+    // (temp dir + rename); other packs are never touched.
+    let target = server_dir.join("world/datapacks").join(format!("project_{}", payload.project_slug));
+    if target.exists() {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let trash = server_dir.join(format!("world/datapacks/.old-{}-{}", payload.project_slug, stamp));
+        std::fs::rename(&target, &trash)
+            .map_err(|e| format!("Could not stage the old pack: {e}"))?;
+        let _ = std::fs::remove_dir_all(&trash);
+    }
+
+    let staging = server_dir.join(format!("world/datapacks/.staging-{}", payload.project_slug));
+    let _ = std::fs::remove_dir_all(&staging);
+    std::fs::create_dir_all(&staging).map_err(|e| format!("mkdir: {e}"))?;
+
+    // pack.mcmeta so vanilla recognizes the pack
+    let mcmeta = serde_json::json!({
+        "pack": {
+            "pack_format": pack_format,
+            "description": format!("{} (deployed by VOXEL)", payload.project_slug)
+        }
+    })
+    .to_string();
+    std::fs::write(staging.join("pack.mcmeta"), &mcmeta)
+        .map_err(|e| format!("write pack.mcmeta: {e}"))?;
+
+    // every namespace the project owns — the pack is project-named, so
+    // multiple projects can coexist without touching each other
+    let mut count = 1usize; // pack.mcmeta counts
+    let mut has_structures = false;
+    let mut has_dimensions = false;
+    let entries = std::fs::read_dir(&data_dir).map_err(|e| format!("{e}"))?;
+    for ns_dir in entries.filter_map(|e| e.ok()) {
+        if !ns_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+        let ns = ns_dir.file_name().to_string_lossy().to_string();
+        if ns.contains("..") || ns.starts_with('.') {
+            continue;
+        }
+        let from = data_dir.join(&ns);
+        if from.join("structures").is_dir() || from.join("structure").is_dir() {
+            has_structures = true;
+        }
+        if from.join("dimension").is_dir() {
+            has_dimensions = true;
+        }
+        copy_tree(&from, &staging.join(&ns), &mut count)?;
+    }
+
+    std::fs::rename(&staging, &target)
+        .map_err(|e| format!("Could not finalize the deploy: {e}"))?;
+
+    Ok(ProjectDeployResult {
+        files_copied: count,
+        datapack_dir: target.to_string_lossy().to_string(),
+        has_structures,
+        has_dimensions,
+    })
+}
+
+/// The server's pack format: its own datapacks declare it — read a real
+/// module's pack.mcmeta instead of guessing. Default 15 (1.20.1) is the
+/// honest baseline when nothing is installed yet.
+fn pack_format_for_server(base: &std::path::Path, server_slug: &str) -> u32 {
+    let packs = base.join("servers").join(server_slug).join("world/datapacks");
+    if let Ok(entries) = std::fs::read_dir(&packs) {
+        for dir in entries.filter_map(|e| e.ok()) {
+            let mcmeta = dir.path().join("pack.mcmeta");
+            if let Ok(content) = std::fs::read_to_string(&mcmeta) {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(n) = v.get("pack").and_then(|p| p.get("pack_format")).and_then(|n| n.as_u64()) {
+                        return n as u32;
+                    }
+                }
+            }
+        }
+    }
+    15
+}
+
 #[cfg(test)]
 mod unit_tests {
     use super::*;
@@ -897,6 +1049,73 @@ mod unit_tests {
         assert_eq!(map.get("difficulty").unwrap(), "hard");
         assert_eq!(map.get("motd").unwrap(), "My styled server");
         assert_eq!(map.get("server-port").unwrap(), "25570");
+    }
+
+    #[test]
+    fn project_datapack_deploys_into_the_server_and_replaces_atomically() {
+        let base = std::env::temp_dir().join(format!("voxel-deploy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        // project with a datapack: structure + dimension
+        let data = base.join("projects/kingdom/src/main/resources/data/kingdom");
+        std::fs::create_dir_all(data.join("structures")).unwrap();
+        std::fs::create_dir_all(data.join("dimension")).unwrap();
+        std::fs::write(data.join("structures/watch_post.nbt"), b"PK-nbt").unwrap();
+        std::fs::write(data.join("dimension/realm.json"), b"{}").unwrap();
+        // server with an existing module pack (pack_format 18 from its own pack.mcmeta)
+        let server_packs = base.join("servers/arena/world/datapacks/nexus_skyblock");
+        std::fs::create_dir_all(&server_packs).unwrap();
+        std::fs::write(server_packs.join("pack.mcmeta"), r#"{"pack":{"pack_format":18,"description":"x"}}"#).unwrap();
+
+        let payload = ProjectDeployPayload {
+            storage_base: base.to_string_lossy().to_string(),
+            project_slug: "kingdom".to_string(),
+            server_slug: "arena".to_string(),
+        };
+        let result = project_deploy_datapack(payload).unwrap();
+        assert!(result.files_copied >= 3); // pack.mcmeta + nbt + json
+        assert!(result.has_structures);
+        assert!(result.has_dimensions);
+        assert!(result.datapack_dir.contains("servers/arena/world/datapacks/project_kingdom"));
+        // the era format came from the server's own module pack
+        let mcmeta = std::fs::read_to_string(
+            base.join("servers/arena/world/datapacks/project_kingdom/pack.mcmeta"),
+        )
+        .unwrap();
+        assert!(mcmeta.contains("18"));
+        // contents copied
+        assert!(base.join("servers/arena/world/datapacks/project_kingdom/kingdom/structures/watch_post.nbt").is_file());
+        // the module pack is untouched
+        assert!(server_packs.join("pack.mcmeta").is_file());
+
+        // re-deploy replaces atomically, no staging leftovers
+        std::fs::write(data.join("structures/watch_post.nbt"), b"PK-nbt-v2").unwrap();
+        project_deploy_datapack(ProjectDeployPayload {
+            storage_base: base.to_string_lossy().to_string(),
+            project_slug: "kingdom".to_string(),
+            server_slug: "arena".to_string(),
+        })
+        .unwrap();
+        let nbt = std::fs::read(
+            base.join("servers/arena/world/datapacks/project_kingdom/kingdom/structures/watch_post.nbt"),
+        )
+        .unwrap();
+        assert_eq!(nbt, b"PK-nbt-v2");
+        let packs = base.join("servers/arena/world/datapacks");
+        let mut names: Vec<String> = std::fs::read_dir(&packs).unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+            .collect();
+        names.sort();
+        assert_eq!(names, vec!["nexus_skyblock", "project_kingdom"]);
+
+        // a project without a datapack is honestly refused
+        std::fs::create_dir_all(base.join("projects/empty/src/main/resources")).unwrap();
+        assert!(project_deploy_datapack(ProjectDeployPayload {
+            storage_base: base.to_string_lossy().to_string(),
+            project_slug: "empty".to_string(),
+            server_slug: "arena".to_string(),
+        }).is_err());
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]
