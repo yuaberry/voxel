@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (43 sessões)
+## 5. Histórico de sessões (44 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 44 | HOTFIX congelamento | **Causa raiz**: commands sync rodam na MAIN THREAD (Tauri 2) — server_ping 8-10s × série + polling = UI travada. 4 commands → async+spawn_blocking; polling paralelo e pausa com janela oculta + v0.5.10 | — |
 | 43 | Deploy↔build↔pt-BR | **project_deploy_datapack** (datapack do mod no servidor, formato lido do pack real, replace atômico, versões compatíveis) + elapsed no BuildDrawer + pt-BR amp + v0.5.9 | escapes no mcmeta; Date.now() impuro (compiler); building antes da declaração |
 | 42 | PT-BR + agent handoff | **i18n honesto** (fallback inglês, setting Auto/EN/PT-BR, nav+títulos+seções traduzidas) + **chat de alterações no Studio** (handoff pro AI Creator, nunca auto-envia) + v0.5.8 | replace de uiStore não casou; togglePalette 0-arg |
 | 41 | Correções do dono | Botão criar nunca-morto (feedback do requisito), delete dentro do projeto, **Community servers ao vivo** (SLP 45s + nerdzone.gg), túnel público no wizard, inferência prison/coin/chain + v0.5.7 | botão disabled silencioso; delete escondido no ⋮ |
@@ -259,7 +260,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 43, v0.5.9)
+## 8. Estado atual (verificado — Sessão 44, v0.5.10)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -279,7 +280,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.5.9 (latest)** | Desktop: **deploy projeto↔servidor + build elapsed + pt-BR amp** + APK mobile 0.3.1 |
+| **v0.5.10 (latest)** | Desktop: **HOTFIX congelamento da área de Servidores** + APK mobile 0.3.1 |
+| v0.5.9 | Desktop: **deploy projeto↔servidor + build elapsed + pt-BR amp** + APK mobile 0.3.1 |
 | v0.5.8 | Desktop: **Português (Brasil) no app + chat do agente no Studio** + APK mobile 0.3.1 |
 | v0.5.7 | Desktop: **correções do dono + community servers ao vivo + túnel no wizard** + APK mobile 0.3.1 |
 | v0.5.6 | Desktop: **Custom Realm (dimensões nos servers)** + APK mobile 0.3.1 |
@@ -476,7 +478,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 43 — deploy projeto↔servidor (datapack do mod no world/datapacks com formato lido do próprio servidor, replace atômico, versões compatíveis) + tempo real do build (tick state) + pt-BR amp. 77/77 + 67/67. Release v0.5.9.*
+*Última atualização: Sessão 44 — HOTFIX: commands síncronos bloqueavam a main thread (server_ping 8-10s em loop serial = congelamento total). server_ping/server_status/launcher_overview/modpack_list agora async+spawn_blocking; polling paralelo e pausado com janela oculta. 77/77 + 67/67. Release v0.5.10.*
 
 ---
 
@@ -1066,3 +1068,21 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (33 warns) · vitest 77/77 ✓ · cargo **67/67** (+1 deploy) ✓ · vite build 1m26s ✓ · boot vivo 0 panics ✓. Release v0.5.9.
 
 **Estado pós-sessão**: o ciclo completo existe: criar mod → agent constrói (texturas/estruturas/dimensões) → **deploy no seu servidor** → jogar. Próximos naturais: auto-deploy pós-build (setting), mais strings pt-BR nos diálogos profundos, monitor de servidor no workspace (console embutido no projeto com deploy alvo).
+
+---
+
+## 44. Sessão 44 — HOTFIX: a área de Servidores congelava o app (corrigido na raiz)
+
+**Bug report do dono**: "estou tendo problemas com a área de Servidores, está deixando meu computador muito lento e não responde."
+
+**Causa raiz (arquitetural)**: Tauri 2 executa commands **síncronos na MAIN THREAD** — e os nossos faziam rede/disco lá:
+- `server_ping` (DNS + SRV + TCP, timeouts 8-10s) em **loop serial** × 8 públicos a cada 45s + self-ping do console = até ~80s de main thread bloqueada por ciclo → **UI inteira congelava**
+- `server_status` (5s × servidor), `launcher_overview` (I/O de disco por instância), `modpack_list` (leitura+parse de cada zip) — todos no fio principal
+
+**Fix (4 commands → async com spawn_blocking, impls síncronas preservadas para os testes)**: server_ping, server_status, launcher_overview, modpack_list. O ping do bridge (mobile) também awaits. **Main thread nunca mais bloqueia com rede/disco.**
+
+**Frontend (ServersPage)**: status checks em **paralelo** (era 1 await por servidor em série), pings públicos em **paralelo via allSettled**, e **ambos os loops pausam 100% com a janela oculta** (visibilitychange) — zero custo em background quando você sai da aba.
+
+**Verificação**: cargo 67/67 ✓ · vitest 77/77 ✓ · typecheck 0 ✓ · lint 0 errors (33) ✓ · vite build ✓ · **boot vivo 0 panics** ✓. Release **v0.5.10** (hotfix).
+
+**Lição permanente registrada**: commands Tauri com rede/disco/zip são SEMPRE `async` + `spawn_blocking` (impl síncrona separada para testes). Os outros commands pesados (server_backup, e2e de compilação) já rodam sob demanda do usuário, não em polling — revisão futura se algum entrar em loop.
