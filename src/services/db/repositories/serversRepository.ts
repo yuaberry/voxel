@@ -1,4 +1,5 @@
 import { getDb } from "@/services/db/client";
+import { invoke } from "@tauri-apps/api/core";
 import type { ServerRecord } from "@/types";
 
 function rowToServer(row: Record<string, unknown>): ServerRecord {
@@ -61,6 +62,90 @@ export async function updateServerStatus(
 export async function removeServer(slug: string): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM servers WHERE slug = $1", [slug]);
+}
+
+interface DiskServerInfo {
+  slug: string;
+  name: string;
+  software: string;
+  mcVersion: string;
+  port: number;
+  ramMb: number;
+  createdAt: string;
+  hasJar: boolean;
+  hasEula: boolean;
+}
+
+/**
+ * The DISK is the source of truth. This reconciles the database against the
+ * real server folders before listing:
+ *  - a folder without a row is ADOPTED (a server is never lost because a
+ *    database write failed after creation — the exact "cannot create"
+ *    frustration the owner reported)
+ *  - a row without a folder is RETIRED (no ghost cards that error on Start)
+ *
+ * Facts for adoption come from voxel-server.json, written by server_create.
+ */
+export async function listServersReconciled(
+  basePath: string,
+): Promise<ServerRecord[]> {
+  const [rows, disk] = await Promise.all([
+    listServers(),
+    invoke<DiskServerInfo[]>("servers_scan_disk", { basePath }).catch(
+      () => [] as DiskServerInfo[],
+    ),
+  ]);
+
+  const bySlug = new Map(rows.map((r) => [r.slug, r]));
+  const now = new Date().toISOString();
+  const adopted: ServerRecord[] = [];
+
+  for (const folder of disk) {
+    const existing = bySlug.get(folder.slug);
+    if (!existing) {
+      const record: ServerRecord = {
+        id: crypto.randomUUID(),
+        name: folder.name,
+        slug: folder.slug,
+        software: (folder.software === "paper" ? "paper" : "vanilla") as ServerRecord["software"],
+        minecraft_version: folder.mcVersion,
+        path: `${basePath}/servers/${folder.slug}`,
+        port: folder.port,
+        ram_mb: folder.ramMb,
+        status: "stopped",
+        created_at: folder.createdAt ? `${folder.createdAt}` : now,
+        updated_at: now,
+      };
+      try {
+        await insertServer(record);
+        adopted.push(record);
+        rows.unshift(record);
+      } catch (error) {
+        console.warn("server adoption failed:", error);
+      }
+    } else {
+      // keep db row but correct drift in the basics
+      if (!existing.path || existing.path === "pending") {
+        existing.path = `${basePath}/servers/${folder.slug}`;
+      }
+    }
+  }
+
+  // retire ghosts: rows whose folder is gone
+  for (const row of [...rows]) {
+    const folderExists = disk.some((d) => d.slug === row.slug);
+    if (!folderExists) {
+      try {
+        await removeServer(row.slug);
+      } catch (error) {
+        console.warn("ghost server retire failed:", error);
+      }
+      const idx = rows.indexOf(row);
+      if (idx >= 0) rows.splice(idx, 1);
+    }
+  }
+
+  return rows;
 }
 
 export async function recordBackup(entry: {

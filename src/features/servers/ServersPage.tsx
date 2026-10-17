@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { t } from "@/i18n";
 import { toast } from "sonner";
-import { Loader2, Plus, Radar, Server as ServerIcon } from "lucide-react";
+import { Loader2, Plus, Radar, Server as ServerIcon, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +9,8 @@ import { CreateServerDialog, type CreateServerInitials } from "./CreateServerDia
 import { ServerConsoleDialog } from "./ServerConsoleDialog";
 import { ImportServerPanel } from "./ImportServerPanel";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { listServers } from "@/services/db/repositories/serversRepository";
+import { listServersReconciled } from "@/services/db/repositories/serversRepository";
+import { DiagnosticsDialog } from "@/components/DiagnosticsDialog";
 import { serverIsRunning } from "@/services/servers/serverService";
 import { pingServer } from "@/services/servers/serverPingService";
 import { PUBLIC_SERVER_REFS } from "@voxel/core/publicServers";
@@ -30,7 +31,15 @@ export function ServersPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const list = await listServers();
+      if (!basePath) {
+        setServers([]);
+        setLoaded(true);
+        return;
+      }
+      // The disk is the source of truth: folders without a db row are
+      // adopted, ghost rows are retired — a server is never invisible
+      // because a database write once failed.
+      const list = await listServersReconciled(basePath);
       setServers(list);
       setLoaded(true);
       // parallel: one round-trip instead of server-count sequential awaits
@@ -41,7 +50,7 @@ export function ServersPage() {
     } catch (error) {
       toast.error("Could not load servers", { description: String(error) });
     }
-  }, []);
+  }, [basePath]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -148,6 +157,15 @@ export function ServersPage() {
             <Plus className="h-4 w-4" />
             {t("Create server")}
           </Button>
+          <DiagnosticsDialog
+            basePath={basePath}
+            trigger={
+              <Button variant="outline" size="sm">
+                <Stethoscope className="h-3.5 w-3.5" />
+                {t("Something not working? Run diagnostics")}
+              </Button>
+            }
+          />
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

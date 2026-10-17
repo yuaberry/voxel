@@ -132,7 +132,16 @@ export function CreateServerDialog({
         setVersions(releases);
         if (!mcVersion && releases.length > 0) setMcVersion(releases[0].version);
       })
-      .catch(() => setVersions([]));
+      .catch(() => {
+        // getVersions is fallback-guarded, but if even the fallback fails
+        // the user must KNOW — a silent empty version picker is unusable
+        setVersions([]);
+        toast.warning("Could not load Minecraft versions", {
+          description:
+            "Even the offline list failed. Run diagnostics (Settings → Advanced) and retry — the picker needs at least one version.",
+          duration: 12000,
+        });
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

@@ -175,6 +175,105 @@ pub struct ServerSetupResult {
     pub jar_path: String,
 }
 
+/// Facts written to `voxel-server.json` inside every server folder — the
+/// disk-side source of truth for self-healing reconciliation.
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerDiskManifest {
+    pub slug: String,
+    pub name: String,
+    pub software: String,
+    pub mc_version: String,
+    pub port: u16,
+    pub ram_mb: u32,
+    pub created_at: String,
+}
+
+/// Scans `<base>/servers/*` and returns the REAL servers that exist on disk
+/// (facts from voxel-server.json / server.properties / eula). The app
+/// reconciles its database against this: folders without a row are adopted
+/// (a server is never lost because a db write failed), rows without a
+/// folder are retired. The disk is the truth — never fake data.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DiskServerInfo {
+    pub slug: String,
+    pub name: String,
+    pub software: String,
+    pub mc_version: String,
+    pub port: u16,
+    pub ram_mb: u32,
+    pub created_at: String,
+    pub has_jar: bool,
+    pub has_eula: bool,
+}
+
+#[tauri::command]
+pub fn servers_scan_disk(base_path: String) -> Result<Vec<DiskServerInfo>, String> {
+    let base = Path::new(&base_path)
+        .canonicalize()
+        .map_err(|e| format!("Storage base not accessible: {e}"))?;
+    let servers_root = base.join("servers");
+    let mut out = Vec::new();
+    let entries = match std::fs::read_dir(&servers_root) {
+        Ok(entries) => entries,
+        Err(_) => return Ok(out), // no servers dir yet — empty is honest
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let slug = entry.file_name().to_string_lossy().to_string();
+        if slug.starts_with('.') {
+            continue;
+        }
+        // Facts, preferring the manifest and falling back to the files
+        let (mut name, mut software, mut mc_version, mut ram_mb) =
+            (slug.clone(), "vanilla".to_string(), String::new(), 2048u32);
+        let mut port = 25565u16;
+        let mut created_at = String::new();
+        if let Ok(bytes) = std::fs::read(path.join("voxel-server.json")) {
+            if let Ok(m) = serde_json::from_slice::<ServerDiskManifest>(&bytes) {
+                name = m.name;
+                software = m.software;
+                mc_version = m.mc_version;
+                port = m.port;
+                ram_mb = m.ram_mb;
+                created_at = m.created_at;
+            }
+        }
+        if let Ok(content) = std::fs::read_to_string(path.join("server.properties")) {
+            for line in content.lines() {
+                if let Some((k, v)) = line.split_once('=') {
+                    if k.trim() == "server-port" {
+                        if let Ok(p) = v.trim().parse::<u16>() {
+                            port = p;
+                        }
+                    }
+                }
+            }
+        }
+        if mc_version.is_empty() {
+            // Old folders (pre-manifest) honestly say what we can't know
+            mc_version = "unknown".to_string();
+        }
+        out.push(DiskServerInfo {
+            slug,
+            name,
+            software,
+            mc_version,
+            port,
+            ram_mb,
+            created_at,
+            has_jar: path.join("server.jar").is_file(),
+            has_eula: path.join("eula.txt").is_file(),
+        });
+    }
+    out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    Ok(out)
+}
+
 #[tauri::command]
 pub async fn server_create(
     base_path: String,
@@ -252,6 +351,26 @@ fn server_create_impl(
         .collect();
     std::fs::write(dir.join("server.properties"), format!("{}\n", lines.join("\n")))
         .map_err(|e| format!("{e}"))?;
+
+    // Self-describing manifest: the DISK is the source of truth, so a server
+    // folder can always reconcile itself back into the app database (if the
+    // db write failed after creation, the server is never lost — the next
+    // listing adopts the folder from these facts).
+    let manifest = ServerDiskManifest {
+        slug: slug.clone(),
+        name: name.trim().to_string(),
+        software: software.to_string(),
+        mc_version: mc_version.clone(),
+        port,
+        ram_mb,
+        created_at: compact_timestamp(),
+    };
+    if let Err(e) = std::fs::write(
+        dir.join("voxel-server.json"),
+        serde_json::to_string_pretty(&manifest).map_err(|e| format!("manifest: {e}"))?,
+    ) {
+        return Err(format!("write voxel-server.json: {e}"));
+    }
 
     // The owner's ask: every server folder carries its own documentation —
     // written BEFORE the jar download so it exists no matter what
@@ -1307,4 +1426,108 @@ mod e2e_tests {
         eprintln!("E2E SERVER OK — jar: {}", setup.jar_path);
     }
 
+    /// The owner's "cannot create a server" report, answered with a proof:
+    /// this exercises the EXACT path the app uses — the async command with
+    /// spawn_blocking (the unit tests only cover the sync impl). Downloads
+    /// the real jar through the real retrying HTTP client.
+    #[test]
+    #[ignore = "e2e: real download through the ASYNC command path (spawn_blocking)"]
+    fn e2e_server_create_async_command_path() {
+        let home = std::env::var("HOME").expect("HOME");
+        let base = format!("{home}/VOXEL");
+        let slug = "e2e-async-command";
+        let _ = std::fs::remove_dir_all(format!("{base}/servers/{slug}"));
+
+        // The app calls the async command; block_on drives the tauri runtime
+        let result = tauri::async_runtime::block_on(server_create(
+            base.clone(),
+            slug.to_string(),
+            "Async Path".to_string(),
+            "vanilla".to_string(),
+            "1.20.1".to_string(),
+            25601,
+            1024,
+            true,
+            None,
+        ))
+        .expect("the async command path must create a server with a real jar");
+        let dir = PathBuf::from(&result.server_dir);
+        assert!(dir.join("server.jar").is_file(), "real jar must be downloaded");
+        assert!(dir.join("voxel-server.json").is_file(), "manifest must exist");
+        assert!(dir.join("eula.txt").is_file());
+        assert!(result.jar_path.ends_with("server.jar"));
+
+        // The disk scan sees it — reconciliation has real facts to work with
+        let scanned = servers_scan_disk(base.clone()).expect("scan");
+        let found = scanned
+            .iter()
+            .find(|s| s.slug == slug)
+            .expect("scan must see the created server");
+        assert!(found.has_jar);
+        assert_eq!(found.name, "Async Path");
+        assert_eq!(found.mc_version, "1.20.1");
+        assert_eq!(found.port, 25601);
+
+        // A duplicate must fail with the friendly error the UI surfaces
+        let dup = tauri::async_runtime::block_on(server_create(
+            base.clone(),
+            slug.to_string(),
+            "Async Path".to_string(),
+            "vanilla".to_string(),
+            "1.20.1".to_string(),
+            25601,
+            1024,
+            true,
+            None,
+        ));
+        let msg = match dup {
+            Err(msg) => msg,
+            Ok(_) => panic!("duplicate slug must be rejected"),
+        };
+        assert!(
+            msg.contains("already exists"),
+            "the error must say what happened: {msg}"
+        );
+
+        let _ = std::fs::remove_dir_all(format!("{base}/servers/{slug}"));
+        eprintln!("E2E ASYNC COMMAND PATH OK");
+    }
+
+    #[test]
+    fn disk_scan_reports_real_folders_only() {
+        let base = std::env::temp_dir().join(format!("voxel-scan-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("servers/real-one/logs")).unwrap();
+        std::fs::write(
+            base.join("servers/real-one/voxel-server.json"),
+            r#"{"slug":"real-one","name":"Real One","software":"paper","mcVersion":"1.21.1","port":25566,"ramMb":2048,"createdAt":"20260101-00000"}"#,
+        )
+        .unwrap();
+        std::fs::write(base.join("servers/real-one/server.jar"), b"jar").unwrap();
+        std::fs::write(base.join("servers/real-one/eula.txt"), b"eula=true").unwrap();
+        // noise that must NOT be reported as a server
+        std::fs::create_dir_all(base.join("servers/.hidden-staging")).unwrap();
+        std::fs::write(base.join("servers/stray-file.txt"), b"x").unwrap();
+
+        let scanned = servers_scan_disk(base.to_string_lossy().to_string()).unwrap();
+        assert_eq!(scanned.len(), 1, "only real server folders count");
+        let one = &scanned[0];
+        assert_eq!(one.slug, "real-one");
+        assert_eq!(one.name, "Real One");
+        assert_eq!(one.software, "paper");
+        assert_eq!(one.mc_version, "1.21.1");
+        assert_eq!(one.port, 25566);
+        assert!(one.has_jar && one.has_eula);
+
+        // a folder without the manifest still reports honest facts
+        std::fs::create_dir_all(base.join("servers/legacy-two")).unwrap();
+        std::fs::write(base.join("servers/legacy-two/server.properties"), b"server-port=25599\n").unwrap();
+        let scanned = servers_scan_disk(base.to_string_lossy().to_string()).unwrap();
+        let legacy = scanned.iter().find(|s| s.slug == "legacy-two").unwrap();
+        assert_eq!(legacy.mc_version, "unknown");
+        assert_eq!(legacy.port, 25599);
+        assert!(!legacy.has_jar);
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
 }

@@ -374,16 +374,23 @@ async function readCache(): Promise<{
   info: MinecraftVersionInfo[];
   lastFetchedAt: string | null;
 }> {
-  const db = await getDb();
-  const rows = await db.select<CatalogRow[]>(
-    "SELECT * FROM minecraft_versions",
-  );
-  const info = rows.map(rowToInfo).sort((a, b) => compareMc(b.version, a.version));
-  const lastFetchedAt =
-    rows.length > 0
-      ? rows.map((r) => r.fetched_at).sort().reverse()[0] ?? null
-      : null;
-  return { info, lastFetchedAt };
+  try {
+    const db = await getDb();
+    const rows = await db.select<CatalogRow[]>(
+      "SELECT * FROM minecraft_versions",
+    );
+    const info = rows.map(rowToInfo).sort((a, b) => compareMc(b.version, a.version));
+    const lastFetchedAt =
+      rows.length > 0
+        ? rows.map((r) => r.fetched_at).sort().reverse()[0] ?? null
+        : null;
+    return { info, lastFetchedAt };
+  } catch (error) {
+    // A dead/unmigrated database must never kill version selection —
+    // the caller falls through to the embedded fallback instead.
+    console.warn("version catalog cache unreadable:", error);
+    return { info: [], lastFetchedAt: null };
+  }
 }
 
 async function writeCache(catalog: MinecraftVersionInfo[]): Promise<void> {
@@ -471,7 +478,10 @@ export async function getVersions(): Promise<MinecraftVersionInfo[]> {
   const cached = await readCache();
   if (cached.info.length === 0) {
     await ensureCatalog();
-    return (await readCache()).info;
+    const fresh = await readCache();
+    // Guaranteed non-empty: even a dead database or no internet leaves the
+    // user with the embedded fallback — version pickers never go blank.
+    return fresh.info.length > 0 ? fresh.info : FALLBACK_CATALOG;
   }
   return cached.info;
 }
