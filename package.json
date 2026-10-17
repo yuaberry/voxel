@@ -1,7 +1,7 @@
 {
   "name": "voxel",
   "private": true,
-  "version": "0.5.10",
+  "version": "0.5.11",
   "description": "VOXEL - AI-Powered Creation Platform",
   "type": "module",
   "scripts": {

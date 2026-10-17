@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (44 sessões)
+## 5. Histórico de sessões (45 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 45 | Classe async + sprites animados | **13 commands de ação → async+spawn_blocking** (server_create/launcher_prepare/túnel/snapshots/backups/modpacks/shaders/modrinth/create_project — a classe inteira fora da main thread) + **sprites ANIMADOS** (strip 16×16×N + .mcmeta, preview CSS steps, agent frames) + v0.5.11 | overflow u8; slices do strip; frame_at de 1 linha; Reader sem height; nota sem newline |
 | 44 | HOTFIX congelamento | **Causa raiz**: commands sync rodam na MAIN THREAD (Tauri 2) — server_ping 8-10s × série + polling = UI travada. 4 commands → async+spawn_blocking; polling paralelo e pausa com janela oculta + v0.5.10 | — |
 | 43 | Deploy↔build↔pt-BR | **project_deploy_datapack** (datapack do mod no servidor, formato lido do pack real, replace atômico, versões compatíveis) + elapsed no BuildDrawer + pt-BR amp + v0.5.9 | escapes no mcmeta; Date.now() impuro (compiler); building antes da declaração |
 | 42 | PT-BR + agent handoff | **i18n honesto** (fallback inglês, setting Auto/EN/PT-BR, nav+títulos+seções traduzidas) + **chat de alterações no Studio** (handoff pro AI Creator, nunca auto-envia) + v0.5.8 | replace de uiStore não casou; togglePalette 0-arg |
@@ -260,12 +261,12 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 44, v0.5.10)
+## 8. Estado atual (verificado — Sessão 45, v0.5.11)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (67) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Rust unit (68) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (77) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
@@ -280,7 +281,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.5.10 (latest)** | Desktop: **HOTFIX congelamento da área de Servidores** + APK mobile 0.3.1 |
+| **v0.5.11 (latest)** | Desktop: **classe async completa (ações nunca congelam) + sprites animados** + APK mobile 0.3.1 |
+| v0.5.10 | Desktop: **HOTFIX congelamento da área de Servidores** + APK mobile 0.3.1 |
 | v0.5.9 | Desktop: **deploy projeto↔servidor + build elapsed + pt-BR amp** + APK mobile 0.3.1 |
 | v0.5.8 | Desktop: **Português (Brasil) no app + chat do agente no Studio** + APK mobile 0.3.1 |
 | v0.5.7 | Desktop: **correções do dono + community servers ao vivo + túnel no wizard** + APK mobile 0.3.1 |
@@ -316,7 +318,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 67 unit
+cd src-tauri && cargo test          # 68 unit
 cargo test -- --ignored --nocapture # 10 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -478,7 +480,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 44 — HOTFIX: commands síncronos bloqueavam a main thread (server_ping 8-10s em loop serial = congelamento total). server_ping/server_status/launcher_overview/modpack_list agora async+spawn_blocking; polling paralelo e pausado com janela oculta. 77/77 + 67/67. Release v0.5.10.*
+*Última atualização: Sessão 45 — a CLASSE completa: 13 commands de ação (server_create com download de jar, launcher_prepare 718MB, túnel, snapshots, backups, modpacks, shaders, modrinth, create_project) agora async+spawn_blocking — a UI nunca mais congela. Sprites ANIMADOS (strip vertical + .mcmeta, o jogo anima nativamente; chips e preview animado no Studio; agent ganha frames). 77/77 + 68/68. Release v0.5.11.*
 
 ---
 
@@ -1086,3 +1088,23 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: cargo 67/67 ✓ · vitest 77/77 ✓ · typecheck 0 ✓ · lint 0 errors (33) ✓ · vite build ✓ · **boot vivo 0 panics** ✓. Release **v0.5.10** (hotfix).
 
 **Lição permanente registrada**: commands Tauri com rede/disco/zip são SEMPRE `async` + `spawn_blocking` (impl síncrona separada para testes). Os outros commands pesados (server_backup, e2e de compilação) já rodam sob demanda do usuário, não em polling — revisão futura se algum entrar em loop.
+
+---
+
+## 45. Sessão 45 — A CLASSE inteira fora da main thread + sprites ANIMADOS
+
+**Bug report do dono**: "nada funciona — excluir projeto não consigo, criar servidor não consigo, qualquer coisa não consigo" + pedido de sprites estáticos/animados no Asset Studio.
+
+**Causa raiz (a classe completa)**: após o hotfix v0.5.10 mover os commands de POLLING pro pool, os commands de **AÇÃO** continuavam síncronos na main thread — e as ações todas faziam trabalho real:
+- `server_create`: **download do jar oficial (30-90s) na main thread** = "não consigo criar servidor" era a UI congelada no meio do download
+- `launcher_prepare` (**718MB+**), `tunnel_start/setup` (download do agente), snapshots (export/import/auto no boot), backups/restore, modpack export/import, shader packs, deploy, `modrinth_download`, `create_project` (template+git) — TODOS na main thread
+
+**Fix**: **13 commands** convertidos pra async + `spawn_blocking` (impls síncronas separadas, os testes continuam nos impls): server_create/backup/restore/deploy, launcher_prepare/copy_mod_jar, tunnel_start/setup, modrinth_download, modpack_export/import_into/update_manifest, shaders_create_pack/install_pack, workspace_export/import_snapshot, snapshot_auto_check. **A UI nunca mais congela por rede/disco** — a lição da S44 agora vale para 100% dos commands pesados.
+
+**Sprites ANIMADOS (vanilla-real)**: `generate_item_texture` ganha `frames` (1=estático; 2-8=animado): **strip vertical 16×16×N com onda de brilho entre os frames** + **`.png.mcmeta`** (`animation/frametime: 2`) escrito ao lado — **o jogo anima nativamente**. O Studio ganha chips **Static / ✨ Animated (4 frames)** e o **preview ANIMA** com CSS steps percorrendo o strip como o jogo faz. A tool do agent ganha o parâmetro com guidance (gemas mágicas, armas de energia, blocos que brilham).
+
+**Bugs caçados (6)**: overflow u8 na soma do pulso (u32); slice do strip com tamanho exato; frame_at com linha de 1px (16 linhas por frame); Reader do png sem campo height (info via reader); nota emendada sem newline (2×); anchor do Style real (bloco dentro de fragmento).
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (33) ✓ · vitest 77/77 ✓ · **cargo 68/68** (+1: strip 16×64, frames diferem, mcmeta com animação, estático 16×16) ✓ · vite build 1m36s ✓ · boot vivo 0 panics ✓. Release **v0.5.11**.
+
+**Regra permanente reforçada**: command Tauri com rede/disco = async + spawn_blocking, SEM exceção.
