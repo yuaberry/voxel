@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (46 sessões)
+## 5. Histórico de sessões (47 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 47 | Autonomia total | **Briefing docs** (.txt/.md/.pdf/.docx reais: docx unzipped, pdf-extract) lidos pelo agente; **Customize Server** (import world .zip atômico, estruturas .nbt com /place, **comandos customizados com mobs NBT + /convert → wallet chain**, plugins Paper do Modrinth); world setup no wizard; defaults de servidor nas settings; v0.6.0 | entidades decodificadas pelo pipeline (code points); routing do convert fora do gate; extensão antes do conteúdo |
 | 46 | Make it unbreakable | **Causa raiz do 2º "nada funciona"**: downloads podiam pendurar PARA SEMPRE (sem timeout total/retry) + app mudo com DB travado + servidor invisível se o row falhasse. Fixes: timeout 5min+retry+erros acionáveis; **diagnósticos reais** (Settings→Advanced, cada falha com o fix); **self-heal disco↔DB** (voxel-server.json + scan + reconcile); catálogo nunca-vazio; banner de emergência. **E2E do caminho async REAL** (download vivo ~10s) + v0.5.12 | ternário inexistente em Rust; expect_err exige Debug |
 | 45 | Classe async + sprites animados | **13 commands de ação → async+spawn_blocking** (server_create/launcher_prepare/túnel/snapshots/backups/modpacks/shaders/modrinth/create_project — a classe inteira fora da main thread) + **sprites ANIMADOS** (strip 16×16×N + .mcmeta, preview CSS steps, agent frames) + v0.5.11 | overflow u8; slices do strip; frame_at de 1 linha; Reader sem height; nota sem newline |
 | 44 | HOTFIX congelamento | **Causa raiz**: commands sync rodam na MAIN THREAD (Tauri 2) — server_ping 8-10s × série + polling = UI travada. 4 commands → async+spawn_blocking; polling paralelo e pausa com janela oculta + v0.5.10 | — |
@@ -262,13 +263,13 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 46, v0.5.12)
+## 8. Estado atual (verificado — Sessão 47, v0.6.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (72) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (77) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Rust unit (80) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Vitest (86) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -282,7 +283,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.5.12 (latest)** | Desktop: **downloads à prova de travamento (timeout+retry) + diagnósticos reais + self-heal disco↔DB + banner de emergência** + APK mobile 0.3.1 |
+| **v0.6.0 (latest)** | Desktop: **era de autonomia** — briefing docs próprios que o agente lê + Customize Server (worlds .zip, estruturas .nbt, comandos custom com mobs e /convert, plugins Paper) + defaults nas settings + APK mobile 0.3.1 |
+| v0.5.12 | Desktop: **downloads à prova de travamento (timeout+retry) + diagnósticos reais + self-heal disco↔DB + banner de emergência** + APK mobile 0.3.1 |
 | v0.5.11 | Desktop: **classe async completa (ações nunca congelam) + sprites animados** + APK mobile 0.3.1 |
 | v0.5.10 | Desktop: **HOTFIX congelamento da área de Servidores** + APK mobile 0.3.1 |
 | v0.5.9 | Desktop: **deploy projeto↔servidor + build elapsed + pt-BR amp** + APK mobile 0.3.1 |
@@ -320,7 +322,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 72 unit
+cd src-tauri && cargo test          # 80 unit
 cargo test --lib -- --ignored --nocapture # 11 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -1148,3 +1150,25 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (33) ✓ · vitest 77/77 ✓ · **cargo 72/72** (+4 unit: 3 diagnostics + disk scan) · **E2E async-path VERDE com download real** ✓ · vite build 1m36s ✓ · boot vivo 0 panics ✓. Release **v0.5.12**.
 
 **Para o dono**: baixar v0.5.12 → se QUALQUER coisa não funcionar, **Settings → Advanced → Run diagnostics** diz o que está quebrado NA MÁQUINA dele (com o fix ao lado) — ou o banner vermelho aparece sozinho se o banco estiver travado.
+
+---
+
+## 47. Sessão 47 — Autonomia total do usuário (briefing docs · worlds · structures · custom commands com mobs · plugins · defaults)
+
+**Pedido do dono**: "mais autonomia independente do cenário" — enviar arquivos próprios (.TXT/.MD/.PDF/.DOCX, "compatível com Google Drive") no momento de criar projeto/servidor; personalizar TUDO no servidor (terreno, construções); baixar mods/plugins prontos; importar construções; criar comandos próprios (ex.: `/convert` moeda minerável → wallet chain/pix); criar mundos/mobs/comandos; mais funções nas configurações.
+
+**Entregue (tudo REAL, nada fake)**:
+
+1. **Briefing documents** (`documents.rs` + `BriefingPicker` + contextService): o usuário traz os próprios arquivos e o texto é EXTRAÍDO DE VERDADE — txt/md direto; **docx** unzipped com os text runs de word/document.xml (entidades por code point — imune a qualquer pipeline de HTML-decode, descoberto na própria sessão); **PDF** parseado com a crate real `pdf-extract`. Testes constroem um DOCX real com a crate zip e um PDF real (objeto Helvetica + xref calculado). Briefings persistem como `.brief.md` em `.voxel/briefing/` (projeto e servidor), e o **system prompt do agente passa a injetá-los** como "USER BRIEFING DOCUMENTS — the user's words outrank generic conventions".
+2. **World setup no wizard + Customize Server**: seed, terreno (normal/large biomes/amplified/flat), dificuldade, generate-structures → direto no server.properties (overrides validados no Rust). Editor ao vivo das regras do servidor existente.
+3. **Import world (.zip)** (`server_import_world`): staging + swap atômico, mundo anterior guardado de lado (nunca destruído; se o swap falha, o antigo volta), zip-slip guarded, checa level.dat, caps 4GB/40k arquivos. **Import structures (.nbt)** (`server_import_structure`): validação de CONTEÚDO primeiro (gzip 1f8b ou compound 0x0a — arquivo sem extensão ainda funciona; bug de UX pescado pelo teste: extensão errada dava a mensagem menos útil), namespace sanitizado (dígito → prefixo), era pack_format lida dos packs do próprio servidor, comando `/place template` retornado pronto.
+4. **Custom Commands Studio** (`customCommands.ts` + 9 testes): o usuário desenha os próprios comandos `/trigger` — message/title/give/teleport/effect/sound, **summon de mobs com NBT real** (CustomName colorido, HandItems/ArmorItems, Attributes 1.20.1), custo em coins com gate de saldo, cooldown que ticka, e o **fluxo /convert** pedido pelo dono: tiers trocam a moeda minerável por tokens da wallet chain do usuário (debita com verificação, escreve intent `CONVERT` no log). O painel Economy ganha o intent (`ledger_tail_intents` com campo `kind`, parser finalmente testado: BUY+CONVERT, offset sem duplicatas, log rotacionado). Datapack espelha o padrão Token Chain (trigger+tick routing, reset de score). **2 bugs reais pescados pelos testes**: routing do convert nunca chegava à função gate; aviso de economia ausente sumia.
+5. **Plugins Paper** (Modrinth → `servers/<slug>/plugins/`): busca com facets loader=paper + install SHA-1-verified (`output_kind: "server_plugins"` no modrinth_download); vanilla recebe o aviso honesto.
+6. **Customize Server** (dialog 5 tabs: Briefing/World/Structures/Commands/Plugins) — botão Customize no card de cada servidor.
+7. **Settings → Minecraft**: defaults de RAM e porta do servidor — e o wizard agora LÊ o default de software que existia mas era ignorado (bug).
+
+**Bugs caçados (7)**: entidades XML decodificadas pelo meu próprio pipeline (→ code points); concat! com format!; unwrap_err exigindo Debug; validação de extensão antes do conteúdo; routing do convert fora do gate; aviso sem economia ausente; duplicate keys ptBR.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (35) ✓ · vitest **86/86** (+9 custom commands) ✓ · cargo **80/80** (+8: 5 documents + world/structure imports + tail intents; 11 E2E) ✓ · vite build 2m09s ✓ · boot vivo 0 panics ✓. Release **v0.6.0** (minor — era de autonomia).
+
+**Nota de compliance**: "compatível com Google Drive" = os formatos que o Drive/Docs exporta (txt/md/pdf/docx), sem integração com a API do Google (não pedida, sem OAuth novo).
