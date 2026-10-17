@@ -5,6 +5,9 @@ import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { DiagnosticsDialog } from "@/components/DiagnosticsDialog";
+import { Button } from "@/components/ui/button";
+import { Stethoscope } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useProjectsStore } from "@/stores/projectsStore";
 import { HomePage } from "@/features/home/HomePage";
@@ -22,6 +25,8 @@ import { SettingsPage } from "@/features/settings/SettingsPage";
 export default function App() {
   const loaded = useSettingsStore((s) => s.loaded);
   const hydrate = useSettingsStore((s) => s.hydrate);
+  const loadError = useSettingsStore((s) => s.loadError);
+  const basePath = useSettingsStore((s) => s.settings.storage.basePath);
   const accent = useSettingsStore((s) => s.settings.appearance.accent);
   const reduceMotion = useSettingsStore((s) => s.settings.appearance.reduceMotion);
 
@@ -167,7 +172,33 @@ export default function App() {
     <TooltipProvider delayDuration={200}>
       <HashRouter>
         {loaded ? (
-          <Routes>
+          <>
+            {/* Emergency banner: a failed settings load (dead/locked database)
+                used to leave the app silently broken — "nothing works". Now
+                it says WHAT is wrong and offers the real diagnosis. */}
+            {loadError ? (
+              <div className="fixed inset-x-0 top-0 z-[70] border-b border-destructive/50 bg-destructive/15 px-4 py-2 backdrop-blur-md">
+                <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2">
+                  <p className="min-w-0 text-[11px] leading-snug text-destructive">
+                    <span className="font-bold">Database problem: </span>
+                    <span className="break-words">
+                      your lists and settings cannot be saved right now ({loadError}).
+                      Creating servers/projects may still work — but nothing will be remembered.
+                    </span>
+                  </p>
+                  <DiagnosticsDialog
+                    basePath={basePath}
+                    trigger={
+                      <Button size="sm" variant="outline" className="shrink-0">
+                        <Stethoscope className="h-3.5 w-3.5" />
+                        Run diagnostics
+                      </Button>
+                    }
+                  />
+                </div>
+              </div>
+            ) : null}
+            <Routes>
             <Route element={<AppLayout />}>
               <Route index element={<HomePage />} />
               <Route path="projects" element={<ProjectsPage />} />
@@ -184,6 +215,7 @@ export default function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
+          </>
         ) : (
           <SplashScreen />
         )}

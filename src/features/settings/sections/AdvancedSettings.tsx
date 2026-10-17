@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DiagnosticsDialog } from "@/components/DiagnosticsDialog";
 import { getAppPaths, openInFileManager } from "@/services/storage/storageService";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { Field, InfoRow, SectionHeader } from "../SettingsBits";
 import type { AppPaths } from "@/types";
 
 export function AdvancedSettings() {
   const [paths, setPaths] = useState<AppPaths | null>(null);
+  const basePath = useSettingsStore((s) => s.settings.storage.basePath);
 
   useEffect(() => {
     getAppPaths()
@@ -20,6 +24,21 @@ export function AdvancedSettings() {
         title="Advanced"
         description="Diagnostics, database location and low-level paths."
       />
+
+      <Field
+        label="Self-diagnostics"
+        hint="If something doesn't work (creating servers, downloading jars, listing projects), this runs every real check — storage, database, Java and the official servers — and tells you exactly what is broken and how to fix it."
+      >
+        <DiagnosticsDialog
+          basePath={basePath}
+          trigger={
+            <Button variant="gradient" size="sm">
+              <Stethoscope className="h-3.5 w-3.5" />
+              Run diagnostics
+            </Button>
+          }
+        />
+      </Field>
 
       <Field
         label="Application paths"

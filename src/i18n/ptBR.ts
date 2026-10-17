@@ -190,4 +190,11 @@ export const ptBR: Record<string, string> = {
   "Custom": "Personalizado",
   "enabled": "ativado",
   "disabled": "desativado",
+  "Diagnostics": "Diagnóstico",
+  "Every check below runs for real on this machine — storage, database, Java and the official download servers. What's red is what's blocking you, with the fix next to it.": "Cada verificação abaixo roda de verdade nesta máquina — armazenamento, banco de dados, Java e os servidores oficiais de download. O que estiver vermelho é o que está bloqueando você, com a correção ao lado.",
+  "Running checks… (network probes take a few seconds)": "Rodando verificações… (as provas de rede levam alguns segundos)",
+  "Run again": "Rodar de novo",
+  "Checks start as soon as the dialog opens…": "As verificações começam assim que o diálogo abre…",
+  "Something not working? Run diagnostics": "Algo não está funcionando? Rode o diagnóstico",
+  "All green on this machine — if something still misbehaves, tell us the exact action and we hunt it.": "Tudo verde nesta máquina — se algo ainda falhar, diga a ação exata que a gente caça.",
 };
