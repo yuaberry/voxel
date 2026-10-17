@@ -176,7 +176,14 @@ fn zip_dir(writer: &mut zip::ZipWriter<fs::File>, dir: &Path, prefix: &str, opti
 }
 
 #[tauri::command]
-pub fn modpack_export(payload: ModpackExportPayload) -> Result<ModpackExportResult, String> {
+pub async fn modpack_export(payload: ModpackExportPayload) -> Result<ModpackExportResult, String> {
+    tauri::async_runtime::spawn_blocking(move || modpack_export_impl(payload))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn modpack_export_impl(payload: ModpackExportPayload) -> Result<ModpackExportResult, String> {
     let name = payload.name.trim();
     if name.is_empty() {
         return Err("Modpack name cannot be empty".to_string());
@@ -318,7 +325,18 @@ fn safe_zip_entry(name: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn modpack_import_into(
+pub async fn modpack_import_into(
+    storage_base: String,
+    zip_path: String,
+    instance_slug: String,
+) -> Result<ModpackImportResult, String> {
+    tauri::async_runtime::spawn_blocking(move || modpack_import_into_impl(storage_base, zip_path, instance_slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn modpack_import_into_impl(
     storage_base: String,
     zip_path: String,
     instance_slug: String,
@@ -906,7 +924,14 @@ pub struct ModpackManifestUpdate {
 }
 
 #[tauri::command]
-pub fn modpack_update_manifest(payload: ModpackManifestUpdate) -> Result<String, String> {
+pub async fn modpack_update_manifest(payload: ModpackManifestUpdate) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || modpack_update_manifest_impl(payload))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn modpack_update_manifest_impl(payload: ModpackManifestUpdate) -> Result<String, String> {
     let base = workspace_base(&payload.storage_base)?;
     let zip_name = safe_file_name(&payload.file_name)?;
     if payload.name.trim().is_empty() {
@@ -1005,7 +1030,7 @@ mod tests {
     #[test]
     fn exports_a_valid_manifest_and_files() {
         let base = fake_workspace("export");
-        let result = modpack_export(payload(&base)).unwrap();
+        let result = modpack_export_impl(payload(&base)).unwrap();
         assert_eq!(result.mod_count, 1);
         assert_eq!(result.shader_count, 1);
         assert!(result.zip_path.ends_with("dark-bundle-1.0.0.zip"), "{}", result.zip_path);
@@ -1045,24 +1070,24 @@ mod tests {
         let base = fake_workspace("guard");
         let mut p = payload(&base);
         p.mods[0].jar_file = "../escape.jar".to_string();
-        assert!(modpack_export(p).is_err());
+        assert!(modpack_export_impl(p).is_err());
 
         let mut p = payload(&base);
         p.mods[0].jar_file = "does-not-exist.jar".to_string();
-        assert!(modpack_export(p).is_err());
+        assert!(modpack_export_impl(p).is_err());
 
         let mut p = payload(&base);
         p.shader_packs = vec!["missing-pack".to_string()];
-        assert!(modpack_export(p).is_err());
+        assert!(modpack_export_impl(p).is_err());
         let _ = fs::remove_dir_all(&base);
     }
 
     #[test]
     fn imports_into_a_prepared_instance() {
         let base = fake_workspace("import");
-        let result = modpack_export(payload(&base)).unwrap();
+        let result = modpack_export_impl(payload(&base)).unwrap();
 
-        let imported = modpack_import_into(
+        let imported = modpack_import_into_impl(
             base.to_string_lossy().to_string(),
             result.zip_path.clone(),
             "dest".to_string(),
@@ -1194,7 +1219,7 @@ versionRange="[1.21,1.22)"
     #[test]
     fn library_lists_exported_packs_and_deletes_by_name() {
         let base = fake_workspace("library");
-        let result = modpack_export(payload(&base)).unwrap();
+        let result = modpack_export_impl(payload(&base)).unwrap();
 
         let list = modpack_list_impl(base.to_string_lossy().to_string()).unwrap();
         assert_eq!(list.len(), 1);
@@ -1220,10 +1245,10 @@ versionRange="[1.21,1.22)"
     #[test]
     fn manifest_editor_renames_and_preserves_contents() {
         let base = fake_workspace("editor");
-        modpack_export(payload(&base)).unwrap();
+        modpack_export_impl(payload(&base)).unwrap();
         let jar_before = std::fs::read(base.join("projects/dark-kingdom/build/libs/dark_kingdom-0.1.0.jar")).unwrap();
 
-        modpack_update_manifest(ModpackManifestUpdate {
+        modpack_update_manifest_impl(ModpackManifestUpdate {
             storage_base: base.to_string_lossy().to_string(),
             file_name: "dark-bundle-1.0.0.zip".to_string(),
             name: "Renamed Bundle".to_string(),
@@ -1257,13 +1282,13 @@ versionRange="[1.21,1.22)"
         assert!(readme.contains("# Renamed Bundle v2.0.0"));
 
         // editing a missing pack / bad names refused
-        assert!(modpack_update_manifest(ModpackManifestUpdate {
+        assert!(modpack_update_manifest_impl(ModpackManifestUpdate {
             storage_base: base.to_string_lossy().to_string(),
             file_name: "nope.zip".to_string(),
             name: "x".to_string(),
             version: "1".to_string(),
         }).is_err());
-        assert!(modpack_update_manifest(ModpackManifestUpdate {
+        assert!(modpack_update_manifest_impl(ModpackManifestUpdate {
             storage_base: base.to_string_lossy().to_string(),
             file_name: "../escape.zip".to_string(),
             name: "x".to_string(),
@@ -1276,7 +1301,7 @@ versionRange="[1.21,1.22)"
     fn import_refuses_unknown_zips_and_unprepared_instances() {
         let base = fake_workspace("refuse");
         // instance not prepared
-        let err = modpack_import_into(
+        let err = modpack_import_into_impl(
             base.to_string_lossy().to_string(),
             "/tmp/whatever.zip".to_string(),
             "no-such-instance".to_string(),
@@ -1290,7 +1315,7 @@ versionRange="[1.21,1.22)"
         w.start_file("random.txt", zip::write::SimpleFileOptions::default()).unwrap();
         w.write_all(b"hello").unwrap();
         w.finish().unwrap();
-        let err = modpack_import_into(
+        let err = modpack_import_into_impl(
             base.to_string_lossy().to_string(),
             plain.to_string_lossy().to_string(),
             "dest".to_string(),

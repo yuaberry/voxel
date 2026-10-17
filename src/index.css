@@ -241,3 +241,29 @@
   padding: 0.25rem 0.5rem;
   text-align: left;
 }
+
+/* Animated sprite preview: walks the vertical strip frame by frame,
+   exactly the way the game animates it in-game. */
+@keyframes voxel-sprite-frames {
+  from { background-position-y: 0%; }
+  to   { background-position-y: -400%; }
+}
+.voxel-anim-preview {
+  background-repeat: no-repeat;
+  background-position-y: 0%;
+  animation: voxel-sprite-frames steps(4) infinite;
+  image-rendering: pixelated;
+}
+
+/* Animated sprite preview: walks the vertical strip frame by frame,
+   exactly the way the game animates it in-game. */
+@keyframes voxel-sprite-frames {
+  from { background-position-y: 0%; }
+  to   { background-position-y: -400%; }
+}
+.voxel-anim-preview {
+  background-size: 100% 400%;
+  background-repeat: no-repeat;
+  animation: voxel-sprite-frames steps(4) infinite;
+  image-rendering: pixelated;
+}

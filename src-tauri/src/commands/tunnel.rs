@@ -54,7 +54,15 @@ pub struct TunnelSetup {
 /// (linux amd64). Returns the local path; `downloaded` tells whether the
 /// binary was fetched in this call.
 #[tauri::command]
-pub fn tunnel_setup(base_path: String) -> Result<TunnelSetup, String> {
+pub async fn tunnel_setup(base_path: String) -> Result<TunnelSetup, String> {
+    // downloads the playit.gg agent
+    tauri::async_runtime::spawn_blocking(move || tunnel_setup_impl(base_path))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn tunnel_setup_impl(base_path: String) -> Result<TunnelSetup, String> {
     let base = PathBuf::from(&base_path);
     let dir = tunnel_dir(&base);
     std::fs::create_dir_all(&dir).map_err(|e| format!("{e}"))?;
@@ -111,7 +119,22 @@ pub fn tunnel_setup(base_path: String) -> Result<TunnelSetup, String> {
 }
 
 #[tauri::command]
-pub fn tunnel_start(
+pub async fn tunnel_start(
+    app: tauri::AppHandle,
+    base_path: String,
+    slug: String,
+    local_port: u16,
+    secret: Option<String>,
+) -> Result<String, String> {
+    // downloads the agent on first use
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || tunnel_start_impl(app, base_path, slug, local_port, secret))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn tunnel_start_impl(
     app: tauri::AppHandle,
     base_path: String,
     slug: String,
@@ -123,7 +146,7 @@ pub fn tunnel_start(
         return Err("A tunnel is already running for this server".to_string());
     }
 
-    let setup = tunnel_setup(base_path)?;
+    let setup = tunnel_setup_impl(base_path)?;
     let agent = PathBuf::from(&setup.agent_path);
 
     let mut command = std::process::Command::new(&agent);

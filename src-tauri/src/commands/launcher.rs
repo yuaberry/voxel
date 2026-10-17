@@ -593,7 +593,22 @@ pub fn prepare_core(
 }
 
 #[tauri::command]
-pub fn launcher_prepare(
+pub async fn launcher_prepare(
+    app: AppHandle,
+    base_path: String,
+    project_slug: String,
+    mc_version: String,
+    loader_version: String,
+) -> Result<PrepareResult, String> {
+    // downloads 718MB+ — off the main thread or the UI freezes
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || launcher_prepare_impl(app, base_path, project_slug, mc_version, loader_version))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn launcher_prepare_impl(
     app: AppHandle,
     base_path: String,
     project_slug: String,
@@ -656,7 +671,18 @@ fn extract_zip_to(archive: &Path, dest: &Path) -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub fn launcher_copy_mod_jar(
+pub async fn launcher_copy_mod_jar(
+    base_path: String,
+    project_slug: String,
+    project_rel: String,
+) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || launcher_copy_mod_jar_impl(base_path, project_slug, project_rel))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn launcher_copy_mod_jar_impl(
     base_path: String,
     project_slug: String,
     project_rel: String,

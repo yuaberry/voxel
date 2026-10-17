@@ -86,6 +86,8 @@ pub struct TextureGenPayload {
     pub secondary: String,
     /// "item" (textures/item) or "block" (textures/block)
     pub asset_kind: Option<String>,
+    /// 1 = static; 2-8 = ANIMATED (vertical strip + .png.mcmeta — vanilla animates it)
+    pub frames: Option<u32>,
     /// preview returns base64 only — nothing is written
     pub preview_only: bool,
 }
@@ -145,8 +147,13 @@ pub struct Canvas {
 
 impl Canvas {
     pub fn new() -> Self {
+        Canvas::new_with_height(1)
+    }
+
+    /// A vertical strip of `frames` 16x16 frames (vanilla animated-sprite format).
+    pub fn new_with_height(frames: usize) -> Self {
         Canvas {
-            px: vec![(0, 0, 0, 0); (TEXTURE_SIZE * TEXTURE_SIZE) as usize],
+            px: vec![(0, 0, 0, 0); (TEXTURE_SIZE * TEXTURE_SIZE) as usize * frames.max(1)],
         }
     }
     pub fn put(&mut self, x: i32, y: i32, c: Rgba) {
@@ -424,6 +431,53 @@ fn render_block(
     pt.img
 }
 
+/// One frame of a style with the animated pulse applied (a gentle shine
+/// wave — the same energy vanilla sprites animate with).
+fn render_frame(
+    style: ItemStyleKind,
+    primary: (u8, u8, u8),
+    secondary: (u8, u8, u8),
+    frame: usize,
+    frame_count: usize,
+) -> Canvas {
+    let mut canvas = render(style, primary, secondary);
+    if frame_count <= 1 {
+        return canvas;
+    }
+    // shine wave: brightest at the middle of the strip loop
+    let phase = std::f32::consts::TAU * frame as f32 / frame_count as f32;
+    let pulse = 1.0 + 0.14 * (phase - std::f32::consts::FRAC_PI_2).sin();
+    for px in canvas.px.iter_mut() {
+        let (r, g, b, a) = *px;
+        if a == 0 {
+            continue; // transparent stays
+        }
+        // outline darkens less, highlights breathe the most
+        let brightness = if (r as u32 + g as u32 + b as u32) < 90 { 1.0 + 0.05 * (pulse - 1.0) } else { pulse };
+        let f = |v: u8| (v as f32 * brightness).clamp(0.0, 255.0) as u8;
+        *px = (f(r), f(g), f(b), a);
+    }
+    canvas
+}
+
+/// The full animated strip: N frames stacked vertically (vanilla format),
+/// plus the .mcmeta the game reads to animate it.
+fn render_strip(
+    style: ItemStyleKind,
+    primary: (u8, u8, u8),
+    secondary: (u8, u8, u8),
+    frames: usize,
+) -> Canvas {
+    let mut strip = Canvas::new_with_height(frames);
+    for frame in 0..frames {
+        let canvas = render_frame(style, primary, secondary, frame, frames);
+        let start = frame * (TEXTURE_SIZE * TEXTURE_SIZE) as usize;
+        strip.px[start..start + (TEXTURE_SIZE * TEXTURE_SIZE) as usize]
+            .copy_from_slice(&canvas.px);
+    }
+    strip
+}
+
 fn render(style: ItemStyleKind, primary: (u8, u8, u8), secondary: (u8, u8, u8)) -> Canvas {
     if matches!(
         style,
@@ -685,9 +739,10 @@ fn render(style: ItemStyleKind, primary: (u8, u8, u8), secondary: (u8, u8, u8)) 
 }
 
 fn png_bytes(img: &Canvas) -> Result<Vec<u8>, String> {
+    let height = (img.px.len() / TEXTURE_SIZE as usize) as u32;
     let mut buf = Vec::new();
     {
-        let mut encoder = png::Encoder::new(&mut buf, TEXTURE_SIZE, TEXTURE_SIZE);
+        let mut encoder = png::Encoder::new(&mut buf, TEXTURE_SIZE, height.max(1));
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
         let mut writer = encoder
@@ -742,10 +797,15 @@ pub fn generate_item_texture(payload: TextureGenPayload) -> Result<TextureGenRes
     }
     let primary = parse_hex(&payload.primary)?;
     let secondary = parse_hex(&payload.secondary)?;
+    let frames = payload.frames.unwrap_or(1).clamp(1, 8);
     safe_id(&payload.mod_id).map_err(|e| format!("mod_id: {e}"))?;
     safe_id(&payload.item_id).map_err(|e| format!("item_id: {e}"))?;
 
-    let img = render(style, primary, secondary);
+    let img = if frames > 1 {
+        render_strip(style, primary, secondary, frames as usize)
+    } else {
+        render(style, primary, secondary)
+    };
     let bytes = png_bytes(&img)?;
     let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
 
@@ -771,6 +831,14 @@ pub fn generate_item_texture(payload: TextureGenPayload) -> Result<TextureGenRes
                 .map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
         }
         std::fs::write(&target, &bytes).map_err(|e| format!("Failed to write texture: {e}"))?;
+        if frames > 1 {
+            let mcmeta = format!(
+                "{{\n  \"animation\": {{ \"frametime\": 2 }}\n}}\n"
+            );
+            let mcmeta_path = target.with_file_name(format!("{}.png.mcmeta", payload.item_id));
+            std::fs::write(&mcmeta_path, mcmeta)
+                .map_err(|e| format!("Failed to write animation mcmeta: {e}"))?;
+        }
         Some(target.to_string_lossy().to_string())
     };
 
@@ -794,6 +862,7 @@ mod tests {
             primary: "#9155ff".to_string(),
             secondary: "#7ee8fa".to_string(),
             asset_kind: None,
+            frames: None,
             preview_only: preview,
         }
     }
@@ -898,6 +967,55 @@ mod tests {
         p.storage_base = base.to_string_lossy().to_string();
         p.asset_kind = Some("armor".to_string());
         assert!(generate_item_texture(p).is_err());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn animated_sprites_ship_a_vertical_strip_and_the_mcmeta() {
+        let base = std::env::temp_dir().join(format!("voxel-anim-{}", std::process::id()));
+        std::fs::create_dir_all(&base).unwrap();
+        fake_project(&base);
+
+        let mut p = payload("gem", false);
+        p.storage_base = base.to_string_lossy().to_string();
+        p.frames = Some(4);
+        p.item_id = "pulsing_gem".to_string();
+        let result = generate_item_texture(p).unwrap();
+
+        // the PNG is a 16x64 vertical strip (4 frames of 16x16)
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(&result.png_base64)
+            .unwrap();
+        let decoder = png::Decoder::new(std::io::Cursor::new(&bytes));
+        let mut reader = decoder.read_info().unwrap();
+        assert_eq!(reader.info().width, 16);
+        assert_eq!(reader.info().height, 64);
+
+        // the .mcmeta tells the game to animate at frametime 2
+        let wrote = result.wrote_path.unwrap();
+        let mcmeta_path = std::path::PathBuf::from(&wrote)
+            .with_file_name("pulsing_gem.png.mcmeta");
+        let mcmeta = std::fs::read_to_string(&mcmeta_path).unwrap();
+        assert!(mcmeta.contains("\"animation\""));
+        assert!(mcmeta.contains("\"frametime\": 2"));
+
+        // frames differ (the pulse must actually move) and static stays 16x16
+        let decoder2 = png::Decoder::new(std::io::Cursor::new(&bytes));
+        let mut reader2 = decoder2.read_info().unwrap();
+        let mut raw = vec![0u8; reader2.output_buffer_size().unwrap()];
+        reader2.next_frame(&mut raw).unwrap();
+        let frame_at = |i: usize| &raw[i * 16 * 16 * 4..(i + 1) * 16 * 16 * 4];
+        assert_ne!(frame_at(0), frame_at(2), "frame 0 and frame 2 must differ (the pulse moves)");
+
+        let mut p = payload("gem", true);
+        p.storage_base = base.to_string_lossy().to_string();
+        p.frames = None;
+        let result = generate_item_texture(p).unwrap();
+        let bytes = base64::engine::general_purpose::STANDARD.decode(&result.png_base64).unwrap();
+        let decoder = png::Decoder::new(std::io::Cursor::new(&bytes));
+        let reader_info = decoder.read_info().map(|r| r.info().clone()).unwrap();
+        assert_eq!(reader_info.height, 16, "static stays 16x16");
+
         let _ = std::fs::remove_dir_all(&base);
     }
 

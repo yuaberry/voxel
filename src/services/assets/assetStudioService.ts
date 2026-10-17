@@ -35,6 +35,8 @@ export interface TextureGenRequest {
   primary: string;
   secondary: string;
   assetKind: AssetKind;
+  /** 1 = static; 2-8 = animated (vanilla strip + .png.mcmeta) */
+  frames: number;
   previewOnly: boolean;
 }
 

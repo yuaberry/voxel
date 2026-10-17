@@ -294,7 +294,14 @@ fn zip_tree<W: std::io::Write + std::io::Seek>(
 }
 
 #[tauri::command]
-pub fn workspace_export_snapshot(base_path: String) -> Result<WorkspaceSnapshotResult, String> {
+pub async fn workspace_export_snapshot(base_path: String) -> Result<WorkspaceSnapshotResult, String> {
+    tauri::async_runtime::spawn_blocking(move || workspace_export_snapshot_impl(base_path))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn workspace_export_snapshot_impl(base_path: String) -> Result<WorkspaceSnapshotResult, String> {
     use std::io::Write as _;
     let base = std::path::PathBuf::from(&base_path)
         .canonicalize()
@@ -377,7 +384,7 @@ mod snapshot_tests {
         std::fs::write(base.join("modpacks/bundle.zip"), b"PK").unwrap();
         std::fs::write(base.join("instances/huge/client.jar"), b"HUGE PRODUCT").unwrap();
 
-        let result = workspace_export_snapshot(base.to_string_lossy().to_string()).unwrap();
+        let result = workspace_export_snapshot_impl(base.to_string_lossy().to_string()).unwrap();
         assert_eq!(result.projects, 1);
         assert_eq!(result.shader_packs, 1);
         assert_eq!(result.modpacks, 1);
@@ -416,7 +423,17 @@ pub struct WorkspaceRestoreResult {
 }
 
 #[tauri::command]
-pub fn workspace_import_snapshot(
+pub async fn workspace_import_snapshot(
+    base_path: String,
+    zip_path: String,
+) -> Result<WorkspaceRestoreResult, String> {
+    tauri::async_runtime::spawn_blocking(move || workspace_import_snapshot_impl(base_path, zip_path))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn workspace_import_snapshot_impl(
     base_path: String,
     zip_path: String,
 ) -> Result<WorkspaceRestoreResult, String> {
@@ -510,13 +527,13 @@ mod restore_tests {
     #[test]
     fn restore_round_trips_and_never_overwrites() {
         let base = workspace_with_assets("full");
-        let snap = workspace_export_snapshot(base.to_string_lossy().to_string()).unwrap();
+        let snap = workspace_export_snapshot_impl(base.to_string_lossy().to_string()).unwrap();
 
         // fresh workspace: everything restores
         let fresh = std::env::temp_dir().join(format!("voxel-restore-fresh-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&fresh);
         std::fs::create_dir_all(&fresh).unwrap();
-        let result = workspace_import_snapshot(fresh.to_string_lossy().to_string(), snap.zip_path.clone()).unwrap();
+        let result = workspace_import_snapshot_impl(fresh.to_string_lossy().to_string(), snap.zip_path.clone()).unwrap();
         assert!(result.restored.contains(&"projects/kingdom/src/Main.java".to_string()));
         assert!(result.restored.contains(&"shaderpacks/cool/style/composite.fsh".to_string()));
         assert!(result.restored.contains(&"modpacks/bundle.zip".to_string()));
@@ -529,7 +546,7 @@ mod restore_tests {
         // same workspace again: everything is skipped, NOTHING overwritten
         let mut king = fresh.join("projects/kingdom/src/Main.java");
         std::fs::write(&king, b"NEWER LOCAL WORK").unwrap();
-        let result = workspace_import_snapshot(fresh.to_string_lossy().to_string(), snap.zip_path.clone()).unwrap();
+        let result = workspace_import_snapshot_impl(fresh.to_string_lossy().to_string(), snap.zip_path.clone()).unwrap();
         assert!(result.restored.is_empty());
         assert!(result.skipped.contains(&"projects/kingdom/src/Main.java".to_string()));
         assert_eq!(std::fs::read_to_string(&king).unwrap(), "NEWER LOCAL WORK");
@@ -552,7 +569,7 @@ mod restore_tests {
         use std::io::Write as _;
         w.write_all(b"hello").unwrap();
         w.finish().unwrap();
-        assert!(workspace_import_snapshot(base.to_string_lossy().to_string(), foreign.to_string_lossy().to_string()).is_err());
+        assert!(workspace_import_snapshot_impl(base.to_string_lossy().to_string(), foreign.to_string_lossy().to_string()).is_err());
 
         // a snapshot with an unexpected section is refused
         let sneaky = base.join("sneaky.zip");
@@ -563,7 +580,7 @@ mod restore_tests {
         w.start_file("instances/evil.jar", zip::write::SimpleFileOptions::default()).unwrap();
         w.write_all(b"x").unwrap();
         w.finish().unwrap();
-        assert!(workspace_import_snapshot(base.to_string_lossy().to_string(), sneaky.to_string_lossy().to_string()).is_err());
+        assert!(workspace_import_snapshot_impl(base.to_string_lossy().to_string(), sneaky.to_string_lossy().to_string()).is_err());
 
         let _ = std::fs::remove_dir_all(&base);
     }
@@ -612,7 +629,18 @@ fn write_last_auto(base: &std::path::Path) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn snapshot_auto_check(
+pub async fn snapshot_auto_check(
+    base_path: String,
+    cadence_days: u32,
+) -> Result<AutoSnapshotCheck, String> {
+    // runs at boot — the whole snapshot happens here, it must be off-thread
+    tauri::async_runtime::spawn_blocking(move || snapshot_auto_check_impl(base_path, cadence_days))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn snapshot_auto_check_impl(
     base_path: String,
     cadence_days: u32,
 ) -> Result<AutoSnapshotCheck, String> {
@@ -652,7 +680,7 @@ pub fn snapshot_auto_check(
         });
     }
 
-    let created = workspace_export_snapshot(base_path)?;
+    let created = workspace_export_snapshot_impl(base_path)?;
     write_last_auto(&base)?;
     Ok(AutoSnapshotCheck {
         created: Some(created),
@@ -679,17 +707,17 @@ mod auto_tests {
         let bp = base.to_string_lossy().to_string();
 
         // never ran + daily cadence -> fires now
-        let check = snapshot_auto_check(bp.clone(), 1).unwrap();
+        let check = snapshot_auto_check_impl(bp.clone(), 1).unwrap();
         assert!(check.created.is_some());
         assert!(base.join("backups/snapshots/last-auto.json").is_file());
 
         // immediately again -> not due, reports remaining hours
-        let check = snapshot_auto_check(bp.clone(), 1).unwrap();
+        let check = snapshot_auto_check_impl(bp.clone(), 1).unwrap();
         assert!(check.created.is_none());
         assert_eq!(check.next_due_in_hours, Some(24));
 
         // cadence off -> never due
-        let check = snapshot_auto_check(bp.clone(), 0).unwrap();
+        let check = snapshot_auto_check_impl(bp.clone(), 0).unwrap();
         assert!(check.created.is_none());
         assert!(check.next_due_in_hours.is_none());
 
@@ -699,7 +727,7 @@ mod auto_tests {
             serde_json::json!({ "at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() - 2 * 86400 }).to_string(),
         )
         .unwrap();
-        let check = snapshot_auto_check(bp.clone(), 7).unwrap();
+        let check = snapshot_auto_check_impl(bp.clone(), 7).unwrap();
         assert!(check.created.is_none(), "2 days < 7 day cadence");
 
         std::fs::write(
@@ -707,7 +735,7 @@ mod auto_tests {
             serde_json::json!({ "at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() - 8 * 86400 }).to_string(),
         )
         .unwrap();
-        let check = snapshot_auto_check(bp, 7).unwrap();
+        let check = snapshot_auto_check_impl(bp, 7).unwrap();
         assert!(check.created.is_some(), "8 days > 7 day cadence");
 
         let _ = std::fs::remove_dir_all(&base);

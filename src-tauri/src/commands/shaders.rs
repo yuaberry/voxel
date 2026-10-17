@@ -114,7 +114,18 @@ fn copy_tree(root: &Path, src: &Path, dest: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn shaders_create_pack(
+pub async fn shaders_create_pack(
+    base_path: String,
+    slug: String,
+    files: Vec<ShaderPackFile>,
+) -> Result<ShaderPackInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || shaders_create_pack_impl(base_path, slug, files))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn shaders_create_pack_impl(
     base_path: String,
     slug: String,
     files: Vec<ShaderPackFile>,
@@ -240,7 +251,18 @@ pub fn shaders_delete_pack(base_path: String, slug: String) -> Result<(), String
 }
 
 #[tauri::command]
-pub fn shaders_install_pack(
+pub async fn shaders_install_pack(
+    base_path: String,
+    instance_slug: String,
+    pack_slug: String,
+) -> Result<ShaderInstallResult, String> {
+    tauri::async_runtime::spawn_blocking(move || shaders_install_pack_impl(base_path, instance_slug, pack_slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn shaders_install_pack_impl(
     base_path: String,
     instance_slug: String,
     pack_slug: String,
@@ -338,7 +360,7 @@ mod tests {
     #[test]
     fn create_list_and_delete_roundtrip() {
         let base = base("roundtrip");
-        let info = shaders_create_pack(
+        let info = shaders_create_pack_impl(
             base.to_string_lossy().to_string(),
             "my-pack".into(),
             glsl_files(),
@@ -365,7 +387,7 @@ mod tests {
             path: "shaders/../../escape.txt".into(),
             content: "x".into(),
         });
-        assert!(shaders_create_pack(
+        assert!(shaders_create_pack_impl(
             base.to_string_lossy().to_string(),
             "evil".into(),
             evil
@@ -377,7 +399,7 @@ mod tests {
             path: "shaders/payload.exe".into(),
             content: "x".into(),
         });
-        assert!(shaders_create_pack(
+        assert!(shaders_create_pack_impl(
             base.to_string_lossy().to_string(),
             "exe".into(),
             exe
@@ -392,10 +414,10 @@ mod tests {
     fn duplicate_pack_is_refused_and_original_survives() {
         let base = base("dup");
         let args = base.to_string_lossy().to_string();
-        shaders_create_pack(args.clone(), "dup-pack".into(), glsl_files()).unwrap();
+        shaders_create_pack_impl(args.clone(), "dup-pack".into(), glsl_files()).unwrap();
 
         // Packs are immutable — a second create over the same slug is refused
-        let second = shaders_create_pack(args, "dup-pack".into(), glsl_files());
+        let second = shaders_create_pack_impl(args, "dup-pack".into(), glsl_files());
         assert!(second.is_err());
         assert!(base.join("shaderpacks/dup-pack/voxel.json").is_file());
         assert_eq!(
@@ -409,22 +431,22 @@ mod tests {
     fn install_requires_prepared_instance_and_copies_tree() {
         let base = base("install");
         let args = base.to_string_lossy().to_string();
-        shaders_create_pack(args.clone(), "pack-a".into(), glsl_files()).unwrap();
+        shaders_create_pack_impl(args.clone(), "pack-a".into(), glsl_files()).unwrap();
 
         // Unprepared instance is refused
         std::fs::create_dir_all(base.join("instances/bare")).unwrap();
-        assert!(shaders_install_pack(args.clone(), "bare".into(), "pack-a".into()).is_err());
+        assert!(shaders_install_pack_impl(args.clone(), "bare".into(), "pack-a".into()).is_err());
 
         // Prepared instance (options.txt marker, launcher bootstrap) works
         let inst = base.join("instances/ready");
         std::fs::create_dir_all(inst.join("shaderpacks")).unwrap();
         std::fs::write(inst.join("options.txt"), "version:612\n").unwrap();
-        let result = shaders_install_pack(args.clone(), "ready".into(), "pack-a".into()).unwrap();
+        let result = shaders_install_pack_impl(args.clone(), "ready".into(), "pack-a".into()).unwrap();
         assert!(result.installed_path.contains("shaderpacks"));
         assert!(inst.join("shaderpacks/pack-a/shaders/composite.vsh").is_file());
 
         // Re-install is refused
-        assert!(shaders_install_pack(args.clone(), "ready".into(), "pack-a".into()).is_err());
+        assert!(shaders_install_pack_impl(args.clone(), "ready".into(), "pack-a".into()).is_err());
 
         // Instance listing only reports prepared ones
         let instances = shaders_list_instances(args).unwrap();

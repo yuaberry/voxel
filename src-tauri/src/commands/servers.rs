@@ -176,7 +176,28 @@ pub struct ServerSetupResult {
 }
 
 #[tauri::command]
-pub fn server_create(
+pub async fn server_create(
+    base_path: String,
+    slug: String,
+    name: String,
+    software: String,
+    mc_version: String,
+    port: u16,
+    ram_mb: u32,
+    accept_eula: bool,
+    properties: Option<std::collections::HashMap<String, String>>,
+) -> Result<ServerSetupResult, String> {
+    // The jar download (official Mojang/Paper endpoints) can take 30-90s —
+    // it MUST run off the main thread or the whole app freezes (owner report)
+    tauri::async_runtime::spawn_blocking(move || server_create_impl(
+        base_path, slug, name, software, mc_version, port, ram_mb, accept_eula, properties,
+    ))
+    .await
+    .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn server_create_impl(
     base_path: String,
     slug: String,
     name: String,
@@ -384,7 +405,14 @@ pub struct BackupInfo {
 }
 
 #[tauri::command]
-pub fn server_backup(base_path: String, slug: String) -> Result<BackupInfo, String> {
+pub async fn server_backup(base_path: String, slug: String) -> Result<BackupInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || server_backup_impl(base_path, slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn server_backup_impl(base_path: String, slug: String) -> Result<BackupInfo, String> {
     let base = Path::new(&base_path);
     let dir = server_dir(base, &slug);
     if !dir.is_dir() {
@@ -498,7 +526,14 @@ pub fn server_list_backups(base_path: String, slug: String) -> Result<Vec<Backup
 
 /// Restores a backup (zip) into the server directory — zip-slip guarded.
 #[tauri::command]
-pub fn server_restore(base_path: String, slug: String, backup_path: String) -> Result<(), String> {
+pub async fn server_restore(base_path: String, slug: String, backup_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || server_restore_impl(base_path, slug, backup_path))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn server_restore_impl(base_path: String, slug: String, backup_path: String) -> Result<(), String> {
     if process::is_running(&format!("server/{slug}")) {
         return Err("Stop the server before restoring".to_string());
     }
@@ -825,7 +860,14 @@ fn copy_tree(src: &std::path::Path, dst: &std::path::Path, count: &mut usize) ->
 }
 
 #[tauri::command]
-pub fn project_deploy_datapack(payload: ProjectDeployPayload) -> Result<ProjectDeployResult, String> {
+pub async fn project_deploy_datapack(payload: ProjectDeployPayload) -> Result<ProjectDeployResult, String> {
+    tauri::async_runtime::spawn_blocking(move || project_deploy_datapack_impl(payload))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn project_deploy_datapack_impl(payload: ProjectDeployPayload) -> Result<ProjectDeployResult, String> {
     let base = std::path::PathBuf::from(&payload.storage_base)
         .canonicalize()
         .map_err(|e| format!("Storage base not accessible: {e}"))?;
@@ -945,7 +987,7 @@ mod unit_tests {
         let dir = server_dir(&base, "info-server");
         let _ = std::fs::remove_dir_all(&dir);
 
-        let result = server_create(
+        let result = server_create_impl(
             base.to_string_lossy().to_string(),
             "info-server".to_string(),
             "Info Server".to_string(),
@@ -1075,7 +1117,7 @@ mod unit_tests {
             project_slug: "kingdom".to_string(),
             server_slug: "arena".to_string(),
         };
-        let result = project_deploy_datapack(payload).unwrap();
+        let result = project_deploy_datapack_impl(payload).unwrap();
         assert!(result.files_copied >= 3); // pack.mcmeta + nbt + json
         assert!(result.has_structures);
         assert!(result.has_dimensions);
@@ -1093,7 +1135,7 @@ mod unit_tests {
 
         // re-deploy replaces atomically, no staging leftovers
         std::fs::write(data.join("structures/watch_post.nbt"), b"PK-nbt-v2").unwrap();
-        project_deploy_datapack(ProjectDeployPayload {
+        project_deploy_datapack_impl(ProjectDeployPayload {
             storage_base: base.to_string_lossy().to_string(),
             project_slug: "kingdom".to_string(),
             server_slug: "arena".to_string(),
@@ -1113,7 +1155,7 @@ mod unit_tests {
 
         // a project without a datapack is honestly refused
         std::fs::create_dir_all(base.join("projects/empty/src/main/resources")).unwrap();
-        assert!(project_deploy_datapack(ProjectDeployPayload {
+        assert!(project_deploy_datapack_impl(ProjectDeployPayload {
             storage_base: base.to_string_lossy().to_string(),
             project_slug: "empty".to_string(),
             server_slug: "arena".to_string(),
@@ -1162,7 +1204,7 @@ mod e2e_tests {
         // 1. create — downloads and verifies the official jar
         let mut style_props = std::collections::HashMap::new();
         style_props.insert("motd".to_string(), "E2E styled".to_string());
-        let setup = server_create(
+        let setup = server_create_impl(
             base.clone(),
             slug.to_string(),
             "E2E Test Server".to_string(),
@@ -1253,9 +1295,9 @@ mod e2e_tests {
         assert!(dir.join("world/level.dat").is_file(), "world must exist");
 
         // 4. backup + 5. restore
-        let backup = server_backup(base.clone(), slug.to_string()).expect("backup");
+        let backup = server_backup_impl(base.clone(), slug.to_string()).expect("backup");
         assert!(PathBuf::from(&backup.path).is_file());
-        server_restore(base.clone(), slug.to_string(), backup.path.clone())
+        server_restore_impl(base.clone(), slug.to_string(), backup.path.clone())
             .expect("restore");
 
         // 6. delete

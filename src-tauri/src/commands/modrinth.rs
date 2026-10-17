@@ -76,7 +76,15 @@ fn safe_mod_file_name(name: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn modrinth_download(payload: ModrinthDownloadPayload) -> Result<ModrinthDownloadResult, String> {
+pub async fn modrinth_download(payload: ModrinthDownloadPayload) -> Result<ModrinthDownloadResult, String> {
+    // downloads mod jars — off the main thread
+    tauri::async_runtime::spawn_blocking(move || modrinth_download_impl(payload))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn modrinth_download_impl(payload: ModrinthDownloadPayload) -> Result<ModrinthDownloadResult, String> {
     if !is_modrinth_cdn_url(&payload.url) {
         return Err(format!(
             "Only https files from {ALLOWED_HOST} are accepted (got: {})",
@@ -184,7 +192,7 @@ mod tests {
             sha1,
             file_name,
         };
-        let result = modrinth_download(payload).unwrap();
+        let result = modrinth_download_impl(payload).unwrap();
         assert!(result.sha1_verified);
         assert!(result.bytes > 100_000, "fabric-api jar should be substantial: {}", result.bytes);
         assert!(result.file_path.ends_with(".jar"));

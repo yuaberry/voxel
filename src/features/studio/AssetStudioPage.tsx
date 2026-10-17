@@ -66,6 +66,7 @@ export function AssetStudioPage() {
   const [itemId, setItemId] = useState("darksteel_ingot");
   const [tab, setTab] = useState<StudioTab>("item");
   const [style, setStyle] = useState<ItemStyle>("sword");
+  const [frames, setFrames] = useState(1);
   const [primary, setPrimary] = useState("#5a6a94");
   const [secondary, setSecondary] = useState("#7ee8fa");
   const [preview, setPreview] = useState<string | null>(null);
@@ -133,6 +134,7 @@ export function AssetStudioPage() {
           primary,
           secondary,
           assetKind: tab as AssetKind,
+          frames,
           previewOnly: true,
         });
         if (!cancelled) setPreview(result.pngBase64);
@@ -149,7 +151,7 @@ export function AssetStudioPage() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [tab, basePath, project, itemId, activeStyle, primary, secondary]);
+  }, [tab, basePath, project, itemId, activeStyle, primary, secondary, frames]);
 
   // ---------------- structure preview ----------------
   useEffect(() => {
@@ -195,6 +197,7 @@ export function AssetStudioPage() {
         primary,
         secondary,
         assetKind: tab as AssetKind,
+        frames,
         previewOnly: false,
       });
       setWrotePath(result.wrotePath);
@@ -300,7 +303,9 @@ export function AssetStudioPage() {
             ? "structure · .nbt"
             : tab === "world"
               ? "dimension · datapack"
-              : "16x16 · vanilla-style"}
+              : frames > 1
+                ? `16x16 · animated (${frames} frames + .mcmeta)`
+                : "16x16 · vanilla-style"}
         </Badge>
       </header>
 
@@ -381,12 +386,22 @@ export function AssetStudioPage() {
                     </div>
                   )
                 ) : preview ? (
-                  <img
-                    src={`data:image/png;base64,${preview}`}
-                    alt="Texture preview"
-                    className="h-40 w-40"
-                    style={{ imageRendering: "pixelated" }}
-                  />
+                  frames > 1 ? (
+                    <div
+                      className="voxel-anim-preview h-40 w-40"
+                      style={{
+                        backgroundImage: `url(data:image/png;base64,${preview})`,
+                        animationDuration: `${frames * 0.25}s`,
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={`data:image/png;base64,${preview}`}
+                      alt="Texture preview"
+                      className="h-40 w-40"
+                      style={{ imageRendering: "pixelated" }}
+                    />
+                  )
                 ) : (
                   <div className="flex h-40 w-40 items-center justify-center text-muted-foreground">
                     <Eye className="h-8 w-8 opacity-40" />
@@ -591,6 +606,32 @@ export function AssetStudioPage() {
                 </>
               ) : (
                 <>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFrames(1)}
+                      className={
+                        "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all active:scale-[0.96] " +
+                        (frames === 1
+                          ? "border-primary/70 bg-primary/15 text-primary shadow-[0_0_10px_rgba(145,85,255,0.2)]"
+                          : "border-border/70 text-muted-foreground hover:border-primary/40")
+                      }
+                    >
+                      Static
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFrames(4)}
+                      className={
+                        "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all active:scale-[0.96] " +
+                        (frames > 1
+                          ? "border-primary/70 bg-primary/15 text-primary shadow-[0_0_10px_rgba(145,85,255,0.2)]"
+                          : "border-border/70 text-muted-foreground hover:border-primary/40")
+                      }
+                    >
+                      ✨ Animated (4 frames)
+                    </button>
+                  </div>
                   <div className="space-y-2">
                     <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                       Style

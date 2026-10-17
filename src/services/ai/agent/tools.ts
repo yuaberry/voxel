@@ -383,6 +383,11 @@ export function buildTools(): ToolExecutor[] {
               type: "string",
               description: "'item' (default) or 'block' — must match the style recipes",
             },
+            frames: {
+              type: "number",
+              description:
+                "1 = static sprite (default). 2-8 = ANIMATED: a vertical strip with a shine pulse plus the .png.mcmeta the game animates. Use for magic gems, energy weapons, glowing blocks.",
+            },
           },
           required: ["item_id", "style", "primary", "secondary"],
         },
@@ -406,6 +411,8 @@ export function buildTools(): ToolExecutor[] {
             typeof args.asset_kind === "string" && args.asset_kind.trim().length > 0
               ? (args.asset_kind.trim() as TextureGenRequest["assetKind"])
               : "item",
+          frames:
+            typeof args.frames === "number" ? Math.min(8, Math.max(1, Math.floor(args.frames))) : 1,
           previewOnly: false,
         });
         return `Texture written: ${result.wrotePath ?? "unknown"} (16x16 pixel art, ${String(args.asset_kind ?? "item")} style ${String(args.style)})`;
