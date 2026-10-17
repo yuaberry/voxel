@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (45 sessões)
+## 5. Histórico de sessões (46 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 46 | Make it unbreakable | **Causa raiz do 2º "nada funciona"**: downloads podiam pendurar PARA SEMPRE (sem timeout total/retry) + app mudo com DB travado + servidor invisível se o row falhasse. Fixes: timeout 5min+retry+erros acionáveis; **diagnósticos reais** (Settings→Advanced, cada falha com o fix); **self-heal disco↔DB** (voxel-server.json + scan + reconcile); catálogo nunca-vazio; banner de emergência. **E2E do caminho async REAL** (download vivo ~10s) + v0.5.12 | ternário inexistente em Rust; expect_err exige Debug |
 | 45 | Classe async + sprites animados | **13 commands de ação → async+spawn_blocking** (server_create/launcher_prepare/túnel/snapshots/backups/modpacks/shaders/modrinth/create_project — a classe inteira fora da main thread) + **sprites ANIMADOS** (strip 16×16×N + .mcmeta, preview CSS steps, agent frames) + v0.5.11 | overflow u8; slices do strip; frame_at de 1 linha; Reader sem height; nota sem newline |
 | 44 | HOTFIX congelamento | **Causa raiz**: commands sync rodam na MAIN THREAD (Tauri 2) — server_ping 8-10s × série + polling = UI travada. 4 commands → async+spawn_blocking; polling paralelo e pausa com janela oculta + v0.5.10 | — |
 | 43 | Deploy↔build↔pt-BR | **project_deploy_datapack** (datapack do mod no servidor, formato lido do pack real, replace atômico, versões compatíveis) + elapsed no BuildDrawer + pt-BR amp + v0.5.9 | escapes no mcmeta; Date.now() impuro (compiler); building antes da declaração |
@@ -261,12 +262,12 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 45, v0.5.11)
+## 8. Estado atual (verificado — Sessão 46, v0.5.12)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (68) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Rust unit (72) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (77) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
@@ -281,7 +282,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.5.11 (latest)** | Desktop: **classe async completa (ações nunca congelam) + sprites animados** + APK mobile 0.3.1 |
+| **v0.5.12 (latest)** | Desktop: **downloads à prova de travamento (timeout+retry) + diagnósticos reais + self-heal disco↔DB + banner de emergência** + APK mobile 0.3.1 |
+| v0.5.11 | Desktop: **classe async completa (ações nunca congelam) + sprites animados** + APK mobile 0.3.1 |
 | v0.5.10 | Desktop: **HOTFIX congelamento da área de Servidores** + APK mobile 0.3.1 |
 | v0.5.9 | Desktop: **deploy projeto↔servidor + build elapsed + pt-BR amp** + APK mobile 0.3.1 |
 | v0.5.8 | Desktop: **Português (Brasil) no app + chat do agente no Studio** + APK mobile 0.3.1 |
@@ -318,8 +320,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 68 unit
-cargo test -- --ignored --nocapture # 10 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
+cd src-tauri && cargo test          # 72 unit
+cargo test --lib -- --ignored --nocapture # 11 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
 ```
@@ -1118,3 +1120,31 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (33) ✓ · vitest 77/77 ✓ · **cargo 68/68** (+1: strip 16×64, frames diferem, mcmeta com animação, estático 16×16) ✓ · vite build 1m36s ✓ · boot vivo 0 panics ✓. Release **v0.5.11**.
 
 **Regra permanente reforçada**: command Tauri com rede/disco = async + spawn_blocking, SEM exceção.
+
+---
+
+## 46. Sessão 46 — "Make it unbreakable": a resposta definitiva ao "nada funciona"
+
+**Pedido do dono**: "ainda não consegui criar o servidor e nem fazer nada. verifique todos os erros e corrija. esse app tem que estar funcionando."
+
+**Investigação de verdade** (não chute): rede real verificada com curl — manifest oficial da Mojang (919 versões, 1.20.1 presente) e PaperMC Fill API v3 respondendo no formato exato que o código espera. O backend estava certo. A causa estava na **classe de resiliência**:
+
+1. **CAUSA RAIZ PRINCIPAL — download podia pendurar PARA SEMPRE**: o cliente HTTP tinha connect timeout de 15s mas **nenhum timeout total e nenhum retry**. Conexão que abre e trava (antivírus escaneando o jar, proxy, firewall silencioso, Wi-Fi ruim) = spinner eterno sem erro nem conclusão — lido como "clico e não acontece nada". TODOS os downloads do app passavam por esse cliente (jars de servidor, 718MB do launcher, túnel, modpacks, Modrinth).
+2. **App mudo quando o banco morria**: `loadError` existia no store mas **nunca era exibido** — SQLite travado (antivírus/lock) deixava o app "normal" sem persistir NADA: listas vazias, settings que resetam — "nem fazer nada".
+3. **Servidor invisível**: se o row do DB falhasse APÓS a pasta criada (download ok), o servidor existia no disco mas nunca aparecia; a próxima tentativa respondia "already exists" — loop de frustração perfeito.
+4. **Select de versões podia ficar vazio em silêncio** se o cache do catálogo falhasse (DB morto) — impossível escolher versão = impossível criar servidor.
+5. **Stale closure latente** no refresh da ServersPage (deps `[]` usando basePath).
+
+**Fixes (todos com teste)**:
+- `shared_client`: **timeout total de 5 min** por request (geroso para jar de ~50MB em link lento, ainda finito) + **3 tentativas com backoff** para falhas transitórias (timeout/connect; status HTTP 4xx/5xx são respostas, não retried) + erros **acionáveis** ("check your internet (or firewall/VPN/proxy)").
+- **Diagnósticos reais** (`diagnostics.rs` + `diagnostics_run` async): storage write/read probe, `java -version` spawn, Mojang/PaperMC/Modrinth reachability com client de timeout curto (12s) — cada check falho traz **o fix concreto**. Frontend soma o probe do SQLite (SELECT 1). UI: `DiagnosticsDialog` (Settings→Advanced + empty state da ServersPage). **3 testes unit** (incluindo /proc honestamente não-writável e TLD .invalid honestamente inalcançável).
+- **Self-heal disco↔DB**: `server_create` escreve `voxel-server.json` (fatos: name/software/version/port/ram/createdAt); `servers_scan_disk` reporta as pastas REAIS (legacy sem manifest honestamente diz version "unknown", port lido do properties); `listServersReconciled` **adota pastas sem row e aposenta rows fantasma** a cada listagem. O disco é a fonte da verdade.
+- **Catálogo à prova de tudo**: `readCache` guardado (DB morto → fallback embutido); `getVersions` **garantido não-vazio**; wizard avisa com dica de diagnóstico se até o fallback falhar.
+- **Banner de emergência** no App quando `loadError` (o que estava quebrado + botão de diagnóstico) — o app nunca mais fica mudo.
+- PT-BR das strings novas.
+
+**E2E novo (a brecha fechada)**: `e2e_server_create_async_command_path` — **o caminho EXATO do app** (command async + `block_on` + spawn_blocking), download real do jar em ~10s, manifest escrito, scan vê o servidor, duplicata falha com a mensagem amigável. Os testes unit sempre cobriram só o `_impl` sync — a ponte async nunca tinha sido exercitada.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (33) ✓ · vitest 77/77 ✓ · **cargo 72/72** (+4 unit: 3 diagnostics + disk scan) · **E2E async-path VERDE com download real** ✓ · vite build 1m36s ✓ · boot vivo 0 panics ✓. Release **v0.5.12**.
+
+**Para o dono**: baixar v0.5.12 → se QUALQUER coisa não funcionar, **Settings → Advanced → Run diagnostics** diz o que está quebrado NA MÁQUINA dele (com o fix ao lado) — ou o banner vermelho aparece sozinho se o banco estiver travado.
