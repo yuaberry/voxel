@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateServerDialog, type CreateServerInitials } from "./CreateServerDialog";
 import { ServerConsoleDialog } from "./ServerConsoleDialog";
+import { ServerCustomizeDialog } from "./ServerCustomizeDialog";
 import { ImportServerPanel } from "./ImportServerPanel";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { listServersReconciled } from "@/services/db/repositories/serversRepository";
@@ -24,6 +25,7 @@ export function ServersPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardInitials, setWizardInitials] = useState<CreateServerInitials | null>(null);
   const [consoleServer, setConsoleServer] = useState<ServerRecord | null>(null);
+  const [customizeServer, setCustomizeServer] = useState<ServerRecord | null>(null);
   const [runningSet, setRunningSet] = useState<Set<string>>(new Set());
   const [publicPings, setPublicPings] = useState<Record<string, ServerPingData | null>>({});
 
@@ -209,13 +211,22 @@ export function ServersPage() {
                     <span className="text-[10px] text-muted-foreground/70">
                       {formatRelativeTime(server.updated_at)}
                     </span>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setConsoleServer(server)}
-                    >
-                      Console
-                    </Button>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setCustomizeServer(server)}
+                      >
+                        Customize
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setConsoleServer(server)}
+                      >
+                        Console
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -320,6 +331,16 @@ export function ServersPage() {
         initials={wizardInitials}
       />
 
+      {customizeServer ? (
+        <ServerCustomizeDialog
+          server={customizeServer}
+          open={Boolean(customizeServer)}
+          onOpenChange={(next) => {
+            if (!next) setCustomizeServer(null);
+          }}
+          basePath={basePath}
+        />
+      ) : null}
       <ServerConsoleDialog
         server={consoleServer}
         basePath={basePath}

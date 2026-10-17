@@ -937,6 +937,225 @@ pub fn server_write_info(payload: ServerInfoPayload) -> Result<String, String> {
 }
 
 // ---------------------------------------------------------------------------
+// Owner autonomy: bring your OWN world and structures into a server.
+// Real files, verified, zip-slip guarded — the disk stays the truth.
+// ---------------------------------------------------------------------------
+
+/// Imports a world zip into a server (replaces world/ atomically: the old
+/// world is renamed aside first, never destroyed on failure). Accepts a
+/// zip that contains either `world/...` at root or the level.dat directly
+/// at root — the classic shapes a downloaded world ships in.
+#[tauri::command]
+pub async fn server_import_world(
+    base_path: String,
+    slug: String,
+    zip_path: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || server_import_world_impl(base_path, slug, zip_path))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn server_import_world_impl(base_path: String, slug: String, zip_path: String) -> Result<String, String> {
+    if process::is_running(&format!("server/{slug}")) {
+        return Err("Stop the server before importing a world".to_string());
+    }
+    let base = Path::new(&base_path)
+        .canonicalize()
+        .map_err(|e| format!("Storage base not accessible: {e}"))?;
+    let dir = server_dir(&base, &slug);
+    if !dir.is_dir() {
+        return Err(format!("Server \"{slug}\" not found", ));
+    }
+    let source = Path::new(&zip_path)
+        .canonicalize()
+        .map_err(|e| format!("World zip not found: {e}"))?;
+    if !source
+        .file_name()
+        .map(|n| n.to_string_lossy().ends_with(".zip"))
+        .unwrap_or(false)
+    {
+        return Err("World import expects a .zip".to_string());
+    }
+    let file = std::fs::File::open(&source).map_err(|e| format!("{e}"))?;
+    let meta = file.metadata().map_err(|e| format!("{e}"))?;
+    if meta.len() > 4 * 1024 * 1024 * 1024 {
+        return Err("World zips are limited to 4 GB".to_string());
+    }
+    let mut zip = zip::ZipArchive::new(file).map_err(|e| format!("zip open: {e}"))?;
+
+    // Staging: extract into a fresh folder, THEN swap — a half-imported
+    // world must never become the live one.
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let staging = dir.join(format!(".world-import-{stamp}"));
+    let _ = std::fs::remove_dir_all(&staging);
+    std::fs::create_dir_all(&staging).map_err(|e| format!("{e}"))?;
+
+    let mut saw_level_dat = false;
+    let mut saw_world_root = false;
+    let mut entries = 0usize;
+    for i in 0..zip.len() {
+        let mut entry = zip.by_index(i).map_err(|e| format!("{e}"))?;
+        let name = entry.name().to_string();
+        if entry.is_dir() || name.starts_with('/') {
+            continue;
+        }
+        let segments: Vec<&str> = name.split('/').collect();
+        if segments.iter().any(|s| *s == ".." || s.is_empty()) {
+            continue; // zip-slip guarded
+        }
+        let (prefix, rest): (usize, Vec<&str>) = if segments.first() == Some(&"world") {
+            saw_world_root = true;
+            (1, segments[1..].to_vec())
+        } else {
+            (0, segments.clone())
+        };
+        let _ = prefix;
+        if rest.last().map(|s| *s == "level.dat").unwrap_or(false) && rest.len() == 1 {
+            saw_level_dat = true;
+        }
+        let target = staging.join(rest.join("/"));
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("{e}"))?;
+        }
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(&mut entry, &mut bytes).map_err(|e| format!("{e}"))?;
+        std::fs::write(&target, bytes).map_err(|e| format!("{e}"))?;
+        entries += 1;
+        if entries > 40_000 {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err("World zip has more than 40,000 files — refused".to_string());
+        }
+    }
+    if !saw_level_dat {
+        let _ = std::fs::remove_dir_all(&staging);
+        return Err("This zip does not look like a Minecraft world (no level.dat inside)".to_string());
+    }
+
+    // Swap: old world renamed aside (user can delete it), staging becomes world/
+    let old = dir.join(format!(".old-world-{stamp}"));
+    let live = dir.join("world");
+    if live.exists() {
+        std::fs::rename(&live, &old).map_err(|e| format!("could not set the old world aside: {e}"))?;
+    }
+    if let Err(e) = std::fs::rename(&staging, &live) {
+        // put the old world back — the server must not end up worldless
+        if old.exists() {
+            let _ = std::fs::rename(&old, &live);
+        }
+        return Err(format!("could not install the imported world: {e}"));
+    }
+    Ok(format!(
+        "world imported ({entries} files) — the previous world was kept at {}",
+        old.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()
+    ))
+}
+
+/// Imports a structure file (.nbt — the vanilla format our own Studio and
+/// every schematic tool exports) into the server as a placeable template:
+/// lands in world/datapacks/voxel_imports/<ns>/structures/<name>.nbt with a
+/// pack.mcmeta of the server's era. In-game it is placed with
+/// `/place template voxel_imports:<ns>/<name>`.
+#[tauri::command]
+pub async fn server_import_structure(
+    base_path: String,
+    slug: String,
+    file_path: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        server_import_structure_impl(base_path, slug, file_path)
+    })
+    .await
+    .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Sync impl — tests call this directly.
+fn server_import_structure_impl(base_path: String, slug: String, file_path: String) -> Result<String, String> {
+    let base = Path::new(&base_path)
+        .canonicalize()
+        .map_err(|e| format!("Storage base not accessible: {e}"))?;
+    let dir = server_dir(&base, &slug);
+    if !dir.is_dir() {
+        return Err(format!("Server \"{slug}\" not found"));
+    }
+    let source = Path::new(&file_path)
+        .canonicalize()
+        .map_err(|e| format!("Structure file not found: {e}"))?;
+    let bytes = std::fs::read(&source).map_err(|e| format!("{e}"))?;
+    if bytes.len() > 8 * 1024 * 1024 {
+        return Err("Structure files are limited to 8 MB".to_string());
+    }
+    // Content first, extension second: a REAL nbt (gzip 1f 8b, or the raw
+    // uncompressed form starting with the compound tag 0x0A) is accepted
+    // even when the name lost its ".nbt" — tools and renames happen.
+    let looks_nbt = (bytes.len() >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b)
+        || (!bytes.is_empty() && bytes[0] == 0x0a);
+    if !looks_nbt {
+        return Err(format!(
+            "not a Minecraft structure file — bring a .nbt exported by a structure block, a schematic tool or our Asset Studio"
+        ));
+    }
+    let raw_name = source
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let name = if raw_name.to_ascii_lowercase().ends_with(".nbt") {
+        raw_name
+    } else {
+        let stem = Path::new(&raw_name)
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "structure".to_string());
+        format!("{stem}.nbt")
+    };
+
+    // era-honest pack format, same rule as the project deploy
+    let pack_format = pack_format_for_server(&base, &slug);
+    let ns = sanitize_structure_ns(&name)?;
+    let pack_dir = dir.join("world/datapacks/voxel_imports");
+    let ns_dir = pack_dir.join(&ns).join("structures");
+    std::fs::create_dir_all(&ns_dir).map_err(|e| format!("{e}"))?;
+
+    let mcmeta = serde_json::json!({
+        "pack": {
+            "pack_format": pack_format,
+            "description": "Structures imported by VOXEL"
+        }
+    })
+    .to_string();
+    std::fs::write(pack_dir.join("pack.mcmeta"), &mcmeta)
+        .map_err(|e| format!("write pack.mcmeta: {e}"))?;
+    std::fs::write(ns_dir.join(&name), &bytes).map_err(|e| format!("{e}"))?;
+
+    Ok(format!(
+        "/place template voxel_imports:{ns}/{}",
+        name.trim_end_matches(".nbt")
+    ))
+}
+
+fn sanitize_structure_ns(file_name: &str) -> Result<String, String> {
+    let stem = file_name
+        .trim_end_matches(".nbt")
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c.to_ascii_lowercase() } else { '_' })
+        .take(64)
+        .collect::<String>();
+    let stem = stem.trim_matches('_').to_string();
+    if stem.is_empty() {
+        return Err("Structure name has no usable characters".to_string());
+    }
+    if stem.chars().next().unwrap().is_ascii_digit() {
+        // namespaces cannot start with a digit — prefix keeps it valid
+        return Ok(format!("s{stem}"));
+    }
+    Ok(stem)
+}
+
+// ---------------------------------------------------------------------------
 // Project ↔ Server connection — deploy the project's datapack (structures,
 // dimensions, advancements, functions) into a server's world/datapacks/,
 // so what you build in the mod is live on your server. Versions must match
@@ -1279,6 +1498,121 @@ mod unit_tests {
             project_slug: "empty".to_string(),
             server_slug: "arena".to_string(),
         }).is_err());
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn world_import_swaps_atomically_and_refuses_non_worlds() {
+        let base = std::env::temp_dir().join(format!("voxel-worldimport-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = base.join("servers/arena");
+        std::fs::create_dir_all(dir.join("world")).unwrap();
+        std::fs::write(dir.join("world/level.dat"), b"OLD WORLD").unwrap();
+
+        // a REAL world zip: world/level.dat + world/region/r.0.0.mca
+        let zip_path = base.join("my-world.zip");
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let opts = zip::write::SimpleFileOptions::default();
+        zip.start_file("world/level.dat", opts).unwrap();
+        std::io::Write::write_all(&mut zip, b"NEW WORLD DATA").unwrap();
+        zip.start_file("world/region/r.0.0.mca", opts).unwrap();
+        std::io::Write::write_all(&mut zip, b"region-bytes").unwrap();
+        zip.finish().unwrap();
+
+        let msg = server_import_world_impl(
+            base.to_string_lossy().to_string(),
+            "arena".to_string(),
+            zip_path.to_string_lossy().to_string(),
+        )
+        .expect("import must succeed");
+        assert!(msg.contains("world imported"), "{msg}");
+        // the new world is live, the old one was kept aside
+        assert_eq!(std::fs::read(dir.join("world/level.dat")).unwrap(), b"NEW WORLD DATA");
+        assert!(dir.join("world/region/r.0.0.mca").is_file());
+        let old: Vec<_> = std::fs::read_dir(&dir).unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .filter(|n| n.starts_with(".old-world-"))
+            .collect();
+        assert_eq!(old.len(), 1, "the previous world is kept aside, never destroyed");
+        assert_eq!(std::fs::read(dir.join(&old[0]).join("level.dat")).unwrap(), b"OLD WORLD");
+
+        // a zip WITHOUT level.dat is honestly refused
+        let bad_path = base.join("nope.zip");
+        let file = std::fs::File::create(&bad_path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file("random.txt", zip::write::SimpleFileOptions::default()).unwrap();
+        std::io::Write::write_all(&mut zip, b"not a world").unwrap();
+        zip.finish().unwrap();
+        let err = server_import_world_impl(
+            base.to_string_lossy().to_string(),
+            "arena".to_string(),
+            bad_path.to_string_lossy().to_string(),
+        )
+        .unwrap_err();
+        assert!(err.contains("level.dat"), "{err}");
+        // the live world is UNTOUCHED by the failed import
+        assert_eq!(std::fs::read(dir.join("world/level.dat")).unwrap(), b"NEW WORLD DATA");
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn structure_import_lands_as_a_placeable_template() {
+        let base = std::env::temp_dir().join(format!("voxel-structimport-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = base.join("servers/arena");
+        // module pack with era format 18 -> imported pack must match it
+        let packs = dir.join("world/datapacks/nexus_skyblock");
+        std::fs::create_dir_all(&packs).unwrap();
+        std::fs::write(packs.join("pack.mcmeta"), br#"{"pack":{"pack_format":18,"description":"x"}}"#).unwrap();
+
+        // a REAL gzip nbt (magic 1f 8b + deflate payload)
+        let src = base.join("castle-tower.nbt");
+        let mut gz: Vec<u8> = Vec::new();
+        {
+            let mut enc = flate2::write::GzEncoder::new(&mut gz, flate2::Compression::default());
+            std::io::Write::write_all(&mut enc, b"\x0a\x00\x00nbt-payload").unwrap();
+            enc.finish().unwrap();
+        }
+        std::fs::write(&src, &gz).unwrap();
+
+        let command = server_import_structure_impl(
+            base.to_string_lossy().to_string(),
+            "arena".to_string(),
+            src.to_string_lossy().to_string(),
+        )
+        .expect("import");
+        assert_eq!(command, "/place template voxel_imports:castle_tower/castle-tower");
+        let nbt = dir.join("world/datapacks/voxel_imports/castle_tower/structures/castle-tower.nbt");
+        assert!(nbt.is_file());
+        assert_eq!(std::fs::read(&nbt).unwrap(), gz, "bytes land unchanged");
+        let mcmeta = std::fs::read_to_string(dir.join("world/datapacks/voxel_imports/pack.mcmeta")).unwrap();
+        assert!(mcmeta.contains("18"), "era format read from the server's own packs");
+
+        // not-an-nbt is honestly refused
+        let bad = base.join("photo.jpg");
+        std::fs::write(&bad, b"\xff\xd8\xff\xe0jpeg").unwrap();
+        let err = server_import_structure_impl(
+            base.to_string_lossy().to_string(),
+            "arena".to_string(),
+            bad.to_string_lossy().to_string(),
+        )
+        .unwrap_err();
+        assert!(err.contains("not a Minecraft structure"), "{err}");
+
+        // a name starting with a digit stays a valid namespace
+        let num = base.join("4-towers.nbt");
+        std::fs::write(&num, &gz).unwrap();
+        let command = server_import_structure_impl(
+            base.to_string_lossy().to_string(),
+            "arena".to_string(),
+            num.to_string_lossy().to_string(),
+        )
+        .unwrap();
+        assert!(command.starts_with("/place template voxel_imports:s4"), "{command}");
 
         let _ = std::fs::remove_dir_all(&base);
     }

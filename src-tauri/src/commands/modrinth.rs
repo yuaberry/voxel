@@ -23,8 +23,13 @@ const MAX_FILE_BYTES: usize = 256 * 1024 * 1024;
 #[serde(rename_all = "camelCase")]
 pub struct ModrinthDownloadPayload {
     pub storage_base: String,
-    /// Prepared instance the mod lands in (e.g. "dark-kingdom")
+    /// Prepared instance the mod lands in (e.g. "dark-kingdom") — used by
+    /// "instance_mods"; for "server_plugins" it is the SERVER slug instead.
     pub instance_slug: String,
+    /// Where the jar lands: "instance_mods" (default, Launcher instances)
+    /// or "server_plugins" (Paper server plugins folder)
+    #[serde(default)]
+    pub output_kind: Option<String>,
     /// CDN url returned by the Modrinth version API
     pub url: String,
     /// SHA-1 hex published by Modrinth for this file
@@ -100,12 +105,33 @@ fn modrinth_download_impl(payload: ModrinthDownloadPayload) -> Result<ModrinthDo
     let base = PathBuf::from(&payload.storage_base)
         .canonicalize()
         .map_err(|e| format!("Storage location is not accessible: {e}"))?;
-    let mods_dir = base.join("instances").join(&payload.instance_slug).join("mods");
-    if !base.join("instances").join(&payload.instance_slug).is_dir() {
-        return Err(format!(
-            "Instance \"{}\" is not prepared — open the Launcher tab and prepare it first",
-            payload.instance_slug
-        ));
+    // Destination by kind — instance mods (launcher) or server plugins
+    let (mods_dir, guard_dir, unready) = match payload.output_kind.as_deref() {
+        Some("server_plugins") => {
+            let dir = base.join("servers").join(&payload.instance_slug).join("plugins");
+            (
+                dir.clone(),
+                base.join("servers").join(&payload.instance_slug),
+                format!(
+                    "Server \"{}\" does not exist — create it first (Servers tab)",
+                    payload.instance_slug
+                ),
+            )
+        }
+        _ => {
+            let dir = base.join("instances").join(&payload.instance_slug).join("mods");
+            (
+                dir.clone(),
+                base.join("instances").join(&payload.instance_slug),
+                format!(
+                    "Instance \"{}\" is not prepared — open the Launcher tab and prepare it first",
+                    payload.instance_slug
+                ),
+            )
+        }
+    };
+    if !guard_dir.is_dir() {
+        return Err(unready);
     }
     std::fs::create_dir_all(&mods_dir)
         .map_err(|e| format!("Failed to create {}: {e}", mods_dir.display()))?;
@@ -191,6 +217,7 @@ mod tests {
             url,
             sha1,
             file_name,
+            output_kind: None,
         };
         let result = modrinth_download_impl(payload).unwrap();
         assert!(result.sha1_verified);
