@@ -8,7 +8,7 @@
 > AI-Powered Creation Platform
 
 **[🌐 Site oficial](https://yuaberry.github.io/voxel/)** ·
-**[⬇️ Downloads (v0.2.0)](https://github.com/yuaberry/voxel/releases/latest)** —
+**[⬇️ Downloads (v0.5.11)](https://github.com/yuaberry/voxel/releases/latest)** —
 Windows `.exe`/`.msi` · Linux `.deb`/`.AppImage` · macOS `.dmg` (Apple Silicon + Intel)
 
 VOXEL é uma plataforma desktop de criação assistida por IA para Minecraft Java Edition. **O MVP está completo e provado de ponta a ponta**: descreva um mod em linguagem natural, compile-o de verdade com Gradle, corrija erros com um agente sandboxado, rode o Minecraft com o seu jar instalado, monte servidores com economia própria e publique o projeto no GitHub.
@@ -28,22 +28,28 @@ boot/stop/backup) — tudo verde, na CI e local.
 |---|---|
 | App shell premium (Tauri 2, dark-first, glassmorphism, Ctrl+K palette) | ✅ |
 | SQLite com schema versionado (18 tabelas, migrations idempotentes) | ✅ |
-| AI Provider Layer — OpenAI-compat/Anthropic/Ollama, streaming + vision | ✅ |
+| AI Provider Layer — OpenRouter/OpenAI-compat/Anthropic/Ollama/**NVIDIA NIM**, streaming + vision, model picker por seleção | ✅ |
 | Credentials no OS keyring (nunca no banco, nunca em logs) | ✅ |
-| Version Catalog auto-atualizável — Mojang + Fabric + Forge + NeoForge + Paper (TTL 12h) | ✅ |
+| Version Catalog auto-atualizável — Mojang + Fabric + Forge + NeoForge + Paper (TTL 12h), esquemas 1.x e 26.x | ✅ |
 | Projects Core — wizard com versão selecionável (esquemas 1.x e 26.x), Monaco, snapshots git | ✅ |
-| Nexus Agent — 12 tools com sandbox Rust, auditoria em `ai_tool_calls`, auto-snapshot | ✅ |
+| VOXEL Agent — sandbox Rust, auditoria em `ai_tool_calls`, auto-snapshot, task force multi-agente (Architect→Developer→Reviewer) e tools de arte (texturas/blocos/estruturas .nbt/dimensões) | ✅ |
 | Build System — `./gradlew build` ao vivo, Error Center, Auto-Fix ≤5 tentativas | ✅ |
 | Launcher — instâncias isoladas, downloads oficiais SHA-1 (718MB provados), MS device flow | ✅ |
 | Server Studio — vanilla/Paper oficiais, console stdin, backups/restore, properties | ✅ |
-| Server Modules misturáveis — Economy Coin, Prison, Token Chain (datapacks) | ✅ Wave 1 |
+| Server Modules misturáveis — 8 sistemas: Economy/Prison/Token Chain, SkyBlock Islands, Factions War, BedWars Lite, Monuments (.nbt reais com /place) e Custom Realm (dimensão real) — cada um com comandos documentados no README do servidor | ✅ |
 | Token Chain — ledger SHA-256 real (mint/transfer/burn/verify, tamper-evidente) | ✅ Wave 1 |
 | Túnel público grátis — playit.gg (servidor acessível de qualquer lugar) | ✅ Wave 1 |
-| Shader Studio — 32 looks icônicos como presets → shaderpacks GLSL originais Iris/OptiFire-compat, preview WebGL vivo, editor Monaco, install na instância | ✅ Wave 2 |
+| Shader Studio — 32 looks icônicos como presets → shaderpacks GLSL originais; Asset Studio — sprites pixel-art (estáticos E animados com .mcmeta), faces de bloco, estruturas .nbt com preview isométrico e dimensões custom | ✅ |inais Iris/OptiFire-compat, preview WebGL vivo, editor Monaco, install na instância | ✅ Wave 2 |
 | GitHub — device flow, create repo, push com header transitório (token nunca persistido) | ✅ |
+| **Asset Studio** — sprites pixel-art **estáticos e ANIMADOS** (strip + .mcmeta — o jogo anima nativamente), faces de bloco, estruturas .nbt (preview isométrico) e dimensões custom — o agent gera tudo | ✅ |
+| **Marketplace local** — modpacks/shaderpacks (swatch de céu real)/seus mods com status vivo e Play, install 1-clique; Modpacks com grafo de dependências Modrinth (SHA-1) e editor de manifest | ✅ |
+| **PT-BR** — o app inteiro fala Português (Brasil): Auto (SO)/English/Português em Settings | ✅ |
+| **Deploy projeto↔servidor** — o datapack do seu mod vai para world/datapacks do seu servidor (formato da era, replace atômico) | ✅ |
+| **Workspace Snapshots** — export/restore guiado (nunca sobrescreve) + agendamento diário/semanal | ✅ |
+| **Mobile** — VOXEL Bridge (token no keyring, biometria), APK Android 0.3.1, PWA iOS instalável, build notifications | ✅ |
 | Dark Kingdom — projeto-exemplo criado automaticamente (espada, receita, advancement) | ✅ |
 | Release multi-OS + site oficial no GitHub Pages | ✅ |
-| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), 46 testes automatizados | ✅ |
+| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), **145 testes verdes**; toda ação fora da main thread (async + spawn_blocking — congelamento extinto como classe) | ✅ |
 
 ## 🚀 Como rodar (desenvolvimento)
 
@@ -97,9 +103,9 @@ Decisões-chave no [`docs/architecture.md`](docs/architecture.md) (AD-1..AD-11 +
 
 | Suíte | Escopo |
 |---|---|
-| `cargo test` | 18 unit (template engine, edits, search, guards, ledger hash chain + tamper, shaderpack guards) |
-| `cargo test -- --ignored` | 3 E2E: mod compila (jar real), launcher baixa 718MB oficiais com SHA-1, servidor boot→stop→backup→restore |
-| `pnpm test:unit` | 28 Vitest (error parser do Auto-Fix, spec, server modules, catálogo de shaders + gerador GLSL com sanidade de parênteses) |
+| `cargo test` | 68 unit (templates ×6 eras, ledger+tamper, shaderpacks, SLP+SRV, bridge multimodal, modpacks, snapshots, deploy, structures NBT, assets animados) |
+| `cargo test -- --ignored` | 10 E2E: **compilação REAL de 6 templates** (fabric/forge/neoforge ×4 eras até 26.3), launcher 718MB SHA-1, server ciclo, SLP de servidores públicos (hypixel/nerdzone…), Modrinth com checksum |
+| `pnpm test:unit` | 77 Vitest (shaders + gerador GLSL, error parser, 6+8 módulos de servidor com comandos, inferência de estilo, task force, model routing, i18n pt-BR, manifestos, parser de MOTD) |
 | CI (`.github/workflows/ci.yml`) | typecheck + lint + vitest + vite build + cargo test |
 | Release (`.github/workflows/release.yml`) | tag `v*` → .exe/.msi/.deb/.AppImage/.dmg (Windows, Linux, macOS arm64+x64) |
 

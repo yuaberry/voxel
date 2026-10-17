@@ -334,13 +334,13 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 1. ~~Forge & NeoForge templates~~ → **ENTREGUE (Sessões 22-23)**: os quatro templates compilam jar real (E2E), incluindo a era NeoGradle 7 (1.20.2-1.21.1). Próximo natural do braço Java: era ModDevGradle (1.21.4+) quando for a hora
 2. ~~Model Router por fase~~ → **ENTREGUE (Sessão 23)**: phaseModels por fase, provider/key global (multi-key por provider = extensão futura honesta)
 3. ~~Push notifications (desktop)~~ → **ENTREGUE (Sessão 23)**: build exit + fim da task force, com permissão honesta. Mobile push = ainda futuro (precisa Expo notifications + backend)
-4. **Mobile polish** (§59) — secure-store do token, biometria, APK com keystore de release (Play Store), TestFlight quando houver conta Apple
-5. **Modpack Creator** → v1 (S24: export/import) · v2 (S25: score) · v3 (S26: catálogo Modrinth SHA-1) · **v4 ENTREGUE (S27): grafo transitivo required**. Restam: CurseForge (precisa API key do dono) e um editor visual de modpack salvo
-6. ~~Resource Pack / World / Structure Studios~~ → items (S25), blocks (S27), structures .nbt + preview iso (S29), **agent tool de structures + custom dimensions (S30)** entregues. Restam: schema de dimensions 1.21.2+, resource packs completos
+4. **Mobile polish** (§59) — ~~secure-store + biometria + build notifications~~ **ENTREGUES (S25/S27: APK 0.3.1)**. Restam: keystore de release (Play Store), TestFlight (conta Apple), push externo (backend)
+5. **Modpack Creator** → v1 (S24: export/import+README) · v2 (S25: score) · v3 (S26: Modrinth SHA-1) · v4 (S27: grafo required) · **Marketplace local + Library + editor de manifest re-pack atômico (S36)** entregues. Restam: CurseForge (precisa API key do dono)
+6. ~~Resource Pack / World / Structure Studios~~ → items (S25) · blocks (S27) · **sprites ANIMADOS (S45: strip+mcmeta, preview animado, agent frames)** · structures .nbt + preview iso (S29) · agent structures + custom dimensions (S30) · dimensions 1.20.1-1.21.8 (S31) entregues. Restam: resource packs completos, módulos estrutura+datapack 2.0
 7. **Módulos de servidor** → **8 entregues**: Economy/Prison/Token (S11) + SkyBlock/Factions/BedWars (S34) + Monuments (S37) + **Custom Realm (S40: dimensão real)**. Próximas fatias: módulos 2.0 combinados (realm+monuments), push externo
 8. **Docker + Deployment Providers** (§44-45) — VPS/SSH/cloud (`DeploymentProvider` reservada)
 9. **Marketplace** (§48) e **Cloud opcional (Supabase)** (§85) — arquiteturas preparadas
-10. **Backlog de qualidade**: migrar warns `set-state-in-effect` (~20), auto-refresh de sessão MSA/GitHub, `@tauri-apps/api` mismatch (CLI de dev reescreve Cargo.toml com `features = []` — neutro; reverter após `tauri dev`)
+10. **Backlog de qualidade**: migrar warns `set-state-in-effect` (~33, família conhecida, nunca errors), auto-refresh de sessão MSA/GitHub. ~~Commands bloqueando a main thread~~ **EXTINTO como classe (S44-45: regra permanente = async+spawn_blocking para qualquer rede/disco)**
 
 ### Entregues nesta era (não refazer!)
 - ✅ Shader Studio (32 presets, gerador real, preview WebGL, editor, install) — Sessão 13
@@ -361,9 +361,19 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 - ✅ Structure Studio (.nbt vanilla real, 4 templates, preview iso) + brand-gradient titles + EmptyState art — Sessão 29
 - ✅ Agent structures (tool generate_structure) + World Studio (dimensões custom datapack) — Sessão 30
 - ✅ World Studio na era moderna (1.21.2-1.21.8, flatten provado) + Modpack Library (export→manage→install) — Sessão 31
+- ✅ Era 26.x (6º template, MDG 2.0.148, Java 25, SwordItem→components pescado pelo E2E) + presets com módulos reais — Sessão 35
+- ✅ Marketplace local (modpacks/shaders com swatch real/mods com Play) + editor de modpack (manifest in-zip atômico) — Sessão 36
+- ✅ Módulo Monuments (.nbt nos servidores, /place via trigger, seed do dono) + Workspace Snapshots (autoria zipada) + agendamento + restore nunca-destrutivo — Sessões 37-39
+- ✅ Módulo Custom Realm (dimensão real no server, era-factual) — Sessão 40
+- ✅ Correções do dono: botão criar nunca-morto, delete dentro do projeto, Community servers AO VIVO (nerdzone.gg pingado com 1220 players), túnel no wizard, inferência prison/coin/chain — Sessão 41
+- ✅ Português (Brasil) no app (t() com fallback inglês, Auto/EN/PT-BR) + chat do agente no Studio (handoff, nunca auto-envia) — Sessão 42
+- ✅ Deploy projeto↔servidor (datapack do mod no world/datapacks, formato lido do próprio servidor, replace atômico) + elapsed no build — Sessão 43
+- ✅ Classe async completa (S44-45: 13 commands de ação + 4 de polling fora da main thread — congelamento extinto) + **sprites ANIMADOS** (strip+mcmeta, o jogo anima nativamente, preview CSS steps, agent frames) — Sessões 44-45
 
 ## 10. Regras de operação com o dono
 
+- **REGRA DE PERFORMANCE (permanente)**: command Tauri com rede/disco/zip = SEMPRE `async` + `spawn_blocking` (impl síncrona separada para os testes). Commands síncronos rodam na MAIN THREAD e congelam a UI — a classe custou 2 bug reports do dono (S44-45).
+- **REGRA DE REPLACES PYTHON**: anchors exatos com contexto; depois de qualquer batch, `grep` de verificação no alvo; notas com `\n` explícito; `#[test]` único por fn (duplicado = teste duplicado no harness = race).
 - Dono fala PT-BR; responder em PT-BR com relatório final estruturado (o que fez, provas, próximo passo).
 - Verificação real após cada mudança: typecheck/build/testes/boot — nunca pular.
 - Commits em unidades lógicas (conventional), inglês, explicando o porquê.
