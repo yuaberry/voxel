@@ -33,20 +33,63 @@ fn shared_client() -> &'static reqwest::blocking::Client {
     CLIENT.get_or_init(|| {
         reqwest::blocking::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(15))
+            // HARD total timeout — the owner report ("nothing works") was an
+            // action hanging FOREVER: a connection that opens but stalls
+            // (antivirus scanning, proxy, flaky Wi-Fi) never errored without
+            // this. 5 minutes is generous for the largest single file we
+            // fetch (a ~50MB server jar on slow links) and still finite.
+            .timeout(std::time::Duration::from_secs(300))
             .build()
             .expect("reqwest client")
     })
 }
 
-pub(crate) fn http_get_bytes(url: &str) -> Result<Vec<u8>, String> {
-    let response = shared_client()
-        .get(url)
-        .send()
-        .map_err(|e| format!("GET {url} failed: {e}"))?;
-    if !response.status().is_success() {
-        return Err(format!("GET {url} -> HTTP {}", response.status()));
+/// Turns low-level reqwest errors into something the user can act on —
+/// "check your internet / firewall / VPN" instead of a bare send error.
+fn friendly_http_error(url: &str, err: &reqwest::Error) -> String {
+    if err.is_timeout() {
+        format!(
+            "Download timed out: {url} — check your internet connection (or firewall/VPN/proxy) and try again"
+        )
+    } else if err.is_connect() {
+        format!(
+            "Could not reach {url} — check your internet connection (or firewall/VPN/proxy) and try again"
+        )
+    } else {
+        format!("GET {url} failed: {err}")
     }
-    Ok(response.bytes().map_err(|e| format!("read {url}: {e}"))?.to_vec())
+}
+
+pub(crate) fn http_get_bytes(url: &str) -> Result<Vec<u8>, String> {
+    // Transient networks deserve retries: 3 attempts total, short backoff.
+    // HTTP error statuses (4xx/5xx) are NOT retried — they are answers.
+    let mut last_err = String::new();
+    for attempt in 1..=3 {
+        let response = shared_client().get(url).send();
+        match response {
+            Ok(response) => {
+                if !response.status().is_success() {
+                    return Err(format!("GET {url} -> HTTP {}", response.status()));
+                }
+                return Ok(response
+                    .bytes()
+                    .map_err(|e| friendly_http_error(url, &e))?
+                    .to_vec());
+            }
+            Err(e) => {
+                last_err = friendly_http_error(url, &e);
+                if !e.is_timeout() && !e.is_connect() {
+                    return Err(last_err);
+                }
+                if attempt < 3 {
+                    std::thread::sleep(std::time::Duration::from_millis(
+                        750 * attempt as u64,
+                    ));
+                }
+            }
+        }
+    }
+    Err(last_err)
 }
 
 fn http_get_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, String> {
