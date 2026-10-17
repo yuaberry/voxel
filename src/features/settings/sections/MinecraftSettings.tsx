@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { Field, InfoRow, SectionHeader } from "../SettingsBits";
 import {
@@ -189,6 +190,44 @@ export function MinecraftSettings() {
               </SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </Field>
+
+      <Field
+        label="Default server RAM & port"
+        hint="What the server wizard starts with — your usual setup, pre-filled every time."
+      >
+        <div className="flex max-w-sm items-center gap-3">
+          <Select
+            value={String(minecraft.defaultServerRamMb)}
+            onValueChange={(value) =>
+              update("minecraft", {
+                defaultServerRamMb: Number(value),
+              }).catch(() => toast.error("Could not save server preference"))
+            }
+          >
+            <SelectTrigger className="w-28">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1024">1 GB</SelectItem>
+              <SelectItem value="2048">2 GB</SelectItem>
+              <SelectItem value="4096">4 GB</SelectItem>
+              <SelectItem value="8192">8 GB</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            className="w-28"
+            inputMode="numeric"
+            value={minecraft.defaultServerPort}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, "").slice(0, 5);
+              if (digits) {
+                update("minecraft", { defaultServerPort: Number(digits) }).catch(() => {});
+              }
+            }}
+            title="Default port"
+          />
         </div>
       </Field>
 

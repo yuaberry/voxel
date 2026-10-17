@@ -43,6 +43,8 @@ export interface MinecraftSettings {
   defaultVersion: string;
   defaultLoader: "fabric" | "forge" | "neoforge";
   defaultServerSoftware: "vanilla" | "paper";
+  defaultServerRamMb: number;
+  defaultServerPort: number;
 }
 
 export interface JavaSettings {
@@ -78,7 +80,7 @@ export interface AppSettings {
 }
 
 export type ProjectType = "mod";
-export type ProjectLoader = "fabric" | "forge" | "neoforge";
+export type ProjectLoader = "fabric" | "forge" | "neoforge" | "paper";
 
 export interface ProjectRecord {
   id: string;

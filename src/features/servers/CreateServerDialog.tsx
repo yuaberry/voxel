@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { t } from "@/i18n";
 import { useNavigate } from "react-router-dom";
-import { Download, Loader2, Wand2 } from "lucide-react";
+import { Download, Globe, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -44,6 +44,8 @@ import {
 } from "@/services/servers/serverPresets";
 import { cn } from "@/lib/utils";
 import { invoke } from "@tauri-apps/api/core";
+import { BriefingPicker } from "@/components/BriefingPicker";
+import { writeBriefingDocuments } from "@/services/documents/documentsService";
 
 const RAM_OPTIONS = [1024, 2048, 4096, 8192];
 
@@ -72,6 +74,7 @@ export function CreateServerDialog({
   const [name, setName] = useState("");
   const [presetId, setPresetId] = useState<string | null>(null);
   const [styleProperties, setStyleProperties] = useState<Record<string, string>>({});
+  const defaults = useSettingsStore((s) => s.settings.minecraft);
   const [software, setSoftware] = useState<"vanilla" | "paper">("vanilla");
   const [versions, setVersions] = useState<MinecraftVersionInfo[]>([]);
   const [mcVersion, setMcVersion] = useState<string>("");
@@ -82,11 +85,27 @@ export function CreateServerDialog({
   const [modules, setModules] = useState<Set<ServerModuleId>>(new Set());
   const [monumentSeed, setMonumentSeed] = useState<number>(1337);
   const [busy, setBusy] = useState(false);
+  // World setup — real server.properties keys, curated by the user
+  const [worldSeed, setWorldSeed] = useState("");
+  const [worldType, setWorldType] = useState<"normal" | "flat" | "amplified" | "large_biomes">("normal");
+  const [difficulty, setDifficulty] = useState<"easy" | "normal" | "hard">("normal");
+  const [generateStructures, setGenerateStructures] = useState(true);
+  // The user's own briefing documents — extracted now, written after create
+  const [briefingDocs, setBriefingDocs] = useState<{ fileName: string; kind: string; text: string }[]>([]);
 
   const slug = useMemo(() => slugify(name), [name]);
   const activePreset = presetId
     ? SERVER_STYLE_PRESETS.find((p) => p.id === presetId) ?? null
     : null;
+
+  // Settings → Minecraft defaults pre-fill the wizard every time it opens
+  useEffect(() => {
+    if (!open) return;
+    setSoftware(defaults.defaultServerSoftware);
+    setRam(defaults.defaultServerRamMb);
+    setPort(String(defaults.defaultServerPort));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Apply an import-panel handoff whenever the dialog opens with one
   useEffect(() => {
@@ -206,7 +225,15 @@ export function CreateServerDialog({
     }
     setBusy(true);
     try {
-      const properties = { ...activePreset?.properties, ...styleProperties };
+      const worldProperties: Record<string, string> = {
+        "level-type": `minecraft:${worldType}`,
+        difficulty,
+        "generate-structures": String(generateStructures),
+      };
+      if (worldSeed.trim()) {
+        worldProperties["level-seed"] = worldSeed.trim();
+      }
+      const properties = { ...activePreset?.properties, ...styleProperties, ...worldProperties };
       const result = await createServerCommand({
         basePath,
         slug,
@@ -249,6 +276,18 @@ export function CreateServerDialog({
           });
         }
       }
+      // The user's own documents become the server's briefing — the agent
+      // reads them whenever it customizes this server further
+      if (briefingDocs.length > 0) {
+        try {
+          await writeBriefingDocuments(basePath, `servers/${slug}/.voxel/briefing`, briefingDocs);
+        } catch (error) {
+          toast.warning("Briefing documents could not be attached", {
+            description: `${error instanceof Error ? error.message : String(error)} — the server itself was created normally.`,
+          });
+        }
+      }
+
       // The server README documents exactly what got installed (objectives
       // + in-game commands per module) — rewritten with the real facts
       await invoke("server_write_info", {
@@ -471,6 +510,62 @@ export function CreateServerDialog({
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-border/60 bg-card/50 p-3">
+            <div className="flex items-center gap-1.5">
+              <Globe className="h-3 w-3 text-primary" />
+              <p className="text-xs font-semibold">{t("World setup")}</p>
+              <span className="text-[10px] text-muted-foreground">
+                {t("terrain, seed and rules — straight into server.properties")}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="world-seed">{t("Seed (optional)")}</Label>
+                <Input
+                  id="world-seed"
+                  placeholder="e.g. 12345 or leave empty for random"
+                  value={worldSeed}
+                  onChange={(e) => setWorldSeed(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("Terrain")}</Label>
+                <Select value={worldType} onValueChange={(v) => setWorldType(v as typeof worldType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="normal">{t("Normal (default world)")}</SelectItem>
+                    <SelectItem value="large_biomes">{t("Large biomes")}</SelectItem>
+                    <SelectItem value="amplified">{t("Amplified (extreme mountains)")}</SelectItem>
+                    <SelectItem value="flat">{t("Superflat")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("Difficulty")}</Label>
+                <Select value={difficulty} onValueChange={(v) => setDifficulty(v as typeof difficulty)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="easy">Peaceful-ish (easy)</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="hard">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
+                <span className="text-[11px] text-muted-foreground">{t("Generate structures")}</span>
+                <Switch checked={generateStructures} onCheckedChange={setGenerateStructures} />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-card/50 p-3">
+            <BriefingPicker docs={briefingDocs} onChange={setBriefingDocs} />
           </div>
 
           <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-card/50 p-3">

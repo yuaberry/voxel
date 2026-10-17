@@ -566,6 +566,10 @@ function loaderAvailable(
             compareMcVersions(info.version, "1.21.8") <= 0) ||
           /^26\./.test(info.version))
       );
+    case "paper":
+      // paper is a SERVER software, not a mod template — never offered in
+      // the mod wizard (the server wizard handles it instead)
+      return false;
   }
 }
 

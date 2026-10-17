@@ -28,6 +28,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     defaultVersion: "1.20.1",
     defaultLoader: "fabric",
     defaultServerSoftware: "vanilla",
+    defaultServerRamMb: 2048,
+    defaultServerPort: 25565,
   },
   java: {
     customJavaPath: "",
