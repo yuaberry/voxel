@@ -35,6 +35,7 @@ const context = {
   loreBible: null,
   gameplayBible: null,
   decisions: null,
+  briefing: null,
   fileTreePreview: "",
   referenceCount: 0,
 };

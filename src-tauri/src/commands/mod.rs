@@ -1,6 +1,7 @@
 pub mod assets;
 pub mod bridge;
 pub mod diagnostics;
+pub mod documents;
 pub mod environment;
 pub mod fs;
 pub mod github;

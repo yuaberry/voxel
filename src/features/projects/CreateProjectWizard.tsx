@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
+import { BriefingPicker } from "@/components/BriefingPicker";
+import { writeBriefingDocuments } from "@/services/documents/documentsService";
 import {
   Dialog,
   DialogContent,
@@ -66,6 +68,8 @@ export function CreateProjectWizard() {
   const [author, setAuthor] = useState(settings.general.authorName);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [busy, setBusy] = useState(false);
+  // the user's own docs (.txt/.md/.pdf/.docx) become the project's design truth
+  const [briefingDocs, setBriefingDocs] = useState<{ fileName: string; kind: string; text: string }[]>([]);
 
   // ---- Version catalog (auto-updating) ----
   const [versions, setVersions] = useState<MinecraftVersionInfo[]>([]);
@@ -205,6 +209,23 @@ export function CreateProjectWizard() {
       };
       await insertProject(record);
       addProject(record);
+
+      // The user's own documents land where the agent reads them —
+      // contextService injects every briefing into the system prompt.
+      if (briefingDocs.length > 0) {
+        try {
+          await writeBriefingDocuments(
+            basePath,
+            `projects/${slug}/.voxel/briefing`,
+            briefingDocs,
+          );
+        } catch (error) {
+          toast.warning("Briefing documents could not be attached", {
+            description: `${error instanceof Error ? error.message : String(error)} — the project itself was created normally.`,
+          });
+        }
+        setBriefingDocs([]);
+      }
 
       toast.success(`Project "${name.trim()}" created`, {
         description: `${result.filesCreated} files · MC ${resolved.minecraftVersion} · Java ${resolved.javaRelease}`,
@@ -383,6 +404,10 @@ export function CreateProjectWizard() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-card/50 p-3">
+            <BriefingPicker docs={briefingDocs} onChange={setBriefingDocs} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

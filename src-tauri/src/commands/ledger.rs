@@ -273,6 +273,10 @@ pub fn ledger_verify(base_path: String, slug: String) -> Result<VerifyResult, St
 pub struct PurchaseIntent {
     pub player: String,
     pub item_id: u32,
+    /// "buy" (classic market) or "convert" (mined coins -> chain tokens,
+    /// the /convert flow the owner designed)
+    #[serde(default)]
+    pub kind: String,
 }
 
 /// Returns new purchase intents since the last call (offset persisted next to
@@ -302,6 +306,20 @@ pub fn ledger_tail_intents(
 
     let mut intents = Vec::new();
     for line in consumed.iter() {
+        // The custom-commands /convert flow writes CONVERT intents: mined
+        // coins exchanged for chain tokens, processed by the panel.
+        if let Some(rest) = line.split_once("[VoxelCoin] CONVERT ") {
+            let mut parts = rest.1.split_whitespace();
+            if let (Some(player), Some(amount)) = (parts.next(), parts.next()) {
+                if let Ok(value) = amount.parse::<u32>() {
+                    intents.push(PurchaseIntent {
+                        player: player.to_string(),
+                        item_id: value,
+                        kind: "convert".to_string(),
+                    });
+                }
+            }
+        }
         if let Some(rest) = line.split_once("[VoxelCoin] BUY ") {
             let mut parts = rest.1.split_whitespace();
             if let (Some(player), Some(item)) = (parts.next(), parts.next()) {
@@ -309,6 +327,7 @@ pub fn ledger_tail_intents(
                     intents.push(PurchaseIntent {
                         player: player.to_string(),
                         item_id,
+                        kind: "buy".to_string(),
                     });
                 }
             }
@@ -340,6 +359,41 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn tail_intents_parse_buy_and_convert_with_offset() {
+        let base = base_dir("tail");
+        let slug = "shop";
+        let logs = base.join("servers").join(slug).join("logs");
+        std::fs::create_dir_all(&logs).unwrap();
+        let log = logs.join("latest.log");
+        std::fs::write(
+            &log,
+            "[19:20:01] [Server thread/INFO]: [VoxelCoin] BUY Alice 3\n[19:20:02] [Server thread/INFO]: [VoxelCoin] CONVERT Bob 250\n",
+        )
+        .unwrap();
+
+        let first = ledger_tail_intents(base.to_string_lossy().to_string(), slug.to_string()).unwrap();
+        assert_eq!(first.len(), 2);
+        assert_eq!(first[0].player, "Alice");
+        assert_eq!(first[0].item_id, 3);
+        assert_eq!(first[0].kind, "buy");
+        assert_eq!(first[1].player, "Bob");
+        assert_eq!(first[1].item_id, 250, "convert carries the AMOUNT in item_id");
+        assert_eq!(first[1].kind, "convert");
+
+        // the offset guarantees nothing is re-read
+        let second = ledger_tail_intents(base.to_string_lossy().to_string(), slug.to_string()).unwrap();
+        assert!(second.is_empty(), "no duplicates");
+
+        // a rotated (shrunk) log resets honestly
+        std::fs::write(&log, "[20:00:00] [Server thread/INFO]: [VoxelCoin] BUY Carol 1\n").unwrap();
+        let third = ledger_tail_intents(base.to_string_lossy().to_string(), slug.to_string()).unwrap();
+        assert_eq!(third.len(), 1);
+        assert_eq!(third[0].player, "Carol");
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

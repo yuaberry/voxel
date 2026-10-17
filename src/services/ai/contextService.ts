@@ -29,6 +29,8 @@ export interface ProjectContext {
   decisions: string | null;
   fileTreePreview: string;
   referenceCount: number;
+  /** user-imported briefing documents (.txt/.md/.pdf/.docx -> .brief.md) */
+  briefing: string | null;
 }
 
 /** Where the spec file lives for this project (.voxel preferred, .nexus legacy). */
@@ -67,7 +69,7 @@ export async function loadProjectContext(
   const basePath = await getStorageBase();
   const rel = `projects/${project.slug}`;
 
-  const [spec, styleBible, aiMemory, loreBible, gameplayBible, decisions, files] =
+  const [spec, styleBible, aiMemory, loreBible, gameplayBible, decisions, files, briefings] =
     await Promise.all([
       readFirst(basePath, rel, "project-spec.json"),
       readFirst(basePath, rel, "style-bible.md"),
@@ -76,7 +78,20 @@ export async function loadProjectContext(
       readFirst(basePath, rel, "gameplay-bible.md"),
       readFirst(basePath, rel, "decisions.md"),
       listProjectFiles(basePath, rel).catch(() => []),
+      // the user's OWN documents (txt/md/pdf/docx) live in .voxel/briefing/
+      listProjectFiles(basePath, `${rel}/.voxel/briefing`).catch(() => []),
     ]);
+  const briefing =
+    (await Promise.all(
+      briefings
+        .filter((f) => !f.is_dir && f.path.endsWith(".brief.md"))
+        .slice(0, 8)
+        .map((f) =>
+          readProjectFile(basePath, `${rel}/.voxel/briefing/${f.path}`).catch(() => null),
+        ),
+    ))
+      .filter((x): x is string => x !== null)
+      .join("\n\n---\n\n") || null;
 
   let projectSpecParsed: Record<string, unknown> | null = null;
   if (spec) {
@@ -109,6 +124,7 @@ export async function loadProjectContext(
     loreBible,
     gameplayBible,
     decisions,
+    briefing,
     fileTreePreview: treePreview,
     referenceCount,
   };
@@ -136,6 +152,10 @@ ${context.gameplayBible ?? "(not found)"}
 
 AI MEMORY (decisions and constraints so far):
 ${context.aiMemory ?? "(empty)"}
+
+USER BRIEFING DOCUMENTS (the user's OWN imported files — .txt/.md/.pdf/.docx;
+honor them as design intent, they outrank generic conventions):
+${context.briefing ?? "(none imported)"}
 
 DECISIONS (ADR log — read before structural changes):
 ${context.decisions ?? "(empty)"}
