@@ -8,7 +8,7 @@
   "use strict";
 
   const REPO = "yuaberry/voxel";
-  const VERSION = "0.6.0";
+  const VERSION = "0.7.0";
   const RELEASE_BASE = `https://github.com/${REPO}/releases/download/v${VERSION}/`;
   const ALL_RELEASES = `https://github.com/${REPO}/releases`;
   // Tauri bundle naming: productName "VOXEL" (v0.2.0+ — assets are

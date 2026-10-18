@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (47 sessões)
+## 5. Histórico de sessões (48 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 48 | Dossiê + Moeda + Comandos de mod | **Dossiê do servidor 30+ páginas em 6 formatos reais** (PDF writer próprio, DOCX/ODT válidos, HTML, TXT, MD; gerado no create + salvo onde quiser); **moeda própria com economia REAL** (BCE ao vivo USD→BRL/EUR, diluição mais-tokens-menos-valor, supply do ledger, compliance in-game honesto); **comandos custom que viajam DENTRO do jar** (datapack do mod remapeado, editor compartilhado) + v0.7.0 | entidades decodificadas 2×; nexus_ strip; tags do mod no lugar errado; stub de appendix |
 | 47 | Autonomia total | **Briefing docs** (.txt/.md/.pdf/.docx reais: docx unzipped, pdf-extract) lidos pelo agente; **Customize Server** (import world .zip atômico, estruturas .nbt com /place, **comandos customizados com mobs NBT + /convert → wallet chain**, plugins Paper do Modrinth); world setup no wizard; defaults de servidor nas settings; v0.6.0 | entidades decodificadas pelo pipeline (code points); routing do convert fora do gate; extensão antes do conteúdo |
 | 46 | Make it unbreakable | **Causa raiz do 2º "nada funciona"**: downloads podiam pendurar PARA SEMPRE (sem timeout total/retry) + app mudo com DB travado + servidor invisível se o row falhasse. Fixes: timeout 5min+retry+erros acionáveis; **diagnósticos reais** (Settings→Advanced, cada falha com o fix); **self-heal disco↔DB** (voxel-server.json + scan + reconcile); catálogo nunca-vazio; banner de emergência. **E2E do caminho async REAL** (download vivo ~10s) + v0.5.12 | ternário inexistente em Rust; expect_err exige Debug |
 | 45 | Classe async + sprites animados | **13 commands de ação → async+spawn_blocking** (server_create/launcher_prepare/túnel/snapshots/backups/modpacks/shaders/modrinth/create_project — a classe inteira fora da main thread) + **sprites ANIMADOS** (strip 16×16×N + .mcmeta, preview CSS steps, agent frames) + v0.5.11 | overflow u8; slices do strip; frame_at de 1 linha; Reader sem height; nota sem newline |
@@ -263,13 +264,13 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 47, v0.6.0)
+## 8. Estado atual (verificado — Sessão 48, v0.7.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (80) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (86) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Rust unit (85) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Vitest (87) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -283,7 +284,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.6.0 (latest)** | Desktop: **era de autonomia** — briefing docs próprios que o agente lê + Customize Server (worlds .zip, estruturas .nbt, comandos custom com mobs e /convert, plugins Paper) + defaults nas settings + APK mobile 0.3.1 |
+| **v0.7.0 (latest)** | Desktop: **Dossiê 30+ páginas × 6 formatos + moeda própria com FX real (USD/BRL/EUR) + comandos dentro dos mods** + APK mobile 0.3.1 |
+| v0.6.0 | Desktop: **era de autonomia** — briefing docs próprios que o agente lê + Customize Server (worlds .zip, estruturas .nbt, comandos custom com mobs e /convert, plugins Paper) + defaults nas settings + APK mobile 0.3.1 |
 | v0.5.12 | Desktop: **downloads à prova de travamento (timeout+retry) + diagnósticos reais + self-heal disco↔DB + banner de emergência** + APK mobile 0.3.1 |
 | v0.5.11 | Desktop: **classe async completa (ações nunca congelam) + sprites animados** + APK mobile 0.3.1 |
 | v0.5.10 | Desktop: **HOTFIX congelamento da área de Servidores** + APK mobile 0.3.1 |
@@ -322,7 +324,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 80 unit
+cd src-tauri && cargo test          # 85 unit
 cargo test --lib -- --ignored --nocapture # 11 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -1172,3 +1174,21 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (35) ✓ · vitest **86/86** (+9 custom commands) ✓ · cargo **80/80** (+8: 5 documents + world/structure imports + tail intents; 11 E2E) ✓ · vite build 2m09s ✓ · boot vivo 0 panics ✓. Release **v0.6.0** (minor — era de autonomia).
 
 **Nota de compliance**: "compatível com Google Drive" = os formatos que o Drive/Docs exporta (txt/md/pdf/docx), sem integração com a API do Google (não pedida, sem OAuth novo).
+
+---
+
+## 48. Sessão 48 — Dossiê do servidor (30+ páginas × 6 formatos) · Moeda própria com economia REAL · Comandos dentro dos mods
+
+**Pedido do dono**: comandos próprios para servidor OU mods; ao gerar o mundo do servidor, um arquivo com TODAS as informações (servidor, comandos, versões, o que cada coisa faz/áreas) — um **Dossiê** como o do projeto dele "Mirai Studio", mínimo 30-45 páginas, baixável em .TXT/.PDF/.DOCX/.MD/outras extensões de leitura; verificação de erros; release multi-OS; a **criação da criptomoeda própria** com quantidade de tokens e economia REAL (mais tokens = menos valor) baseada em USD/BRL/EUR convertidos automaticamente.
+
+**Entregue**:
+
+1. **The Server Dossier** (`dossier.rs`): um único markdown factual (tudo lido do disco: properties, manifest, datapacks, comandos custom parseados das mcfunctions, ledger REAL, moeda, briefings, java/OS) renderizado em **6 formatos de verdade**: .md · .txt · .html (tabelas estilizadas) · **.pdf (writer próprio** — páginas reais, Helvetica/Courier, quebra por capítulo, xref completo — o mesmo layout que os testes provam legível) · **.docx (pacote Word válido** com styles/headings/bold runs) · **.odt (mimetype primeiro e STORED, como manda o ODF)**. Conteúdo: overview, manual de operações, áreas com a grid REAL das 16 ilhas (coords), tabela de todos os módulos e comandos, segurança, troubleshooting (modos reais de falha), economia com **exemplos computados da diluição** e apêndices A-F (properties, árvore, funções geradas, manifests, transações da chain, briefings). Gerado no `server_create` (best-effort) + regenerável/salvável em qualquer lugar via Customize → Dossier (`dossier_save_copy`: leitura guardada dentro, dialog nativa fora). **Teste: servidor rico (8 módulos + custom + ledger + moeda) → 30+ páginas PDF provadas + estrutura de cada formato verificada.**
+2. **Moeda própria com economia REAL** (`fx.rs` + `currencyService.ts`): taxas AO VIVO do **BCE via frankfurter** (sem key, cache 1h no workspace, fallback honesto offline), designer da moeda (nome/símbolo/supply máximo/fator de diluição/valor de referência USD), supply circulante = FATO do ledger (mints−burns), valor = `referência/(1+circulante/diluição)` — **quanto mais tokens, menos vale cada um**, cotado em USD e **convertido para BRL e EUR automaticamente** (painel mostra a data ECB). Mint registrado na chain SHA-256. **Compliance permanente em todas as superfícies**: moeda do jogo com indexação FX real — NÃO é criptomoeda, sem valor monetário, sem saque (checklist de valor real externo continua com o dono, regra §6.12).
+3. **Comandos dentro dos MODS** (`generateModCommandFiles` + `CommandDraftEditor` compartilhado + `ModCommandsDialog` no workspace com botão Commands): o mesmo estúdio remapeado — functions em `src/main/resources/data/<modId>/`, tags em `data/minecraft/tags/functions/` apontando pro namespace do mod, sem pack.mcmeta duplicado (o template já tem). O jar carrega; Deploy espalha. Teste prova o remap (zero referências `nexus_custom` sobrando).
+
+**Bugs caçados (7)**: entidades HTML decodificadas pelo pipeline de novo (2× — code points em TODOS os escapes de dossier/fx); módulos com prefixo nexus_ não casavam na tabela de docs (strip); appendices liam arquivos via stub (server_dir real nos facts); tags remapeadas para o lugar ERRADO no mod (data/minecraft raiz, não aninhado); closure borrow de `dir`/`slug` movidos (clone + ordem); ZipFile read_to_string sem import no mod de testes; `mimetype` precisa escopo p/ borrow duplo.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (35) ✓ · vitest **87/87** ✓ · cargo **85/85** (+5: 2 dossier + 3 fx; 11 E2E) ✓ · vite build 1m29s ✓ · boot vivo 0 panics ✓. Release **v0.7.0**.
+
+**Notas de escopo honestas**: "outras extensões de leitura" = .html e .odt além das 4 pedidas; páginas do dossiê = tamanho dos FATOS (30+ com módulos instalados — servidor vanilla vazio produz dossiê menor, sem inflar fake); moeda = economia de jogo indexada a câmbio real (não token financeiro — compliance do briefing original).
