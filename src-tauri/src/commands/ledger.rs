@@ -144,7 +144,13 @@ fn validate_tx(blocks: &[Block], tx: &str, from: &str, amount: i64) -> Result<()
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub fn ledger_init(base_path: String, slug: String, currency: String) -> Result<Block, String> {
+pub async fn ledger_init(base_path: String, slug: String, currency: String) -> Result<Block, String> {
+    tauri::async_runtime::spawn_blocking(move || ledger_init_impl(base_path, slug, currency))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn ledger_init_impl(base_path: String, slug: String, currency: String) -> Result<Block, String> {
     let base = Path::new(&base_path);
     let path = ledger_path(base, &slug);
     if path.exists() {
@@ -168,7 +174,22 @@ pub fn ledger_init(base_path: String, slug: String, currency: String) -> Result<
 }
 
 #[tauri::command]
-pub fn ledger_apply(
+pub async fn ledger_apply(
+    base_path: String,
+    slug: String,
+    tx: String,
+    from: String,
+    to: String,
+    amount: i64,
+) -> Result<Block, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        ledger_apply_impl(base_path, slug, tx, from, to, amount)
+    })
+    .await
+    .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn ledger_apply_impl(
     base_path: String,
     slug: String,
     tx: String,
@@ -212,7 +233,13 @@ pub struct LedgerSnapshot {
 }
 
 #[tauri::command]
-pub fn ledger_list(base_path: String, slug: String) -> Result<LedgerSnapshot, String> {
+pub async fn ledger_list(base_path: String, slug: String) -> Result<LedgerSnapshot, String> {
+    tauri::async_runtime::spawn_blocking(move || ledger_list_impl(base_path, slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn ledger_list_impl(base_path: String, slug: String) -> Result<LedgerSnapshot, String> {
     let blocks = read_blocks(&ledger_path(Path::new(&base_path), &slug))?;
     let length = blocks.len() as u64;
     let balances = compute_balances(&blocks);
@@ -228,7 +255,13 @@ pub struct VerifyResult {
 }
 
 #[tauri::command]
-pub fn ledger_verify(base_path: String, slug: String) -> Result<VerifyResult, String> {
+pub async fn ledger_verify(base_path: String, slug: String) -> Result<VerifyResult, String> {
+    tauri::async_runtime::spawn_blocking(move || ledger_verify_impl(base_path, slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn ledger_verify_impl(base_path: String, slug: String) -> Result<VerifyResult, String> {
     let blocks = read_blocks(&ledger_path(Path::new(&base_path), &slug))?;
     let mut prev_hash = "GENESIS".to_string();
     for (position, block) in blocks.iter().enumerate() {
@@ -283,7 +316,16 @@ pub struct PurchaseIntent {
 /// the ledger). Lines look like:
 /// `[19:20:01] [Server thread/INFO]: [VoxelCoin] BUY Alice 3`
 #[tauri::command]
-pub fn ledger_tail_intents(
+pub async fn ledger_tail_intents(
+    base_path: String,
+    slug: String,
+) -> Result<Vec<PurchaseIntent>, String> {
+    tauri::async_runtime::spawn_blocking(move || ledger_tail_intents_impl(base_path, slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn ledger_tail_intents_impl(
     base_path: String,
     slug: String,
 ) -> Result<Vec<PurchaseIntent>, String> {
@@ -374,7 +416,7 @@ mod tests {
         )
         .unwrap();
 
-        let first = ledger_tail_intents(base.to_string_lossy().to_string(), slug.to_string()).unwrap();
+        let first = ledger_tail_intents_impl(base.to_string_lossy().to_string(), slug.to_string()).unwrap();
         assert_eq!(first.len(), 2);
         assert_eq!(first[0].player, "Alice");
         assert_eq!(first[0].item_id, 3);
@@ -384,12 +426,12 @@ mod tests {
         assert_eq!(first[1].kind, "convert");
 
         // the offset guarantees nothing is re-read
-        let second = ledger_tail_intents(base.to_string_lossy().to_string(), slug.to_string()).unwrap();
+        let second = ledger_tail_intents_impl(base.to_string_lossy().to_string(), slug.to_string()).unwrap();
         assert!(second.is_empty(), "no duplicates");
 
         // a rotated (shrunk) log resets honestly
         std::fs::write(&log, "[20:00:00] [Server thread/INFO]: [VoxelCoin] BUY Carol 1\n").unwrap();
-        let third = ledger_tail_intents(base.to_string_lossy().to_string(), slug.to_string()).unwrap();
+        let third = ledger_tail_intents_impl(base.to_string_lossy().to_string(), slug.to_string()).unwrap();
         assert_eq!(third.len(), 1);
         assert_eq!(third[0].player, "Carol");
 
@@ -412,11 +454,11 @@ mod tests {
         let slug = format!("test-{}", std::process::id());
         std::fs::create_dir_all(base.join("servers").join(&slug)).unwrap();
 
-        ledger_init(base.to_string_lossy().to_string(), slug.clone(), "VoxelCoin".into())
+        ledger_init_impl(base.to_string_lossy().to_string(), slug.clone(), "VoxelCoin".into())
             .unwrap();
 
         let tx = |tx: &str, from: &str, to: &str, amount: i64| {
-            ledger_apply(
+            ledger_apply_impl(
                 base.to_string_lossy().to_string(),
                 slug.clone(),
                 tx.to_string(),
@@ -432,18 +474,18 @@ mod tests {
         tx("burn", "bob", "", 5);
 
         let snapshot =
-            ledger_list(base.to_string_lossy().to_string(), slug.clone()).unwrap();
+            ledger_list_impl(base.to_string_lossy().to_string(), slug.clone()).unwrap();
         assert_eq!(snapshot.length, 4); // genesis + 3
         assert_eq!(snapshot.balances.get("alice"), Some(&70));
         assert_eq!(snapshot.balances.get("bob"), Some(&25));
 
         let verify =
-            ledger_verify(base.to_string_lossy().to_string(), slug.clone()).unwrap();
+            ledger_verify_impl(base.to_string_lossy().to_string(), slug.clone()).unwrap();
         assert!(verify.valid, "chain must verify");
         assert_eq!(verify.checked, 4);
 
         // Insufficient funds are refused
-        let err = ledger_apply(
+        let err = ledger_apply_impl(
             base.to_string_lossy().to_string(),
             slug.clone(),
             "transfer".into(),
@@ -461,8 +503,8 @@ mod tests {
         let base = base_dir("tamper");
         let slug = format!("tamper-{}", std::process::id());
         std::fs::create_dir_all(base.join("servers").join(&slug)).unwrap();
-        ledger_init(base.to_string_lossy().to_string(), slug.clone(), "C".into()).unwrap();
-        ledger_apply(
+        ledger_init_impl(base.to_string_lossy().to_string(), slug.clone(), "C".into()).unwrap();
+        ledger_apply_impl(
             base.to_string_lossy().to_string(),
             slug.clone(),
             "mint".into(),
@@ -478,7 +520,7 @@ mod tests {
         let corrupted = raw.replace("\"amount\":50", "\"amount\":500");
         std::fs::write(&path, corrupted).unwrap();
 
-        let verify = ledger_verify(base.to_string_lossy().to_string(), slug.clone()).unwrap();
+        let verify = ledger_verify_impl(base.to_string_lossy().to_string(), slug.clone()).unwrap();
         assert!(!verify.valid, "tamper must be detected");
         assert_eq!(verify.first_bad_index, Some(1));
 

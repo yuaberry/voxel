@@ -388,7 +388,7 @@ fn server_create_impl(
         ram_mb,
         modules: Vec::new(),
     };
-    if let Err(e) = server_write_info(info) {
+    if let Err(e) = server_write_info_impl(info) {
         eprintln!("DEBUG server_write_info failed: {e}");
     }
 
@@ -621,7 +621,13 @@ fn add_dir_to_zip(
 }
 
 #[tauri::command]
-pub fn server_list_backups(base_path: String, slug: String) -> Result<Vec<BackupInfo>, String> {
+pub async fn server_list_backups(base_path: String, slug: String) -> Result<Vec<BackupInfo>, String> {
+    tauri::async_runtime::spawn_blocking(move || server_list_backups_impl(base_path, slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn server_list_backups_impl(base_path: String, slug: String) -> Result<Vec<BackupInfo>, String> {
     let dest = backups_dir(Path::new(&base_path), &slug);
     let mut out = Vec::new();
     if !dest.is_dir() {
@@ -709,7 +715,13 @@ fn server_restore_impl(base_path: String, slug: String, backup_path: String) -> 
 }
 
 #[tauri::command]
-pub fn server_delete(base_path: String, slug: String) -> Result<(), String> {
+pub async fn server_delete(base_path: String, slug: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || server_delete_impl(base_path, slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn server_delete_impl(base_path: String, slug: String) -> Result<(), String> {
     if process::is_running(&format!("server/{slug}")) {
         return Err("Stop the server first".to_string());
     }
@@ -926,7 +938,13 @@ fn render_server_readme(payload: &ServerInfoPayload, dir: &std::path::Path) -> S
 }
 
 #[tauri::command]
-pub fn server_write_info(payload: ServerInfoPayload) -> Result<String, String> {
+pub async fn server_write_info(payload: ServerInfoPayload) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || server_write_info_impl(payload))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn server_write_info_impl(payload: ServerInfoPayload) -> Result<String, String> {
     let base = std::path::PathBuf::from(&payload.storage_base)
         .canonicalize()
         .map_err(|e| format!("Storage base not accessible: {e}"))?;
@@ -1357,7 +1375,7 @@ mod unit_tests {
         assert!(readme.contains("not affiliated with"));
 
         // module rewrite adds the docs of ONLY the installed modules
-        let path = server_write_info(ServerInfoPayload {
+        let path = server_write_info_impl(ServerInfoPayload {
             storage_base: base.to_string_lossy().to_string(),
             slug: "info-server".to_string(),
             name: "Info Server".to_string(),
@@ -1380,7 +1398,7 @@ mod unit_tests {
         assert!(readme.contains("| `/trigger nexus_token set <1-5>` |"));
 
         // and the prison module documents the /mine experience the owner asked for
-        let path = server_write_info(ServerInfoPayload {
+        let path = server_write_info_impl(ServerInfoPayload {
             storage_base: base.to_string_lossy().to_string(),
             slug: "info-server".to_string(),
             name: "Info Server".to_string(),
@@ -1396,7 +1414,7 @@ mod unit_tests {
         assert!(readme.contains("| `/function nexus_prison:warp_c` |"));
 
         // the new gameplay modules document themselves too
-        let path = server_write_info(ServerInfoPayload {
+        let path = server_write_info_impl(ServerInfoPayload {
             storage_base: base.to_string_lossy().to_string(),
             slug: "info-server".to_string(),
             name: "Info Server".to_string(),
@@ -1759,7 +1777,7 @@ mod e2e_tests {
             .expect("restore");
 
         // 6. delete
-        server_delete(base.clone(), slug.to_string()).expect("delete");
+        server_delete_impl(base.clone(), slug.to_string()).expect("delete");
         assert!(!dir.exists(), "server dir must be gone");
 
         eprintln!("E2E SERVER OK — jar: {}", setup.jar_path);

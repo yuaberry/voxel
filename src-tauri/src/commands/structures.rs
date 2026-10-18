@@ -657,7 +657,13 @@ fn safe_structure_id(id: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn structure_generate(payload: StructureGenPayload) -> Result<StructureGenResult, String> {
+pub async fn structure_generate(payload: StructureGenPayload) -> Result<StructureGenResult, String> {
+    tauri::async_runtime::spawn_blocking(move || structure_generate_impl(payload))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn structure_generate_impl(payload: StructureGenPayload) -> Result<StructureGenResult, String> {
     let kind = StructureKind::from_str(payload.kind.trim())
         .ok_or_else(|| format!("Unknown structure kind \"{}\" — use watchtower|cottage|obelisk|ruin", payload.kind))?;
     safe_structure_id(&payload.structure_id)?;
@@ -759,7 +765,7 @@ mod tests {
             fake_project(&base);
             p.storage_base = base.to_string_lossy().to_string();
 
-            let result = structure_generate(p).unwrap();
+            let result = structure_generate_impl(p).unwrap();
             assert!(result.block_count > 40, "kind {kind} drew only {}", result.block_count);
             assert_eq!(result.blocks.len(), result.block_count);
 
@@ -798,7 +804,7 @@ mod tests {
         p.project_rel = "servers/arena".to_string();
         p.structure_id = "grand_tower".to_string();
         p.output_kind = Some("server_module".to_string());
-        let result = structure_generate(p).unwrap();
+        let result = structure_generate_impl(p).unwrap();
         let wrote = result.wrote_path.unwrap();
         assert!(
             wrote.contains("servers/arena/world/datapacks/nexus_monuments/data/nexus_monuments/structures/grand_tower.nbt"),
@@ -810,7 +816,7 @@ mod tests {
         let mut p = payload("obelisk", true);
         p.storage_base = base.to_string_lossy().to_string();
         p.output_kind = Some("castle".to_string());
-        assert!(structure_generate(p).is_err());
+        assert!(structure_generate_impl(p).is_err());
         let _ = std::fs::remove_dir_all(&base);
     }
 
@@ -843,7 +849,7 @@ mod tests {
         let mut p = payload("obelisk", false);
         p.storage_base = base.to_string_lossy().to_string();
         p.structure_id = "elder_obelisk".to_string();
-        let result = structure_generate(p).unwrap();
+        let result = structure_generate_impl(p).unwrap();
         let wrote = result.wrote_path.clone().unwrap();
         // 1.20.1 → structures/ (plural)
         assert!(wrote.contains("data/dark_kingdom/structures/elder_obelisk.nbt"), "{wrote}");
@@ -854,7 +860,7 @@ mod tests {
         p.storage_base = base.to_string_lossy().to_string();
         p.mc_version = "1.21.4".to_string();
         let bytes = base64::engine::general_purpose::STANDARD
-            .decode(&structure_generate(p).unwrap().nbt_base64)
+            .decode(&structure_generate_impl(p).unwrap().nbt_base64)
             .unwrap();
         let mut decoder = flate2::read::GzDecoder::new(&bytes[..]);
         let mut nbt = Vec::new();
@@ -865,14 +871,14 @@ mod tests {
         let mut p = payload("ruin", false);
         p.storage_base = base.to_string_lossy().to_string();
         p.project_rel = "projects/../../etc".to_string();
-        assert!(structure_generate(p).is_err());
+        assert!(structure_generate_impl(p).is_err());
         let mut p = payload("ruin", false);
         p.storage_base = base.to_string_lossy().to_string();
         p.structure_id = "Bad-Id".to_string();
-        assert!(structure_generate(p).is_err());
+        assert!(structure_generate_impl(p).is_err());
         let mut p = payload("castle", true);
         p.storage_base = base.to_string_lossy().to_string();
-        assert!(structure_generate(p).is_err());
+        assert!(structure_generate_impl(p).is_err());
         let _ = std::fs::remove_dir_all(&base);
     }
 }

@@ -64,7 +64,13 @@ fn valid_package(package: &str) -> bool {
 }
 
 #[tauri::command]
-pub fn create_project(payload: CreateProjectPayload) -> Result<CreateProjectResult, String> {
+pub async fn create_project(payload: CreateProjectPayload) -> Result<CreateProjectResult, String> {
+    tauri::async_runtime::spawn_blocking(move || create_project_impl(payload))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn create_project_impl(payload: CreateProjectPayload) -> Result<CreateProjectResult, String> {
     let name = payload.name.trim();
     if name.is_empty() {
         return Err("Project name cannot be empty".to_string());
@@ -221,32 +227,32 @@ mod tests {
         let mut p = payload("valid-slug");
         p.storage_base = std::env::temp_dir().to_string_lossy().to_string();
         p.slug = "Invalid Slug".to_string();
-        assert!(create_project(p).is_err());
+        assert!(create_project_impl(p).is_err());
 
         let mut p = payload("valid-slug");
         p.storage_base = std::env::temp_dir().to_string_lossy().to_string();
         p.package = "Invalid.Package".to_string();
-        assert!(create_project(p).is_err());
+        assert!(create_project_impl(p).is_err());
 
         // Template and loader must agree (stale client defense)
         let mut p = payload("valid-slug");
         p.storage_base = std::env::temp_dir().to_string_lossy().to_string();
         p.loader = "forge".to_string();
-        assert!(create_project(p).is_err(), "fabric template with forge loader must be refused");
+        assert!(create_project_impl(p).is_err(), "fabric template with forge loader must be refused");
         let mut p = payload("valid-slug");
         p.storage_base = std::env::temp_dir().to_string_lossy().to_string();
         p.template = "forge-1.20.1-mod".to_string();
         p.loader = "fabric".to_string();
-        assert!(create_project(p).is_err(), "forge template with fabric loader must be refused");
+        assert!(create_project_impl(p).is_err(), "forge template with fabric loader must be refused");
         let mut p = payload("valid-slug");
         p.storage_base = std::env::temp_dir().to_string_lossy().to_string();
         p.loader = "quilt".to_string();
-        assert!(create_project(p).is_err(), "unknown loader must be refused");
+        assert!(create_project_impl(p).is_err(), "unknown loader must be refused");
 
         let mut p = payload("valid-slug");
         p.storage_base = std::env::temp_dir().to_string_lossy().to_string();
         p.pack_format = 0;
-        assert!(create_project(p).is_err(), "pack_format=0 must be refused");
+        assert!(create_project_impl(p).is_err(), "pack_format=0 must be refused");
     }
 
     #[test]
@@ -257,7 +263,7 @@ mod tests {
         let mut p = payload("dark-kingdom");
         p.storage_base = base.to_string_lossy().to_string();
 
-        let result = create_project(p).unwrap();
+        let result = create_project_impl(p).unwrap();
         let project_dir = std::path::PathBuf::from(&result.project_path);
         assert!(project_dir.join("build.gradle").is_file());
         assert!(project_dir
@@ -269,7 +275,7 @@ mod tests {
         // Duplicate slug must be refused
         let mut dup = payload("dark-kingdom");
         dup.storage_base = base.to_string_lossy().to_string();
-        assert!(create_project(dup).is_err());
+        assert!(create_project_impl(dup).is_err());
 
         let _ = std::fs::remove_dir_all(&base);
     }
@@ -321,7 +327,7 @@ mod e2e_tests {
             pack_format: 15,
         };
 
-        let result = create_project(payload).expect("project creation must succeed");
+        let result = create_project_impl(payload).expect("project creation must succeed");
         let project_dir = std::path::PathBuf::from(&result.project_path);
 
         // Warm the app's real cache so the first user build is fast
@@ -434,7 +440,7 @@ mod e2e_tests {
             pack_format: 46,
         };
 
-        let result = create_project(payload).expect("project creation must succeed");
+        let result = create_project_impl(payload).expect("project creation must succeed");
         let project_dir = std::path::PathBuf::from(&result.project_path);
         let gradle_home = base.join(".gradle-cache");
         std::fs::create_dir_all(&gradle_home).unwrap();
@@ -499,7 +505,7 @@ mod e2e_tests {
             pack_format: 46,
         };
 
-        let result = create_project(payload).expect("project creation must succeed");
+        let result = create_project_impl(payload).expect("project creation must succeed");
         let project_dir = std::path::PathBuf::from(&result.project_path);
         let gradle_home = base.join(".gradle-cache");
         std::fs::create_dir_all(&gradle_home).unwrap();
@@ -566,7 +572,7 @@ mod e2e_tests {
             pack_format: 18,
         };
 
-        let result = create_project(payload).expect("project creation must succeed");
+        let result = create_project_impl(payload).expect("project creation must succeed");
         let project_dir = std::path::PathBuf::from(&result.project_path);
         let gradle_home = base.join(".gradle-cache");
         std::fs::create_dir_all(&gradle_home).unwrap();

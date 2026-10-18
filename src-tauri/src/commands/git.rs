@@ -129,7 +129,13 @@ fn valid_label_component(reason: &str) -> String {
 }
 
 #[tauri::command]
-pub fn project_create_snapshot(
+pub async fn project_create_snapshot(base_path: String, project_rel: String, reason: String) -> Result<SnapshotEntry, String> {
+    tauri::async_runtime::spawn_blocking(move || project_create_snapshot_impl(base_path, project_rel, reason))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn project_create_snapshot_impl(
     base_path: String,
     project_rel: String,
     reason: String,
@@ -207,7 +213,13 @@ pub fn project_list_snapshots(
 /// Restores the working tree from a snapshot commit while preserving history
 /// (working-tree restore + a new restore commit).
 #[tauri::command]
-pub fn project_snapshot_restore(
+pub async fn project_snapshot_restore(base_path: String, project_rel: String, sha: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || project_snapshot_restore_impl(base_path, project_rel, sha))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn project_snapshot_restore_impl(
     base_path: String,
     project_rel: String,
     sha: String,

@@ -465,7 +465,13 @@ pub struct ExportableAssets {
 /// Everything the export wizard can truthfully offer: jars actually built by
 /// this workspace's projects and shaderpacks authored in this app.
 #[tauri::command]
-pub fn modpack_exportable_assets(storage_base: String) -> Result<ExportableAssets, String> {
+pub async fn modpack_exportable_assets(storage_base: String) -> Result<ExportableAssets, String> {
+    tauri::async_runtime::spawn_blocking(move || modpack_exportable_assets_impl(storage_base))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn modpack_exportable_assets_impl(storage_base: String) -> Result<ExportableAssets, String> {
     let base = workspace_base(&storage_base)?;
     let mut jars = Vec::new();
     let projects = base.join("projects");
@@ -715,7 +721,13 @@ fn read_jar_facts(jar_path: &Path, jar_name: &str) -> JarFacts {
 }
 
 #[tauri::command]
-pub fn modpack_check_compatibility(
+pub async fn modpack_check_compatibility(storage_base: String, mods: Vec<ModpackModIn>) -> Result<ModpackCompatibility, String> {
+    tauri::async_runtime::spawn_blocking(move || modpack_check_compatibility_impl(storage_base, mods))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn modpack_check_compatibility_impl(
     storage_base: String,
     mods: Vec<ModpackModIn>,
 ) -> Result<ModpackCompatibility, String> {
@@ -897,7 +909,13 @@ pub fn modpack_list_impl(storage_base: String) -> Result<Vec<SavedModpack>, Stri
 }
 
 #[tauri::command]
-pub fn modpack_delete(storage_base: String, file_name: String) -> Result<(), String> {
+pub async fn modpack_delete(storage_base: String, file_name: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || modpack_delete_impl(storage_base, file_name))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn modpack_delete_impl(storage_base: String, file_name: String) -> Result<(), String> {
     let base = workspace_base(&storage_base)?;
     let name = safe_file_name(&file_name)?;
     let target = base.join("modpacks").join(name);
@@ -1143,7 +1161,7 @@ versionRange="[1.21,1.22)"
             "fabric.mod.json",
         );
 
-        let result = modpack_check_compatibility(
+        let result = modpack_check_compatibility_impl(
             base.to_string_lossy().to_string(),
             vec![
                 ModpackModIn { project_slug: "dark-kingdom".into(), jar_file: "dark_kingdom-0.1.0.jar".into() },
@@ -1174,7 +1192,7 @@ versionRange="[1.21,1.22)"
             "fabric.mod.json",
         );
 
-        let result = modpack_check_compatibility(
+        let result = modpack_check_compatibility_impl(
             base.to_string_lossy().to_string(),
             vec![
                 ModpackModIn { project_slug: "dark-kingdom".into(), jar_file: "dark_kingdom-0.1.0.jar".into() },
@@ -1234,10 +1252,10 @@ versionRange="[1.21,1.22)"
         assert!(!pack.created_at.is_empty());
 
         // delete by name; a fake name and traversal are refused
-        modpack_delete(base.to_string_lossy().to_string(), pack.file_name.clone()).unwrap();
+        modpack_delete_impl(base.to_string_lossy().to_string(), pack.file_name.clone()).unwrap();
         assert!(modpack_list_impl(base.to_string_lossy().to_string()).unwrap().is_empty());
-        assert!(modpack_delete(base.to_string_lossy().to_string(), "nope.zip".to_string()).is_err());
-        assert!(modpack_delete(base.to_string_lossy().to_string(), "../escape.zip".to_string()).is_err());
+        assert!(modpack_delete_impl(base.to_string_lossy().to_string(), "nope.zip".to_string()).is_err());
+        assert!(modpack_delete_impl(base.to_string_lossy().to_string(), "../escape.zip".to_string()).is_err());
 
         let _ = std::fs::remove_dir_all(&base);
     }

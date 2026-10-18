@@ -250,6 +250,9 @@ fn gather_facts(base: &Path, slug: &str) -> Result<DossierFacts, String> {
         }
     }
     pack_names.sort();
+    // curation: the custom-commands pack has its own dedicated section;
+    // imports keep their generic entry — the list stays meaningful
+    modules.retain(|m| m != "nexus_custom");
     modules.sort();
     // custom commands live in their own pack
     let custom_commands = collect_custom_commands(&packs_root.join("nexus_custom"));
@@ -871,11 +874,70 @@ fn md_line_to_docx_paragraph(line: &str, mono: bool) -> String {
     format!("<w:p>{ppr}{runs}</w:p>")
 }
 
+fn docx_cell(text: &str, fill: Option<&str>, white_text: bool) -> String {
+    let color = if white_text { "<w:color w:val=\"FFFFFF\"/>" } else { "" };
+    let shading = fill
+        .map(|f| format!("<w:shd w:val=\"clear\" w:fill=\"{f}\"/>"))
+        .unwrap_or_default();
+    let runs = docx_runs(&text.replace('`', ""));
+    format!(
+        "<w:tc><w:tcPr>{shading}<w:tcW w:w=\"2400\" w:type=\"dxa\"/></w:tcPr><w:p><w:pPr><w:rPr>{color}</w:rPr></w:pPr>{runs}</w:p></w:tc>"
+    )
+}
+
+fn docx_table(rows: &[Vec<String>]) -> String {
+    // first row = header (purple band, white bold), the rest zebra-striped
+    let mut xml = String::from(
+        "<w:tbl><w:tblPr><w:tblW w:w=\"5000\" w:type=\"pct\"/><w:tblBorders>\
+<w:top w:val=\"single\" w:sz=\"4\" w:color=\"D9D5F2\"/><w:left w:val=\"single\" w:sz=\"4\" w:color=\"D9D5F2\"/>\
+<w:bottom w:val=\"single\" w:sz=\"4\" w:color=\"D9D5F2\"/><w:right w:val=\"single\" w:sz=\"4\" w:color=\"D9D5F2\"/>\
+<w:insideH w:val=\"single\" w:sz=\"4\" w:color=\"D9D5F2\"/><w:insideV w:val=\"single\" w:sz=\"4\" w:color=\"D9D5F2\"/></w:tblBorders></w:tblPr>",
+    );
+    for (i, row) in rows.iter().enumerate() {
+        xml.push_str("<w:tr>");
+        for (j, cell) in row.iter().enumerate() {
+            if i == 0 {
+                let bold_cell = format!("**{}**", cell);
+                let _ = bold_cell;
+                xml.push_str(&docx_cell(cell, Some("7C3AED"), true));
+            } else {
+                let fill = if i % 2 == 0 { Some("F5F3FB") } else { None };
+                let _ = j;
+                xml.push_str(&docx_cell(cell, fill, false));
+            }
+        }
+        xml.push_str("</w:tr>");
+    }
+    xml.push_str("</w:tbl>");
+    xml
+}
+
 pub fn docx_bytes(md: &str, title: &str) -> Vec<u8> {
     let mut body = String::new();
     let mut in_code = false;
+    let mut table_rows: Vec<Vec<String>> = Vec::new();
     for line in md.lines() {
         let t = line.trim_end();
+        // markdown table -> a REAL Word table
+        if t.starts_with('|') {
+            let cells: Vec<String> = t
+                .split('|')
+                .skip(1)
+                .map(|c| c.trim())
+                .filter(|c| !c.is_empty())
+                .map(|c| c.replace("**", "").replace('`', ""))
+                .collect();
+            if cells.iter().all(|c| c.chars().all(|ch| ch == '-')) || cells.is_empty() {
+                continue;
+            }
+            table_rows.push(cells);
+            continue;
+        }
+        if !table_rows.is_empty() {
+            body.push_str(&docx_table(&table_rows));
+            body.push_str("<w:p/>");
+            table_rows.clear();
+        }
         if t.starts_with("```") {
             in_code = !in_code;
             continue;
@@ -889,6 +951,9 @@ pub fn docx_bytes(md: &str, title: &str) -> Vec<u8> {
             continue;
         }
         body.push_str(&md_line_to_docx_paragraph(t, in_code));
+    }
+    if !table_rows.is_empty() {
+        body.push_str(&docx_table(&table_rows));
     }
 
     let document = format!(
@@ -1063,141 +1128,384 @@ pub fn odt_bytes(md: &str, title: &str) -> Vec<u8> {
 }
 
 // ---------------------------------------------------------------------------
-// PDF — our own writer (real pages, real fonts, real page breaks)
+// PDF — the professional renderer: cover page, table of contents with real
+// page numbers (two-pass), branded chapter headings, ruled two-column tables,
+// boxed code, and a "Page N of M" footer on every page. Our own writer —
+// real pages, real fonts, no external crates.
 // ---------------------------------------------------------------------------
-
-struct PdfWriter {
-    pages: Vec<String>,
-    current: String,
-    y: f64,
-}
 
 const PAGE_W: f64 = 612.0;
 const PAGE_H: f64 = 792.0;
 const MARGIN: f64 = 64.0;
-const LINE_H: f64 = 14.5;
 
-impl PdfWriter {
+const COLOR_PURPLE: (f64, f64, f64) = (0.486, 0.227, 0.929); // #7c3aed
+const COLOR_INK: (f64, f64, f64) = (0.13, 0.13, 0.16);
+const COLOR_GRAY: (f64, f64, f64) = (0.45, 0.45, 0.50);
+const COLOR_RULE: (f64, f64, f64) = (0.87, 0.85, 0.95);
+const COLOR_ZEBRA: (f64, f64, f64) = (0.965, 0.96, 0.985);
+const COLOR_CODEBG: (f64, f64, f64) = (0.955, 0.95, 0.975);
+
+struct Page {
+    content: String,
+}
+
+#[derive(Clone)]
+struct TocEntry {
+    level: u8,
+    title: String,
+    page: u32,
+}
+
+struct Doc {
+    pages: Vec<Page>,
+    current: String,
+    y: f64,
+    toc: Vec<TocEntry>,
+    chapter: u32,
+    section: u32,
+    in_code: bool,
+}
+
+impl Doc {
     fn new() -> Self {
-        PdfWriter {
+        Doc {
             pages: Vec::new(),
             current: String::new(),
             y: PAGE_H - MARGIN,
+            toc: Vec::new(),
+            chapter: 0,
+            section: 0,
+            in_code: false,
         }
     }
 
-    fn start_page(&mut self) {
-        if !self.current.is_empty() {
-            self.pages.push(std::mem::take(&mut self.current));
-        }
+    fn break_page(&mut self) {
+        self.pages.push(Page { content: std::mem::take(&mut self.current) });
         self.y = PAGE_H - MARGIN;
     }
 
-    fn ensure_room(&mut self, needed: f64) {
-        if self.y - needed < MARGIN {
-            self.pages.push(std::mem::take(&mut self.current));
-            self.y = PAGE_H - MARGIN;
+    fn ensure(&mut self, needed: f64) {
+        if self.y - needed < MARGIN + 22.0 {
+            self.break_page();
         }
     }
 
-    fn esc(s: &str) -> String {
-        s.replace('\\', "\\\\")
-            .replace('(', "\\(")
-            .replace(')', "\\)")
+    fn esc(t: &str) -> String {
+        t.replace('\\', "\\\\").replace('(', "\\(").replace(')', "\\)")
     }
 
-    fn put_text(&mut self, text: &str, font: &str, size: f64) {
-        let (char_w, height) = if font == "F3" { (size * 0.62, size * 1.6) } else { (size * 0.55, size * 1.6) };
+    /// WinAnsi-safe: our typography uses a handful of smart glyphs — map
+    /// them to honest ASCII so every reader renders the same characters.
+    fn ascii_safe(t: &str) -> String {
+        t.replace('\u{2014}', "-")
+            .replace('\u{2013}', "-")
+            .replace('\u{2022}', "-")
+            .replace('\u{00B7}', "-")
+            .replace('\u{201C}', "\"")
+            .replace('\u{201D}', "\"")
+            .replace('\u{2018}', "'")
+            .replace('\u{2019}', "'")
+            .replace('\u{2192}', "->")
+            .replace('\u{2264}', "<=")
+            .replace('\u{2265}', ">=")
+    }
+
+    fn text_at(&mut self, x: f64, y: f64, t: &str, font: &str, size: f64, color: (f64, f64, f64)) {
+        let (r, g, b) = color;
+        self.current.push_str(&format!(
+            "BT {r:.3} {g:.3} {b:.3} rg /{font} {size} Tf {x:.1} {y:.1} Td ({}) Tj ET\n",
+            Self::esc(&Self::ascii_safe(t))
+        ));
+    }
+
+    fn wrap_width(text: &str, font: &str, size: f64) -> Vec<String> {
+        let char_w = if font == "F3" { size * 0.62 } else { size * 0.55 };
         let max_chars = (((PAGE_W - 2.0 * MARGIN) / char_w).floor() as usize).max(20);
         let clean = text.replace('\t', "    ");
-        // word wrap (long code words hard-break)
+        let mut lines: Vec<String> = Vec::new();
         let mut line = String::new();
         for word in clean.split(' ') {
-            let candidate_len = line.len() + word.len() + 1;
-            if line.is_empty() {
-                line.push_str(&word[..word.len().min(max_chars.max(1))]);
-                let mut rest_idx = max_chars;
-                while rest_idx < word.len() {
-                    self.ensure_room(height);
-                    let chunk: String = word[rest_idx..].chars().take(max_chars).collect();
-                    self.current.push_str(&format!(
-                        "BT /{font} {size} Tf {MARGIN} {:.1} Td ({}) Tj ET\n",
-                        self.y,
-                        Self::esc(line.as_str())
-                    ));
-                    self.y -= height;
-                    line = chunk;
-                    rest_idx += max_chars;
+            if word.len() > max_chars {
+                // flush what we have, then hard-break the giant word
+                if !line.is_empty() {
+                    lines.push(std::mem::take(&mut line));
                 }
-            } else if candidate_len <= max_chars {
+                let mut rest: &str = word;
+                while rest.len() > max_chars {
+                    let chunk: String = rest.chars().take(max_chars).collect();
+                    let skip: usize = rest.chars().take(max_chars).map(char::len_utf8).sum();
+                    lines.push(chunk);
+                    rest = &rest[skip..];
+                }
+                line.push_str(rest);
+            } else if line.is_empty() {
+                line.push_str(word);
+            } else if line.len() + word.len() + 1 <= max_chars {
                 line.push(' ');
                 line.push_str(word);
             } else {
-                self.ensure_room(height);
-                self.current.push_str(&format!(
-                    "BT /{font} {size} Tf {MARGIN} {:.1} Td ({}) Tj ET\n",
-                    self.y,
-                    Self::esc(line.as_str())
-                ));
-                self.y -= height;
-                line.clear();
-                line.push_str(&word[..word.len().min(max_chars)]);
+                lines.push(std::mem::take(&mut line));
+                line.push_str(word);
             }
         }
-        self.ensure_room(height);
+        lines.push(line);
+        if lines.is_empty() {
+            lines.push(String::new());
+        }
+        lines
+    }
+
+    fn line(&mut self, text: &str, font: &str, size: f64, color: (f64, f64, f64), indent: f64) {
+        let height = size * 1.45;
+        for wrapped in Self::wrap_width(text, font, size) {
+            self.ensure(height);
+            self.text_at(MARGIN + indent, self.y - size, &wrapped, font, size, color);
+            self.y -= height;
+        }
+    }
+
+    fn rule(&mut self, color: (f64, f64, f64), thickness: f64, indent: f64) {
+        self.ensure(8.0);
+        let (r, g, b) = color;
         self.current.push_str(&format!(
-            "BT /{font} {size} Tf {MARGIN} {:.1} Td ({}) Tj ET\n",
+            "{r:.3} {g:.3} {b:.3} RG {thickness:.2} w {:.1} {:.1} m {:.1} {:.1} l S\n",
+            MARGIN + indent,
             self.y,
-            Self::esc(line.as_str())
+            PAGE_W - MARGIN,
+            self.y
         ));
+        self.y -= 10.0;
+    }
+
+    fn rect(&mut self, x: f64, y: f64, w: f64, h: f64, color: (f64, f64, f64)) {
+        let (r, g, b) = color;
+        self.current.push_str(&format!(
+            "{r:.3} {g:.3} {b:.3} rg {x:.1} {y:.1} {w:.1} {h:.1} re f\n"
+        ));
+    }
+
+    fn cover(&mut self, title: &str, subtitle: &str) {
+        self.y = PAGE_H - 210.0;
+        self.text_at(MARGIN, self.y, "VOXEL", "F2", 30.0, COLOR_PURPLE);
+        self.y -= 18.0;
+        self.rect(MARGIN, self.y, 120.0, 3.0, COLOR_PURPLE);
+        self.y -= 60.0;
+        for wrapped in Self::wrap_width(title, "F2", 26.0) {
+            self.text_at(MARGIN, self.y - 26.0, &wrapped, "F2", 26.0, COLOR_INK);
+            self.y -= 34.0;
+        }
+        self.y -= 8.0;
+        for wrapped in Self::wrap_width(subtitle, "F1", 12.0) {
+            self.text_at(MARGIN, self.y - 12.0, &wrapped, "F1", 12.0, COLOR_GRAY);
+            self.y -= 17.0;
+        }
+        self.y -= 26.0;
+        self.rect(MARGIN, self.y, PAGE_W - 2.0 * MARGIN, 0.8, COLOR_RULE);
+        self.y -= 24.0;
+        self.text_at(
+            MARGIN,
+            self.y - 9.0,
+            &format!("Generated {} · VOXEL {}", 
+                super::servers::compact_timestamp_pub(),
+                env!("CARGO_PKG_VERSION")),
+            "F1", 9.0, COLOR_GRAY,
+        );
+        self.break_page();
+    }
+
+    fn toc_page(&mut self, entries: &[TocEntry]) {
+        self.chapter = 0;
+        self.section = 0;
+        self.text_at(MARGIN, self.y - 14.0, "Contents", "F2", 18.0, COLOR_PURPLE);
+        self.y -= 26.0;
+        self.rect(MARGIN, self.y, PAGE_W - 2.0 * MARGIN, 0.8, COLOR_PURPLE);
+        self.y -= 16.0;
+        for entry in entries {
+            let indent = if entry.level == 1 { 14.0 } else { 34.0 };
+            let font = if entry.level == 1 { "F2" } else { "F1" };
+            let size = if entry.level == 1 { 10.5 } else { 9.5 };
+            self.ensure(15.0);
+            // dot leaders: title, dots, page number right-aligned
+            let display = &entry.title;
+            let page_label = format!("{}", entry.page);
+            self.text_at(MARGIN + indent, self.y - size, display, font, size, COLOR_INK);
+            let page_x = PAGE_W - MARGIN - 24.0;
+            // dots from title end to page number
+            let title_w = display.chars().count() as f64 * size * 0.55 + indent;
+            let dots = ((page_x - MARGIN - title_w) / (size * 0.28)).max(0.0) as usize;
+            if dots > 2 {
+                let leaders = ".".repeat(dots.min(80));
+                self.text_at(MARGIN + title_w, self.y - size, &leaders, "F1", size, COLOR_RULE);
+            }
+            self.text_at(page_x, self.y - size, &page_label, font, size, COLOR_PURPLE);
+            self.y -= 15.0;
+        }
+        self.break_page();
+    }
+
+    /// chapter heading: new page, numbered, branded
+    fn chapter(&mut self, title: &str) {
+        self.break_page();
+        self.chapter += 1;
+        self.section = 0;
+        // the content page being opened is pages.len() + 1 in human terms
+        self.toc.push(TocEntry {
+            level: 1,
+            title: title.to_string(),
+            page: (self.pages.len() + 1) as u32,
+        });
+        self.y = PAGE_H - MARGIN;
+        self.text_at(MARGIN, self.y - 18.0, &format!("{}.", self.chapter), "F2", 18.0, COLOR_PURPLE);
+        for wrapped in Self::wrap_width(title, "F2", 18.0) {
+            self.text_at(MARGIN + 34.0, self.y - 18.0, &wrapped, "F2", 18.0, COLOR_PURPLE);
+            self.y -= 24.0;
+        }
+        self.y -= 2.0;
+        self.rect(MARGIN, self.y, PAGE_W - 2.0 * MARGIN, 1.0, COLOR_PURPLE);
+        self.y -= 14.0;
+    }
+
+    fn h2(&mut self, title: &str) {
+        self.section += 1;
+        self.toc.push(TocEntry {
+            level: 2,
+            title: title.to_string(),
+            page: (self.pages.len() + 1) as u32,
+        });
+        self.ensure(52.0);
+        self.y -= 8.0;
+        for wrapped in Self::wrap_width(title, "F2", 13.0) {
+            self.text_at(MARGIN, self.y - 13.0, &wrapped, "F2", 13.0, COLOR_INK);
+            self.y -= 17.0;
+        }
+        self.rect(MARGIN, self.y, 56.0, 1.4, COLOR_PURPLE);
+        self.y -= 10.0;
+    }
+
+    /// A real two-column table: header band, zebra rows, hairline separators.
+    fn table_row(&mut self, cells: [&str; 2], header: bool, zebra: bool) {
+        let col1_w = 190.0;
+        let col2_w = PAGE_W - 2.0 * MARGIN - col1_w;
+        let size = 8.4;
+        let line_h = 12.5;
+        let left_lines = Self::wrap_width(cells[0], "F3", size - 0.6);
+        let right_lines = Self::wrap_width(cells[1], "F1", size);
+        let rows = left_lines.len().max(right_lines.len()).max(1);
+        let block_h = rows as f64 * line_h + 4.0;
+        self.ensure(block_h + 6.0);
+        let top = self.y;
+        if header {
+            self.rect(MARGIN, top - block_h, col1_w, block_h, COLOR_PURPLE);
+            self.rect(MARGIN + col1_w, top - block_h, col2_w, block_h, COLOR_PURPLE);
+            let mut ly = top - line_h;
+            for (i, l) in left_lines.iter().enumerate() {
+                if i == 0 {
+                    self.text_at(MARGIN + 4.0, ly, l, "F2", size, (1.0, 1.0, 1.0));
+                }
+                ly -= line_h;
+            }
+            let mut ly = top - line_h;
+            for (i, l) in right_lines.iter().enumerate() {
+                if i == 0 {
+                    self.text_at(MARGIN + col1_w + 6.0, ly, l, "F2", size, (1.0, 1.0, 1.0));
+                }
+                ly -= line_h;
+            }
+        } else {
+            if zebra {
+                self.rect(MARGIN, top - block_h, PAGE_W - 2.0 * MARGIN, block_h, COLOR_ZEBRA);
+            }
+            let mut ly = top - line_h;
+            for l in &left_lines {
+                self.text_at(MARGIN + 4.0, ly, l, "F3", size - 0.6, COLOR_INK);
+                ly -= line_h;
+            }
+            let mut ly = top - line_h;
+            for l in &right_lines {
+                self.text_at(MARGIN + col1_w + 6.0, ly, l, "F1", size, COLOR_INK);
+                ly -= line_h;
+            }
+            // column divider + row hairline
+            self.current.push_str(&format!(
+                "{:.3} {:.3} {:.3} RG 0.5 w {:.1} {:.1} m {:.1} {:.1} l S\n",
+                COLOR_RULE.0, COLOR_RULE.1, COLOR_RULE.2,
+                MARGIN + col1_w,
+                top,
+                MARGIN + col1_w,
+                top - block_h
+            ));
+            self.current.push_str(&format!(
+                "{:.3} {:.3} {:.3} RG 0.5 w {:.1} {:.1} m {:.1} {:.1} l S\n",
+                COLOR_RULE.0, COLOR_RULE.1, COLOR_RULE.2,
+                MARGIN,
+                top - block_h,
+                PAGE_W - MARGIN,
+                top - block_h
+            ));
+        }
+        self.y -= block_h;
+    }
+
+    fn code_line(&mut self, text: &str) {
+        let size = 8.4;
+        let height = size * 1.45;
+        self.ensure(height);
+        self.rect(MARGIN, self.y - height + 3.0, PAGE_W - 2.0 * MARGIN, height, COLOR_CODEBG);
+        self.text_at(MARGIN + 8.0, self.y - size, text, "F3", size, COLOR_INK);
         self.y -= height;
     }
 
-    fn spacing(&mut self, amount: f64) {
-        self.y -= amount;
+    fn finish(mut self, title: &str) -> (Vec<u8>, u32, Vec<TocEntry>) {
+        if !self.current.trim().is_empty() {
+            self.break_page();
+        }
+        let total = self.pages.len() as u32;
+        // footer on every page: brand left, "Page N of M" right
+        for (i, page) in self.pages.iter_mut().enumerate() {
+            let n = i as u32 + 1;
+            let footer = format!(
+                "BT {:.3} {:.3} {:.3} rg /F1 8.0 Tf {:.1} 34.0 Td ({}) Tj ET\nBT /F1 8.0 Tf {:.1} 34.0 Td (Page {} of {}) Tj ET\n",
+                COLOR_GRAY.0, COLOR_GRAY.1, COLOR_GRAY.2,
+                MARGIN,
+                Self::esc(&Self::ascii_safe(&format!("VOXEL {title}"))),
+                PAGE_W - MARGIN - 70.0,
+                n,
+                total
+            );
+            page.content.push_str(&footer);
+        }
+        let toc = self.toc.clone();
+        (self.assemble(), total, toc)
     }
 
-    fn finish(mut self, _title: &str) -> Vec<u8> {
-        if !self.current.is_empty() {
-            self.pages.push(std::mem::take(&mut self.current));
-        }
+    fn assemble(self) -> Vec<u8> {
         let page_count = self.pages.len();
-        // objects: 1 catalog, 2 pages, 3 F1 Helvetica, 4 F2 Bold, 5 F3 Courier,
-        // then (page, content) pairs from id 6
-        let kids: Vec<String> = (0..page_count)
-            .map(|i| format!("{} 0 R", 6 + i * 2))
-            .collect();
+        let kids: Vec<String> = (0..page_count).map(|i| format!("{} 0 R", 6 + i * 2)).collect();
         let mut objects: Vec<(usize, String)> = vec![
             (1, "<< /Type /Catalog /Pages 2 0 R >>".to_string()),
             (
                 2,
-                format!(
-                    "<< /Type /Pages /Kids [{}] /Count {} >>",
-                    kids.join(" "),
-                    page_count
-                ),
+                format!("<< /Type /Pages /Kids [{}] /Count {} >>", kids.join(" "), page_count),
             ),
             (3, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string()),
             (4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>".to_string()),
             (5, "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>".to_string()),
         ];
         let mut next_id = 6;
-        for content in &self.pages {
-            let page_id = next_id;
-            let content_id = next_id + 1;
+        for page in &self.pages {
             objects.push((
-                page_id,
+                next_id,
                 format!(
-                    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PAGE_W} {PAGE_H}] /Contents {content_id} 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> >>"
+                    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PAGE_W} {PAGE_H}] /Contents {} 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> >>",
+                    next_id + 1
                 ),
             ));
             objects.push((
-                content_id,
-                format!("<< /Length {} >>\nstream\n{}endstream", content.len(), content),
+                next_id + 1,
+                format!("<< /Length {} >>\nstream\n{}endstream", page.content.len(), page.content),
             ));
             next_id += 2;
         }
-
         let mut pdf = String::from("%PDF-1.4\n");
         let mut offsets: Vec<usize> = Vec::new();
         for (id, body) in &objects {
@@ -1219,53 +1527,96 @@ impl PdfWriter {
     }
 }
 
-pub fn pdf_bytes(md: &str) -> Vec<u8> {
-    let mut w = PdfWriter::new();
-    let mut in_code = false;
-    let mut first_h1 = true;
-    for raw in md.lines() {
-        let t = raw.trim_end();
-        if t.starts_with("```") {
-            in_code = !in_code;
-            continue;
-        }
-        if let Some(rest) = t.strip_prefix("# ") {
-            if !first_h1 {
-                w.start_page();
-            }
-            first_h1 = false;
-            w.spacing(6.0);
-            w.put_text(rest, "F2", 18.0);
-            w.spacing(4.0);
-        } else if let Some(rest) = t.strip_prefix("## ") {
-            w.ensure_room(50.0);
-            w.spacing(10.0);
-            w.put_text(rest, "F2", 13.5);
-            w.spacing(3.0);
-        } else if let Some(rest) = t.strip_prefix("### ") {
-            w.ensure_room(40.0);
-            w.spacing(8.0);
-            w.put_text(rest, "F2", 11.5);
-        } else if t.starts_with('|') {
-            let flat = t.replace("**", "").replace('`', "");
-            w.put_text(&flat, "F3", 8.2);
-        } else if t.starts_with("- ") {
-            w.put_text(&format!("•  {}", &t[2..]), "F1", 10.0);
-        } else if t.starts_with("---") {
-            w.put_text("————————————————", "F1", 10.0);
-        } else if let Some(rest) = t.strip_prefix("> ") {
-            w.put_text(&format!("  {}", rest.replace("**", "")), "F1", 9.5);
-        } else if !t.trim().is_empty() {
-            if in_code {
-                w.put_text(t, "F3", 8.6);
+/// Renders the markdown into the professional PDF. Two passes: the first
+/// lays out and records every chapter/section page; the second adds the
+/// cover and the TOC with those real numbers.
+pub fn pdf_bytes(md: &str, title: &str, subtitle: &str) -> (Vec<u8>, u32) {
+    let render = |with_toc: bool, toc_seed: Option<&[TocEntry]>| -> (Vec<u8>, u32, Vec<TocEntry>) {
+        let mut doc = Doc::new();
+        doc.cover(title, subtitle);
+        if with_toc {
+            if let Some(entries) = toc_seed {
+                doc.toc_page(entries);
             } else {
-                w.put_text(&t.replace("**", "").replace('`', ""), "F1", 10.0);
+                doc.break_page(); // TOC page reserved on the first pass
             }
-        } else {
-            w.spacing(5.0);
         }
-    }
-    w.finish("dossier")
+        let mut chapter_titles: Vec<String> = Vec::new();
+        let mut in_code = false;
+        let mut table_state: Vec<Vec<String>> = Vec::new();
+        let mut zebra = false;
+        for raw in md.lines() {
+            let t = raw.trim_end();
+            if t.starts_with("```") {
+                in_code = !in_code;
+                continue;
+            }
+            if t.starts_with("|") {
+                let cells: Vec<String> = t
+                    .split('|')
+                    .skip(1)
+                    .map(|c| c.trim())
+                    .filter(|c| !c.is_empty())
+                    .map(|c| c.replace("**", "").replace('`', ""))
+                    .collect();
+                if cells.iter().all(|c| c.chars().all(|ch| ch == '-')) || cells.is_empty() {
+                    continue; // separator row
+                }
+                if cells.len() == 2 {
+                    if table_state.is_empty() {
+                        zebra = false;
+                        doc.table_row([&cells[0], &cells[1]], true, false);
+                        table_state.push(cells);
+                    } else {
+                        doc.table_row([&cells[0], &cells[1]], false, zebra);
+                        zebra = !zebra;
+                    }
+                }
+                continue;
+            }
+            if !table_state.is_empty() {
+                table_state.clear();
+                doc.y -= 6.0;
+            }
+            if let Some(rest) = t.strip_prefix("# ") {
+                if chapter_titles.len() == 0 && rest.starts_with("Server Dossier") {
+                    // skip the markdown h1 title — the cover already has it
+                    chapter_titles.push(rest.to_string());
+                    continue;
+                }
+                doc.chapter(rest);
+                chapter_titles.push(rest.to_string());
+            } else if let Some(rest) = t.strip_prefix("## ") {
+                doc.h2(rest);
+            } else if let Some(rest) = t.strip_prefix("### ") {
+                doc.ensure(34.0);
+                doc.line(rest, "F2", 11.0, COLOR_INK, 8.0);
+            } else if t.starts_with("- ") {
+                doc.line(&format!("•  {}", &t[2..]), "F1", 9.8, COLOR_INK, 6.0);
+            } else if t.starts_with("---") {
+                doc.y -= 4.0;
+                doc.rule(COLOR_RULE, 0.8, 40.0);
+                doc.y -= 4.0;
+            } else if let Some(rest) = t.strip_prefix("> ") {
+                doc.line(&rest.replace("**", ""), "F1", 9.2, COLOR_GRAY, 10.0);
+            } else if in_code {
+                doc.code_line(t);
+            } else if !t.trim().is_empty() {
+                doc.line(&t.replace("**", "").replace('`', ""), "F1", 9.8, COLOR_INK, 0.0);
+            } else {
+                doc.y -= 4.5;
+            }
+        }
+        doc.finish(title)
+    };
+
+    // Pass 1 lays out the content and records every chapter/section page
+    // (numbering starts after cover+TOC); pass 2 re-renders with the real
+    // numbers on the TOC page.
+    let (_, _, toc) = render(true, None);
+    let with_pages: Vec<TocEntry> = toc.clone();
+    let (bytes, pages, _) = render(true, Some(&with_pages));
+    (bytes, pages)
 }
 
 // ---------------------------------------------------------------------------
@@ -1313,8 +1664,7 @@ pub fn dossier_generate_impl(base_path: String, slug: String) -> Result<DossierR
     push("md", md.clone().into_bytes())?;
     push("txt", markdown_to_txt(&md).into_bytes())?;
     push("html", markdown_to_html(&md, &title).into_bytes())?;
-    let pdf = pdf_bytes(&md);
-    let pages = count_pdf_pages(&pdf);
+    let (pdf, pages) = pdf_bytes(&md, &title, &format!("{} — complete server documentation", facts.name));
     push("pdf", pdf)?;
     push("docx", docx_bytes(&md, &title))?;
     push("odt", odt_bytes(&md, &title))?;
@@ -1495,7 +1845,7 @@ mod tests {
         assert!(html.contains("<table>"));
         assert!(html.contains("KingdomCoin"));
 
-        // pdf: our own writer — count pages by the page objects
+        // pdf: the professional renderer — cover, TOC, footers, branded tables
         let pdf = by_format("pdf");
         assert!(pdf.starts_with(b"%PDF-1.4"));
         let pdf_text = String::from_utf8_lossy(&pdf);
@@ -1504,6 +1854,20 @@ mod tests {
         assert!(pdf_text.contains("/Type /Pages"));
         assert!(pdf_text.contains("/BaseFont /Helvetica-Bold"));
         assert!(pdf.ends_with(b"%%EOF\n"));
+        // cover with the brand
+        assert!(pdf_text.contains("(VOXEL) Tj"));
+        assert!(pdf_text.contains("(Server Dossier - Kingdom SMP) Tj"), "cover carries the sanitized title");
+        // table of contents with the chapter names
+        assert!(pdf_text.contains("(Contents) Tj"));
+        assert!(pdf_text.contains("(Gameplay modules - what every command does) Tj"), "TOC lists the chapters");
+        assert!(pdf_text.contains("(Economy & your token) Tj"));
+        // footer on every page
+        assert!(pdf_text.contains("(Page 1 of "), "footer with real page numbers");
+        assert!(pdf_text.contains(&format!("(Page {pages} of {pages})")), "last page numbered");
+        assert!(pdf_text.contains("(VOXEL Server Dossier - Kingdom SMP) Tj"), "footer brand");
+        // branded purple and ruled tables
+        assert!(pdf_text.contains("0.486 0.227 0.929"), "brand purple present");
+        assert!(pdf_text.matches(" re f\n").count() > 20, "table bands and code boxes drawn: {}", pdf_text.matches(" re f").count());
 
         // docx: a real Word file (zip with the required parts)
         let docx = by_format("docx");
@@ -1518,6 +1882,10 @@ mod tests {
         assert!(xml.contains("<w:pStyle w:val=\"Heading1\"/>"), "headings styled");
         assert!(xml.contains("Kingdom SMP"));
         assert!(xml.contains("<w:b/>"), "bold runs present");
+        assert!(xml.contains("<w:tbl>"), "real Word tables");
+        assert!(xml.contains("w:fill=\"7C3AED\""), "purple header band");
+        assert!(xml.contains("w:fill=\"F5F3FB\""), "zebra stripes");
+        assert!(xml.contains("<w:tblBorders>"), "ruled borders");
 
         // odt: mimetype first and stored (the ODF rule)
         let odt = by_format("odt");

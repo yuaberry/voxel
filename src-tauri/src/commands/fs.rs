@@ -191,7 +191,13 @@ pub fn create_project_directory(base_path: String, rel: String) -> Result<(), St
 }
 
 #[tauri::command]
-pub fn delete_project_entry(base_path: String, rel: String) -> Result<(), String> {
+pub async fn delete_project_entry(base_path: String, rel: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || delete_project_entry_impl(base_path, rel))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn delete_project_entry_impl(base_path: String, rel: String) -> Result<(), String> {
     let target = validated_path(&base_path, &rel, false)?;
 
     // Refuse to delete the project root itself via relative empty-ish paths
@@ -515,7 +521,13 @@ fn walk_search(
 
 /// Case-insensitive text search across the project (agent tool).
 #[tauri::command]
-pub fn search_project(
+pub async fn search_project(base_path: String, project_rel: String, query: String, case_sensitive: Option<bool>, max_results: Option<u32>) -> Result<Vec<SearchMatch>, String> {
+    tauri::async_runtime::spawn_blocking(move || search_project_impl(base_path, project_rel, query, case_sensitive, max_results))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn search_project_impl(
     base_path: String,
     project_rel: String,
     query: String,
@@ -607,7 +619,7 @@ mod agent_tool_tests {
         fs::create_dir_all(&git_dir).unwrap();
         fs::write(git_dir.join("config"), "voidcutter should not appear").unwrap();
 
-        let matches = search_project(
+        let matches = search_project_impl(
             base.to_string_lossy().to_string(),
             ".".into(),
             "voidcutter".into(),

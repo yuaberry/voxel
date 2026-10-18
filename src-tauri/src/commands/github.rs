@@ -36,7 +36,13 @@ fn stdout_trim(output: &std::process::Output) -> String {
 
 /// Commits every pending change in the project (used before publishing).
 #[tauri::command]
-pub fn git_commit_all(
+pub async fn git_commit_all(base_path: String, project_rel: String, message: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_commit_all_impl(base_path, project_rel, message))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn git_commit_all_impl(
     base_path: String,
     project_rel: String,
     message: String,
@@ -67,7 +73,13 @@ pub struct PushResult {
 /// Adds the GitHub remote (if missing) and pushes the branch with the token
 /// sent via a transient http extraheader — nothing is persisted on disk.
 #[tauri::command]
-pub fn git_push_github(
+pub async fn git_push_github(base_path: String, project_rel: String, remote_url: String, token: String) -> Result<PushResult, String> {
+    tauri::async_runtime::spawn_blocking(move || git_push_github_impl(base_path, project_rel, remote_url, token))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn git_push_github_impl(
     base_path: String,
     project_rel: String,
     remote_url: String,
