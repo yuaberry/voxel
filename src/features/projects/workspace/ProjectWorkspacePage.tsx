@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
-import { ChevronRight, Github, Loader2, Play, Save, Trash2, Upload, X } from "lucide-react";
+import { ChevronRight, Github, Loader2, Play, Save, Trash2, Upload, X, MessageSquareCode } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ import { LaunchDialog } from "./LaunchDialog";
 import { PublishDialog } from "./PublishDialog";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
 import { DeployToServerDialog } from "./DeployToServerDialog";
+import { ModCommandsDialog } from "./ModCommandsDialog";
 import type { ProjectFileEntry } from "@/types";
 
 interface OpenTab {
@@ -50,6 +51,7 @@ export function ProjectWorkspacePage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [deployOpen, setDeployOpen] = useState(false);
+  const [modCommandsOpen, setModCommandsOpen] = useState(false);
   const [files, setFiles] = useState<ProjectFileEntry[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [tabs, setTabs] = useState<OpenTab[]>([]);
@@ -230,6 +232,15 @@ export function ProjectWorkspacePage() {
           <Button
             size="sm"
             variant="outline"
+            onClick={() => setModCommandsOpen(true)}
+            title="Design custom commands that ship inside this mod"
+          >
+            <MessageSquareCode className="h-3.5 w-3.5" />
+            Commands
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => setDeployOpen(true)}
             title="Deploy this project's datapack to one of your servers"
           >
@@ -396,6 +407,15 @@ export function ProjectWorkspacePage() {
 
       {/* Publish to GitHub */}
       <PublishDialog project={project} open={publishOpen} onOpenChange={setPublishOpen} />
+
+      {/* Custom commands designed by the author, shipped by the jar */}
+      <ModCommandsDialog
+        project={project}
+        open={modCommandsOpen}
+        onOpenChange={setModCommandsOpen}
+        basePath={basePath}
+        packFormat={15}
+      />
 
       {/* Deploy the project's datapack to a server — the project↔server link */}
       <DeployToServerDialog

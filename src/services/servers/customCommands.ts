@@ -317,6 +317,59 @@ ${tickLines.join("\n")}
   return files;
 }
 
+/**
+ * MOD commands — the same studio, aimed at a MOD's datapack: the files land
+ * inside src/main/resources/data/<modId>/ (functions + tags), so the jar
+ * ships them and the Deploy button makes them live on any server running
+ * the mod. Era-honest: the pack_format follows the project's MC version.
+ */
+export function generateModCommandFiles(
+  commands: CustomCommand[],
+  modId: string,
+  // pack_format of the mod's era — reserved: the template already ships a
+  // pack.mcmeta, so the mod datapack inherits the project's own manifest
+  _packFormat: number,
+): GeneratedFile[] {
+  const files = generateCustomCommandsDatapack(commands, { hasEconomy: false });
+  const out: GeneratedFile[] = [];
+  for (const file of files) {
+    // datapack pack.mcmeta — the mod template already ships one; skip it
+    if (file.path.endsWith("pack.mcmeta")) continue;
+    // custom functions -> the mod's own namespace
+    if (file.path.includes(`data/${CUSTOM_NS}/functions/`)) {
+      const name = file.path.split("/").pop()!;
+      out.push({
+        path: `src/main/resources/data/${modId}/functions/${name}`,
+        content: file.content.split(`${CUSTOM_NS}:`).join(`${modId}:`),
+      });
+      continue;
+    }
+    // minecraft tags (load/tick) -> the real datapack tag location
+    if (file.path.includes("data/minecraft/tags/functions/")) {
+      const name = file.path.split("/").pop()!;
+      out.push({
+        path: `src/main/resources/data/minecraft/tags/functions/${name}`,
+        content: JSON.stringify(
+          { values: [`${modId}:${file.path.split("/").pop()!.replace(".json", "")}`] },
+          null,
+          2,
+        ) // rebuilt below to reference the real function
+      });
+      continue;
+    }
+  }
+  // fix the tag values to point at the mod's load/tick functions
+  for (const file of out) {
+    if (file.path.endsWith("tags/functions/load.json")) {
+      file.content = JSON.stringify({ values: [`${modId}:load`] }, null, 2);
+    }
+    if (file.path.endsWith("tags/functions/tick.json")) {
+      file.content = JSON.stringify({ values: [`${modId}:tick`] }, null, 2);
+    }
+  }
+  return out;
+}
+
 /** The README lines the server docs gain — faithful to the generated pack. */
 export function customCommandsDocs(commands: CustomCommand[]): string[] {
   return commands.map((c) => {

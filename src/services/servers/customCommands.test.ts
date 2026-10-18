@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CUSTOM_NS,
   generateCustomCommandsDatapack,
+  generateModCommandFiles,
   validateTriggerId,
   type CustomCommand,
 } from "./customCommands";
@@ -149,5 +150,31 @@ describe("custom commands generator (vanilla-real datapack)", () => {
     // balanced quotes in the whole line
     const tellrawLine = run.split("\n").find((l) => l.startsWith("tellraw"))!;
     expect(tellrawLine.split('"').length % 2).toBe(1);
+  });
+});
+
+describe("mod commands (the project's datapack)", () => {
+  it("lands functions in the mod's namespace and tags in data/minecraft", () => {
+    const files = generateModCommandFiles(
+      [{ id: "wand_fx", description: "wand effects", actions: [{ kind: "effect", effect: "speed", seconds: 20, amplifier: 1 }] }],
+      "dark_kingdom",
+      15,
+    );
+    const paths = files.map((f) => f.path).sort();
+    expect(paths).toContain("src/main/resources/data/dark_kingdom/functions/load.mcfunction");
+    expect(paths).toContain("src/main/resources/data/dark_kingdom/functions/cmd_wand_fx.mcfunction");
+    expect(paths).toContain("src/main/resources/data/minecraft/tags/functions/load.json");
+    expect(paths).toContain("src/main/resources/data/minecraft/tags/functions/tick.json");
+    // no datapack pack.mcmeta — the mod template already ships its own
+    expect(paths.some((p) => p.endsWith("pack.mcmeta"))).toBe(false);
+    // tags point at the mod's own functions
+    const loadTag = JSON.parse(
+      files.find((f) => f.path.endsWith("tags/functions/load.json"))!.content,
+    );
+    expect(loadTag).toEqual({ values: ["dark_kingdom:load"] });
+    // command routing references the mod namespace, not the server one
+    const tick = files.find((f) => f.path.endsWith("functions/tick.mcfunction"))!.content;
+    expect(tick).toContain("run function dark_kingdom:cmd_wand_fx");
+    expect(tick).not.toContain("nexus_custom:");
   });
 });
