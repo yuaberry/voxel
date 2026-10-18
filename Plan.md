@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (48 sessões)
+## 5. Histórico de sessões (49 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 49 | Dossiê profissional + classe trava final | **PDF reconstruído**: capa, TOC com páginas reais (2 passadas), footer Page N of M, tabelas com banda roxa+zebra, código em caixas, WinAnsi-safe; DOCX com w:tbl reais; curadoria do conteúdo. **14 commands pesados → async** (create_project, server_delete, git push/commit, snapshots, search, modpack trio, structure, ledger×5). Testes pescaram: wrap quebrava por palavra (67→31 páginas honestas), TOC page 0, footer duplicado, em-dash WinAnsi + v0.7.1 | — |
 | 48 | Dossiê + Moeda + Comandos de mod | **Dossiê do servidor 30+ páginas em 6 formatos reais** (PDF writer próprio, DOCX/ODT válidos, HTML, TXT, MD; gerado no create + salvo onde quiser); **moeda própria com economia REAL** (BCE ao vivo USD→BRL/EUR, diluição mais-tokens-menos-valor, supply do ledger, compliance in-game honesto); **comandos custom que viajam DENTRO do jar** (datapack do mod remapeado, editor compartilhado) + v0.7.0 | entidades decodificadas 2×; nexus_ strip; tags do mod no lugar errado; stub de appendix |
 | 47 | Autonomia total | **Briefing docs** (.txt/.md/.pdf/.docx reais: docx unzipped, pdf-extract) lidos pelo agente; **Customize Server** (import world .zip atômico, estruturas .nbt com /place, **comandos customizados com mobs NBT + /convert → wallet chain**, plugins Paper do Modrinth); world setup no wizard; defaults de servidor nas settings; v0.6.0 | entidades decodificadas pelo pipeline (code points); routing do convert fora do gate; extensão antes do conteúdo |
 | 46 | Make it unbreakable | **Causa raiz do 2º "nada funciona"**: downloads podiam pendurar PARA SEMPRE (sem timeout total/retry) + app mudo com DB travado + servidor invisível se o row falhasse. Fixes: timeout 5min+retry+erros acionáveis; **diagnósticos reais** (Settings→Advanced, cada falha com o fix); **self-heal disco↔DB** (voxel-server.json + scan + reconcile); catálogo nunca-vazio; banner de emergência. **E2E do caminho async REAL** (download vivo ~10s) + v0.5.12 | ternário inexistente em Rust; expect_err exige Debug |
@@ -264,7 +265,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 48, v0.7.0)
+## 8. Estado atual (verificado — Sessão 49, v0.7.1)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -284,7 +285,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.7.0 (latest)** | Desktop: **Dossiê 30+ páginas × 6 formatos + moeda própria com FX real (USD/BRL/EUR) + comandos dentro dos mods** + APK mobile 0.3.1 |
+| **v0.7.1 (latest)** | Desktop: **Dossiê profissional (capa, sumário com páginas, rodapé, tabelas diagramadas) + 14 commands pesados agora async — nada trava** + APK mobile 0.3.1 |
+| v0.7.0 | Desktop: **Dossiê 30+ páginas × 6 formatos + moeda própria com FX real (USD/BRL/EUR) + comandos dentro dos mods** + APK mobile 0.3.1 |
 | v0.6.0 | Desktop: **era de autonomia** — briefing docs próprios que o agente lê + Customize Server (worlds .zip, estruturas .nbt, comandos custom com mobs e /convert, plugins Paper) + defaults nas settings + APK mobile 0.3.1 |
 | v0.5.12 | Desktop: **downloads à prova de travamento (timeout+retry) + diagnósticos reais + self-heal disco↔DB + banner de emergência** + APK mobile 0.3.1 |
 | v0.5.11 | Desktop: **classe async completa (ações nunca congelam) + sprites animados** + APK mobile 0.3.1 |
@@ -1192,3 +1194,31 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (35) ✓ · vitest **87/87** ✓ · cargo **85/85** (+5: 2 dossier + 3 fx; 11 E2E) ✓ · vite build 1m29s ✓ · boot vivo 0 panics ✓. Release **v0.7.0**.
 
 **Notas de escopo honestas**: "outras extensões de leitura" = .html e .odt além das 4 pedidas; páginas do dossiê = tamanho dos FATOS (30+ com módulos instalados — servidor vanilla vazio produz dossiê menor, sem inflar fake); moeda = economia de jogo indexada a câmbio real (não token financeiro — compliance do briefing original).
+
+---
+
+## 49. Sessão 49 — Dossiê profissional + a classe "trava" terminada de vez
+
+**Pedido do dono**: "aumente a qualidade do dossiê para algo incrivelmente profissional, somente o que é necessário de informações. corrija todos os erros. tudo funcionando sem travar."
+
+**Dossiê profissional (PDF reconstruído como relatório de verdade)**:
+- **Capa** com a marca (VOXEL + nome do servidor + régua roxa + carimbo de geração/data)
+- **Sumário (TOC)** com dot leaders e **números de página REAIS** — layout em duas passadas (pass 1 grava a página de cada capítulo/seção; pass 2 renderiza com o sumário preenchido)
+- **Rodapé em toda página**: "Page N of M" à direita, marca + título à esquerda (cinza 8pt)
+- **Capítulos numerados** com réguas roxas; **tabelas diagramadas**: banda de header roxa com texto branco, zebra rows, divisórias hairline; **código em caixas** cinza-claro
+- **Tipografia WinAnsi-safe**: smart glyphs (—, •, →) transliterados — todo leitor renderiza o mesmo texto
+- **DOCX ganhou tabelas Word REAIS** (w:tbl com bordas, banda roxa, zebra)
+- **Curadoria**: o pack de comandos custom saiu da lista genérica de módulos (tem capítulo próprio) — cada linha ganha seu lugar
+- Teste agora PROVA a mobília: capa com o título, TOC com capítulos e páginas, footer na 1ª e última página, roxo da marca, bandas desenhadas
+
+**A classe "trava" terminada**: a onda da S45 deixou os commands pesados síncronos. **14 convertidos** para async+spawn_blocking com impls separadas: `create_project` (render+git init), `server_delete` (rmtree do world inteiro), `git_commit_all`/`git_push_github` (rede!), snapshots create/restore, `search_project` (grep na árvore toda), `delete_project_entry`, `modpack_check_compatibility`/`exportable_assets`/`delete`, `structure_generate`, e os 5 do ledger (`init/apply/list/verify/tail_intents`). Nomes de invoke inalterados; testes chamam as impls.
+
+**Bugs REAIS pescados pelos testes reforçados (4)**:
+1. **wrap_width quebrava CADA PALAVRA numa linha própria** (split duplo) — o debug do PDF mostrou a capa esmiuçada em 5 linhas e 67 páginas infladas de mentira; reescrito, as 31 páginas agora são honestas
+2. **TOC registrava page 0** para todas as entradas (chapter/h2 nunca anotavam a página real)
+3. **Footer duplicava o prefixo** ("VOXEL Server Dossier - Server Dossier - …")
+4. **Em-dash morria em WinAnsiEncoding** (transliteração aplicada em text_at E footer)
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (35) ✓ · vitest 87/87 ✓ · cargo **85/85** ✓ (11 E2E) · vite build 1m39s ✓ · boot vivo 0 panics ✓. Release **v0.7.1**.
+
+**Regra reforçada**: quando um teste novo falhar, NUNCA afrouxar o teste antes de debugar o artefato real (o dump do PDF provou o bug de wrap em 30 segundos).
