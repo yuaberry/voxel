@@ -10,7 +10,6 @@ import {
   PackagePlus,
   Plus,
   Trash2,
-  X,
 } from "lucide-react";
 import {
   Dialog,
@@ -29,6 +28,7 @@ import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import type { ServerRecord } from "@/types";
 import { BriefingPicker } from "@/components/BriefingPicker";
+import { CommandDraftEditor } from "@/components/CommandDraftEditor";
 import {
   listBriefingDocuments,
   writeBriefingDocuments,
@@ -37,7 +37,6 @@ import { readProjectFile, writeProjectFile } from "@/services/projects/projectsS
 import {
   generateCustomCommandsDatapack,
   validateTriggerId,
-  type CommandAction,
   type CustomCommand,
 } from "@/services/servers/customCommands";
 import {
@@ -46,8 +45,17 @@ import {
   pickModrinthFile,
   type ModrinthSearchHit,
 } from "@/services/modpacks/modrinthService";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import {
+  getCurrency,
+  saveCurrency,
+  valueCurrency,
+  type CurrencyConfig,
+  type CurrencyValuation,
+} from "@/services/servers/currencyService";
+import { Coins, FileDown } from "lucide-react";
 
-type Tab = "briefing" | "world" | "structures" | "commands" | "plugins";
+type Tab = "briefing" | "world" | "structures" | "commands" | "plugins" | "currency" | "dossier";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "briefing", label: "Briefing", icon: <FileText className="h-3.5 w-3.5" /> },
@@ -55,6 +63,8 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "structures", label: "Structures", icon: <Boxes className="h-3.5 w-3.5" /> },
   { id: "commands", label: "Commands", icon: <MessageSquareCode className="h-3.5 w-3.5" /> },
   { id: "plugins", label: "Plugins", icon: <PackagePlus className="h-3.5 w-3.5" /> },
+  { id: "currency", label: "Currency", icon: <Coins className="h-3.5 w-3.5" /> },
+  { id: "dossier", label: "Dossier", icon: <FileText className="h-3.5 w-3.5" /> },
 ];
 
 /**
@@ -104,6 +114,14 @@ export function ServerCustomizeDialog({
   const [briefDocs, setBriefDocs] = useState<{ fileName: string; kind: string; text: string }[]>([]);
   const [existingBriefs, setExistingBriefs] = useState<{ name: string; sizeBytes: number }[]>([]);
 
+  // ---- currency state (the user's OWN token)
+  const [currency, setCurrency] = useState<CurrencyConfig | null>(null);
+  const [valuation, setValuation] = useState<CurrencyValuation | null>(null);
+  const [mintAmount, setMintAmount] = useState("1000");
+
+  // ---- dossier state
+  const [dossier, setDossier] = useState<{ files: { format: string; path: string; bytes: number }[]; pages: number } | null>(null);
+
   const serverRel = `servers/${slug}`;
 
   useEffect(() => {
@@ -129,6 +147,15 @@ export function ServerCustomizeDialog({
       .then(() => setHasEconomy(true))
       .catch(() => setHasEconomy(false));
     listBriefingDocuments(basePath, `${serverRel}/.voxel/briefing`).then(setExistingBriefs);
+    setDossier(null);
+    getCurrency(basePath, slug).then((cfg) => {
+      setCurrency(cfg);
+      if (cfg) {
+        valueCurrency(basePath, slug, cfg).then(setValuation);
+      } else {
+        setValuation(null);
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, slug, basePath]);
 
@@ -336,9 +363,97 @@ export function ServerCustomizeDialog({
     }
   };
 
-  const addDraftAction = (action: CommandAction) => {
-    if (!draft) return;
-    setDraft({ ...draft, actions: [...draft.actions, action] });
+  const saveTheCurrency = async () => {
+    if (!currency || busy) return;
+    setBusy(true);
+    try {
+      await saveCurrency(basePath, slug, currency);
+      setValuation(await valueCurrency(basePath, slug, currency));
+      toast.success(`Currency ${currency.name} (${currency.symbol}) saved`, {
+        description:
+          "In-game currency with real-economics dilution — more tokens minted, less value each. It is game money: no monetary value, no cash-out.",
+        duration: 12000,
+      });
+    } catch (error) {
+      toast.error("Could not save the currency", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const mintSupply = async () => {
+    if (!currency || busy) return;
+    const amount = Math.floor(Number(mintAmount));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.warning("Pick how many tokens to mint");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { applyLedgerTx } = await import("@/services/servers/economyService");
+      await applyLedgerTx({
+        basePath,
+        slug,
+        tx: "mint",
+        from: "genesis",
+        to: "owner",
+        amount,
+      });
+      setValuation(await valueCurrency(basePath, slug, currency));
+      toast.success(`Minted ${amount.toLocaleString()} ${currency.symbol}`, {
+        description:
+          "Recorded on the SHA-256 chain. Watch the dilution: the more tokens circulating, the less each one is worth.",
+        duration: 10000,
+      });
+    } catch (error) {
+      toast.error("Mint failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const generateDossier = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await invoke<{ files: { format: string; path: string; bytes: number }[]; pages: number }>(
+        "server_generate_dossier",
+        { basePath, slug },
+      );
+      setDossier(result);
+      toast.success(`Dossier ready — ${result.pages} pages`, {
+        description: `Six reading formats under servers/${slug}/Dossier/ — and the save buttons copy them anywhere.`,
+        duration: 10000,
+      });
+    } catch (error) {
+      toast.error("Dossier generation failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveDossierFile = async (format: string, path: string) => {
+    const rel = path.split(`servers/${slug}/`)[1];
+    if (!rel) return;
+    const dest = await saveDialog({
+      title: `Save the dossier (${format})`,
+      defaultPath: `Dossier-${slug}.${format}`,
+    });
+    if (!dest) return;
+    try {
+      await invoke("dossier_save_copy", { basePath, rel, destPath: dest });
+      toast.success(`Saved ${format.toUpperCase()} to ${dest}`);
+    } catch (error) {
+      toast.error("Could not save", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
   };
 
   const addDraft = () => {
@@ -563,132 +678,173 @@ export function ServerCustomizeDialog({
             </div>
 
             {draft && (
-              <div className="space-y-2.5 rounded-lg border border-primary/30 bg-primary/5 p-3">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">{t("Command id")}</Label>
+              <CommandDraftEditor
+                draft={draft}
+                onChange={setDraft}
+                hasEconomy={hasEconomy}
+                onCancel={() => setDraft(null)}
+                onSave={saveDraft}
+              />
+            )}
+          </div>
+        )}
+
+        {tab === "currency" && (
+          <div className="space-y-4">
+            {!currency ? (
+              <Button
+                size="sm"
+                variant="gradient"
+                onClick={() =>
+                  setCurrency({
+                    name: `${server.name} Coin`,
+                    symbol: "VXC",
+                    maxSupply: 1000000,
+                    dilution: 100000,
+                    referenceUsd: 0.01,
+                  })
+                }
+              >
+                <Coins className="h-3.5 w-3.5" />
+                {t("Design my currency")}
+              </Button>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>{t("Currency name")}</Label>
+                    <Input value={currency.name} onChange={(e) => setCurrency({ ...currency, name: e.target.value })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("Symbol")}</Label>
                     <Input
-                      placeholder="vip_kit"
-                      className="h-8 text-xs"
-                      value={draft.id}
-                      onChange={(e) => setDraft({ ...draft, id: e.target.value })}
+                      value={currency.symbol}
+                      maxLength={5}
+                      onChange={(e) => setCurrency({ ...currency, symbol: e.target.value.toUpperCase() })}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">{t("What it does")}</Label>
+                  <div className="space-y-1.5">
+                    <Label>{t("Maximum supply (tokens)")}</Label>
                     <Input
-                      placeholder="The VIP welcome kit"
-                      className="h-8 text-xs"
-                      value={draft.description}
-                      onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                      type="number"
+                      min={1}
+                      value={currency.maxSupply}
+                      onChange={(e) => setCurrency({ ...currency, maxSupply: Number(e.target.value) || 1 })}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">{t("Cost in coins (0 = free)")}</Label>
+                  <div className="space-y-1.5">
+                    <Label>{t("Dilution factor")}</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={currency.dilution}
+                      onChange={(e) => setCurrency({ ...currency, dilution: Number(e.target.value) || 1 })}
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      {t("higher = value falls slower. At the factor, each token is worth half the launch value.")}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("Reference value at launch (USD)")}</Label>
                     <Input
                       type="number"
                       min={0}
-                      className="h-8 text-xs"
-                      value={draft.costCoins ?? 0}
-                      onChange={(e) => setDraft({ ...draft, costCoins: Number(e.target.value) || 0 })}
+                      step={0.001}
+                      value={currency.referenceUsd}
+                      onChange={(e) => setCurrency({ ...currency, referenceUsd: Number(e.target.value) || 0 })}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">{t("Cooldown seconds")}</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      className="h-8 text-xs"
-                      value={draft.cooldownSeconds ?? 0}
-                      onChange={(e) =>
-                        setDraft({ ...draft, cooldownSeconds: Number(e.target.value) || 0 })
-                      }
-                    />
+                  <div className="space-y-1.5">
+                    <Label>{t("Mint tokens (recorded on the chain)")}</Label>
+                    <div className="flex gap-2">
+                      <Input type="number" min={1} value={mintAmount} onChange={(e) => setMintAmount(e.target.value)} />
+                      <Button size="sm" variant="outline" onClick={() => void mintSupply()} disabled={busy}>
+                        {t("Mint")}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <Button size="sm" variant="outline" onClick={() => addDraftAction({ kind: "message", text: "Welcome!", color: "green" })}>
-                    + message
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="gradient" onClick={() => void saveTheCurrency()} disabled={busy}>
+                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    {t("Save currency")}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => addDraftAction({ kind: "title", text: "ARENA" })}>
-                    + title
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => addDraftAction({ kind: "give", item: "diamond", count: 1 })}>
-                    + give
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => addDraftAction({ kind: "teleport", x: 0, y: 64, z: 0 })}>
-                    + teleport
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => addDraftAction({ kind: "effect", effect: "speed", seconds: 30, amplifier: 1 })}>
-                    + effect
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => addDraftAction({ kind: "sound", sound: "entity.player.levelup" })}>
-                    + sound
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      addDraftAction({
-                        kind: "summon",
-                        mob: "zombie",
-                        name: "Arena Guardian",
-                        health: 40,
-                        heldItem: "iron_sword",
-                        helmet: "diamond_helmet",
-                      })
-                    }
-                  >
-                    + mob
-                  </Button>
-                  {hasEconomy && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addDraftAction({ kind: "convert", tiers: [50, 100, 250] })}
-                    >
-                      + /convert
-                    </Button>
-                  )}
                 </div>
-                {draft.actions.length > 0 && (
-                  <div className="space-y-1">
-                    {draft.actions.map((a, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-card/60 px-2 py-1 text-[10px]"
-                      >
-                        <code className="truncate font-mono text-muted-foreground">
-                          {a.kind === "message" && `message "${a.text}"`}
-                          {a.kind === "title" && `title "${a.text}"`}
-                          {a.kind === "give" && `give ${a.item} x${a.count ?? 1}`}
-                          {a.kind === "teleport" && `tp ${a.x} ${a.y} ${a.z}`}
-                          {a.kind === "effect" && `effect ${a.effect} ${a.seconds}s`}
-                          {a.kind === "sound" && `sound ${a.sound}`}
-                          {a.kind === "summon" && `summon ${a.mob} "${a.name ?? ""}"`}
-                          {a.kind === "convert" && `convert tiers ${a.tiers.join("/")}`}
-                        </code>
-                        <button
-                          type="button"
-                          className="shrink-0 text-muted-foreground hover:text-destructive"
-                          onClick={() =>
-                            setDraft({ ...draft, actions: draft.actions.filter((_, j) => j !== i) })
-                          }
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
+                {valuation && (
+                  <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                    <p className="text-xs font-semibold">
+                      {t("Real economics, live")} — {valuation.circulating.toLocaleString()}{" "}
+                      {currency.symbol} {t("circulating")}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-md border border-border/60 bg-card/60 px-2 py-2">
+                        <p className="text-[10px] text-muted-foreground">USD</p>
+                        <p className="font-mono text-sm text-primary">${valuation.valueUsd.toFixed(4)}</p>
                       </div>
-                    ))}
+                      <div className="rounded-md border border-border/60 bg-card/60 px-2 py-2">
+                        <p className="text-[10px] text-muted-foreground">BRL</p>
+                        <p className="font-mono text-sm text-primary">
+                          {valuation.fx ? `R$ ${valuation.valueBrl.toFixed(4)}` : "—"}
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-border/60 bg-card/60 px-2 py-2">
+                        <p className="text-[10px] text-muted-foreground">EUR</p>
+                        <p className="font-mono text-sm text-primary">
+                          {valuation.fx ? `€ ${valuation.valueEur.toFixed(4)}` : "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[10px] leading-relaxed text-muted-foreground">
+                      {valuation.fx
+                        ? t(`ECB rates of ${valuation.fx.rateDate} (USD→BRL ${valuation.fx.usdBrl.toFixed(4)}, USD→EUR ${valuation.fx.usdEur.toFixed(4)}) — converted automatically.`)
+                        : t("FX offline — showing USD only. Rates load from the European Central Bank when online.")}
+                    </p>
+                    <p className="text-[10px] leading-relaxed text-muted-foreground">
+                      {t(
+                        "In-game currency with real-economics behavior. It has no monetary value, cannot be cashed out, and is not a cryptocurrency.",
+                      )}
+                    </p>
                   </div>
                 )}
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>
-                    {t("Cancel")}
-                  </Button>
-                  <Button size="sm" variant="gradient" onClick={saveDraft}>
-                    {t("Add command")}
-                  </Button>
+              </>
+            )}
+          </div>
+        )}
+
+        {tab === "dossier" && (
+          <div className="space-y-3">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t(
+                "The complete documentation of THIS server — versions, every command with what it does, areas, economy, operations manual and appendices — 30+ pages of facts read from the server's own files, in six reading formats.",
+              )}
+            </p>
+            <Button size="sm" variant="gradient" onClick={() => void generateDossier()} disabled={busy}>
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+              {dossier ? t("Regenerate dossier") : t("Generate dossier")}
+            </Button>
+            {dossier && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold">
+                  {t("Pages") + `: ${dossier.pages}` + " · " + dossier.files.length + " formats"}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                  {dossier.files.map((f) => (
+                    <button
+                      key={f.format}
+                      type="button"
+                      onClick={() => void saveDossierFile(f.format, f.path)}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-card/50 px-3 py-2 text-xs transition-colors hover:border-primary/40"
+                    >
+                      <span className="font-semibold uppercase">{f.format}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {(f.bytes / 1024).toFixed(0)} KB
+                      </span>
+                    </button>
+                  ))}
                 </div>
+                <p className="text-[10px] text-muted-foreground">
+                  {t("Click a format to save it anywhere (the .md/.txt/.html/.pdf/.docx/.odt also live in the server's Dossier folder).")}
+                </p>
               </div>
             )}
           </div>

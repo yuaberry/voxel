@@ -288,6 +288,20 @@ export function CreateServerDialog({
         }
       }
 
+      // The DOSSIER: full documentation of this server (versions, every
+      // command, areas, economy, appendices — 30+ pages in 6 formats).
+      // Generated right at creation, best-effort: the server exists either way.
+      invoke<{ pages: number }>("server_generate_dossier", { basePath, slug })
+        .then((result) => {
+          toast.success(`Server dossier generated (${result.pages} pages)`, {
+            description: `servers/${slug}/Dossier/ — .md, .txt, .html, .pdf, .docx and .odt. Customize → Dossier saves them anywhere.`,
+            duration: 12000,
+          });
+        })
+        .catch(() => {
+          // generation is best-effort; a toast would be noise on top of success
+        });
+
       // The server README documents exactly what got installed (objectives
       // + in-game commands per module) — rewritten with the real facts
       await invoke("server_write_info", {

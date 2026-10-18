@@ -49,6 +49,11 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn compact_timestamp() -> String {
+    compact_timestamp_pub()
+}
+
+/// Timestamp shared with the dossier module.
+pub(crate) fn compact_timestamp_pub() -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -738,7 +743,7 @@ pub struct ServerInfoPayload {
 /// Objective + in-game commands for a module, faithful to the datapacks we
 /// actually generate (serverModules.ts) — command lists match the
 /// mcfunctions and triggers the pack really registers.
-fn module_docs(id: &str) -> Option<(&'static str, &'static str, Vec<(&'static str, &'static str)>)> {
+pub(crate) fn module_docs(id: &str) -> Option<(&'static str, &'static str, Vec<(&'static str, &'static str)>)> {
     Some(match id {
         "economy" => (
             "Economy Coin",
