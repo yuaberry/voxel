@@ -5,7 +5,7 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 
-export const STRUCTURE_KINDS = ["watchtower", "cottage", "obelisk", "ruin"] as const;
+export const STRUCTURE_KINDS = ["watchtower", "cottage", "obelisk", "ruin", "mine", "prison"] as const;
 export type StructureKindId = (typeof STRUCTURE_KINDS)[number];
 
 export interface StructureBlock {

@@ -59,6 +59,17 @@ export async function updateServerStatus(
   );
 }
 
+export async function updateServerRecord(
+  slug: string,
+  patch: { name?: string; port?: number; ram_mb?: number },
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE servers SET name = COALESCE($2, name), port = COALESCE($3, port), ram_mb = COALESCE($4, ram_mb), updated_at = datetime('now') WHERE slug = $1",
+    [slug, patch.name ?? null, patch.port ?? null, patch.ram_mb ?? null],
+  );
+}
+
 export async function removeServer(slug: string): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM servers WHERE slug = $1", [slug]);

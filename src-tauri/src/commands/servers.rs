@@ -1888,3 +1888,163 @@ mod e2e_tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Server metadata editing — the owner's ask: rename the server, adjust RAM
+// and port AFTER creation. Facts stay truthful: voxel-server.json,
+// server.properties and the README all get the same new truth.
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn server_update_metadata(
+    base_path: String,
+    slug: String,
+    name: Option<String>,
+    ram_mb: Option<u32>,
+    port: Option<u16>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        server_update_metadata_impl(base_path, slug, name, ram_mb, port)
+    })
+    .await
+    .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn server_update_metadata_impl(
+    base_path: String,
+    slug: String,
+    name: Option<String>,
+    ram_mb: Option<u32>,
+    port: Option<u16>,
+) -> Result<String, String> {
+    let base = Path::new(&base_path)
+        .canonicalize()
+        .map_err(|e| format!("Storage base not accessible: {e}"))?;
+    let dir = server_dir(&base, &slug);
+    if !dir.is_dir() {
+        return Err(format!("Server \"{slug}\" not found"));
+    }
+
+    // 1. the manifest is the source of truth on disk
+    let manifest_path = dir.join("voxel-server.json");
+    let mut manifest: serde_json::Value = std::fs::read(&manifest_path)
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .ok_or_else(|| "voxel-server.json missing or unreadable".to_string())?;
+    if let Some(name) = name.as_deref() {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Err("Server name cannot be empty".to_string());
+        }
+        manifest["name"] = serde_json::Value::String(trimmed.to_string());
+    }
+    if let Some(ram) = ram_mb {
+        if !(512..=32768).contains(&ram) {
+            return Err("RAM must be between 512 MB and 32 GB".to_string());
+        }
+        manifest["ramMb"] = serde_json::Value::from(ram);
+    }
+    if let Some(p) = port {
+        if !(1024..=65535).contains(&p) {
+            return Err("Port must be between 1024 and 65535".to_string());
+        }
+        manifest["port"] = serde_json::Value::from(p);
+        // keep server.properties in sync — the file the server actually reads
+        let props_path = dir.join("server.properties");
+        if let Ok(content) = std::fs::read_to_string(&props_path) {
+            let updated = content
+                .lines()
+                .map(|l| {
+                    if l.trim_start_matches('#').starts_with("server-port=") {
+                        format!("server-port={p}")
+                    } else {
+                        l.to_string()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            std::fs::write(&props_path, format!("{updated}\n"))
+                .map_err(|e| format!("write server.properties: {e}"))?;
+        }
+    }
+    let pretty = serde_json::to_string_pretty(&manifest).map_err(|e| format!("{e}"))?;
+    std::fs::write(&manifest_path, &pretty).map_err(|e| format!("write manifest: {e}"))?;
+
+    // 2. the README tells the same story as the facts
+    let info = ServerInfoPayload {
+        storage_base: base.to_string_lossy().to_string(),
+        slug: slug.clone(),
+        name: manifest
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or(&slug)
+            .to_string(),
+        software: manifest
+            .get("software")
+            .and_then(|v| v.as_str())
+            .unwrap_or("vanilla")
+            .to_string(),
+        mc_version: manifest
+            .get("mcVersion")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string(),
+        ram_mb: manifest.get("ramMb").and_then(|v| v.as_u64()).unwrap_or(2048) as u32,
+        modules: Vec::new(), // module docs are rewritten by server_write_info when installed
+    };
+    if let Err(e) = server_write_info_impl(info) {
+        return Err(format!("server renamed, but the README could not be updated: {e}"));
+    }
+
+    Ok(pretty)
+}
+
+#[cfg(test)]
+mod metadata_tests {
+    use super::*;
+
+    #[test]
+    fn metadata_updates_sync_the_manifest_properties_and_readme() {
+        let base = std::env::temp_dir().join(format!("voxel-meta-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = base.join("servers/arena");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("voxel-server.json"),
+            r#"{"slug":"arena","name":"Old Name","software":"paper","mcVersion":"1.20.1","port":25565,"ramMb":2048,"createdAt":"20260101-00000"}"#,
+        )
+        .unwrap();
+        std::fs::write(dir.join("server.properties"), "server-port=25565\nmotd=x\n").unwrap();
+
+        server_update_metadata_impl(
+            base.to_string_lossy().to_string(),
+            "arena".to_string(),
+            Some("Kingdom Arena".to_string()),
+            Some(4096),
+            Some(25570),
+        )
+        .unwrap();
+
+        let manifest = std::fs::read_to_string(dir.join("voxel-server.json")).unwrap();
+        assert!(manifest.contains("\"Kingdom Arena\""));
+        assert!(manifest.contains("4096"));
+        assert!(manifest.contains("25570"));
+        let props = std::fs::read_to_string(dir.join("server.properties")).unwrap();
+        assert!(props.contains("server-port=25570"));
+        assert!(props.contains("motd=x"));
+        let readme = std::fs::read_to_string(dir.join("README.md")).unwrap();
+        assert!(readme.contains("# Kingdom Arena"));
+
+        // boundaries are honest
+        let err = server_update_metadata_impl(
+            base.to_string_lossy().to_string(),
+            "arena".to_string(),
+            None,
+            Some(100),
+            None,
+        );
+        assert!(err.unwrap_err().contains("512"));
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}

@@ -53,9 +53,18 @@ import {
   type CurrencyConfig,
   type CurrencyValuation,
 } from "@/services/servers/currencyService";
-import { Coins, FileDown } from "lucide-react";
+import { Coins, FileDown, Sparkles } from "lucide-react";
+import { IsoStructureCanvas } from "@/features/studio/IsoStructureCanvas";
+import {
+  designServerPlan,
+  previewPlanStructure,
+  applyServerPlan,
+  type ServerPlan,
+} from "@/services/servers/aiServerStudio";
+import { updateServerRecord } from "@/services/db/repositories/serversRepository";
+import type { StructureGenResult } from "@/services/assets/structureService";
 
-type Tab = "briefing" | "world" | "structures" | "commands" | "plugins" | "currency" | "dossier";
+type Tab = "briefing" | "world" | "structures" | "commands" | "plugins" | "currency" | "dossier" | "ai";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "briefing", label: "Briefing", icon: <FileText className="h-3.5 w-3.5" /> },
@@ -65,6 +74,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "plugins", label: "Plugins", icon: <PackagePlus className="h-3.5 w-3.5" /> },
   { id: "currency", label: "Currency", icon: <Coins className="h-3.5 w-3.5" /> },
   { id: "dossier", label: "Dossier", icon: <FileText className="h-3.5 w-3.5" /> },
+  { id: "ai", label: "AI Studio", icon: <Sparkles className="h-3.5 w-3.5" /> },
 ];
 
 /**
@@ -122,6 +132,15 @@ export function ServerCustomizeDialog({
   // ---- dossier state
   const [dossier, setDossier] = useState<{ files: { format: string; path: string; bytes: number }[]; pages: number } | null>(null);
 
+  // ---- AI Studio state
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [plan, setPlan] = useState<ServerPlan | null>(null);
+  const [planPreviews, setPlanPreviews] = useState<Record<string, StructureGenResult | null>>({});
+
+  // ---- rename state (the World tab edits the server identity too)
+  const [serverName, setServerName] = useState(server.name);
+
   const serverRel = `servers/${slug}`;
 
   useEffect(() => {
@@ -148,6 +167,9 @@ export function ServerCustomizeDialog({
       .catch(() => setHasEconomy(false));
     listBriefingDocuments(basePath, `${serverRel}/.voxel/briefing`).then(setExistingBriefs);
     setDossier(null);
+    setPlan(null);
+    setPlanPreviews({});
+    setServerName(server.name);
     getCurrency(basePath, slug).then((cfg) => {
       setCurrency(cfg);
       if (cfg) {
@@ -363,6 +385,88 @@ export function ServerCustomizeDialog({
     }
   };
 
+  const renameServer = async () => {
+    if (busy) return;
+    const name = serverName.trim();
+    if (!name || name === server.name) return;
+    setBusy(true);
+    try {
+      await invoke("server_update_metadata", {
+        basePath,
+        slug,
+        name,
+        ramMb: null,
+        port: null,
+      });
+      await updateServerRecord(slug, { name });
+      toast.success(`Server renamed to "${name}"`, {
+        description: "The manifest, the README and the list all carry the new name now.",
+      });
+    } catch (error) {
+      toast.error("Could not rename the server", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const designWithAi = async () => {
+    if (aiBusy || !aiPrompt.trim()) return;
+    setAiBusy(true);
+    setPlan(null);
+    setPlanPreviews({});
+    try {
+      const { plan: designed } = await designServerPlan(aiPrompt.trim(), server);
+      setPlan(designed);
+      // PREVIEW every planned structure — real generation, nothing written
+      const previews: Record<string, StructureGenResult | null> = {};
+      for (const structure of designed.structures) {
+        previews[structure.id] = await previewPlanStructure(
+          structure,
+          basePath,
+          slug,
+          server.minecraft_version,
+        ).catch(() => null);
+      }
+      setPlanPreviews(previews);
+      toast.success("Plan ready — preview everything, then install", {
+        description: designed.summary.slice(0, 140),
+        duration: 12000,
+      });
+    } catch (error) {
+      toast.error("The AI could not design this", {
+        description: error instanceof Error ? error.message : String(error),
+        duration: 12000,
+      });
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const installPlan = async () => {
+    if (busy || !plan) return;
+    setBusy(true);
+    try {
+      const result = await applyServerPlan(plan, basePath, server);
+      toast.success("Plan installed", {
+        description:
+          `${result.placed.length} structure${result.placed.length === 1 ? "" : "s"} on disk, ${result.commandsInstalled} command${result.commandsInstalled === 1 ? "" : "s"} in the datapack — run /reload and place them in-game.`,
+        duration: 14000,
+      });
+      setPlan(null);
+      setPlanPreviews({});
+      // regenerate the dossier so the documentation carries the new truth
+      invoke("server_generate_dossier", { basePath, slug }).catch(() => {});
+    } catch (error) {
+      toast.error("Install failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const saveTheCurrency = async () => {
     if (!currency || busy) return;
     setBusy(true);
@@ -555,6 +659,15 @@ export function ServerCustomizeDialog({
 
         {tab === "world" && (
           <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>{t("Server name")}</Label>
+              <div className="flex gap-2">
+                <Input value={serverName} onChange={(e) => setServerName(e.target.value)} />
+                <Button size="sm" variant="outline" onClick={() => void renameServer()} disabled={busy || !serverName.trim() || serverName.trim() === server.name}>
+                  {t("Rename")}
+                </Button>
+              </div>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>MOTD</Label>
@@ -845,6 +958,111 @@ export function ServerCustomizeDialog({
                 <p className="text-[10px] text-muted-foreground">
                   {t("Click a format to save it anywhere (the .md/.txt/.html/.pdf/.docx/.odt also live in the server's Dossier folder).")}
                 </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "ai" && (
+          <div className="space-y-3">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t(
+                "You give the command — the AI designs everything else: structures (mines, prisons, towers...), custom commands, world rules. Everything below is a REAL plan with REAL previews; nothing lands until you install it.",
+              )}
+            </p>
+            <textarea
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              rows={3}
+              placeholder={t(
+                'e.g. "Build a prison server: a prison block with 4 cells, a coal mine for rank A, an iron mine for rank B and a diamond mine for rank C, plus a /warp_prison command that teleports and greets"',
+              )}
+              className="w-full resize-none rounded-lg border border-input bg-background/60 px-3 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <Button size="sm" variant="gradient" onClick={() => void designWithAi()} disabled={aiBusy || !aiPrompt.trim()}>
+              {aiBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {aiBusy ? t("Designing…") : t("Design with AI")}
+            </Button>
+
+            {plan && (
+              <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <p className="text-[11px] leading-relaxed text-foreground/90">
+                  <span className="font-semibold">{t("The plan")} — </span>
+                  {plan.summary}
+                </p>
+
+                {plan.structures.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold">
+                      {t("Structures")} · {plan.structures.length}
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {plan.structures.map((structure) => (
+                        <div key={structure.id} className="rounded-lg border border-border/60 bg-card/60 p-2">
+                          <p className="flex items-center justify-between gap-2 text-[11px] font-semibold">
+                            <span className="truncate">{structure.id}</span>
+                            <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[9px] uppercase text-primary">
+                              {structure.kind}
+                            </span>
+                          </p>
+                          {structure.purpose && (
+                            <p className="mt-0.5 line-clamp-2 text-[10px] text-muted-foreground">{structure.purpose}</p>
+                          )}
+                          {planPreviews[structure.id] ? (
+                            <IsoStructureCanvas
+                              blocks={planPreviews[structure.id]!.blocks}
+                              size={planPreviews[structure.id]!.size}
+                            />
+                          ) : (
+                            <div className="flex h-24 items-center justify-center text-[10px] text-muted-foreground">
+                              {t("preview unavailable")}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {plan.commands.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold">
+                      {t("Commands")} · {plan.commands.length}
+                    </p>
+                    {plan.commands.map((c) => (
+                      <div key={c.id} className="rounded-lg border border-border/60 bg-card/60 px-3 py-2">
+                        <p className="text-[11px] font-semibold">
+                          <code className="font-mono text-primary">/trigger {c.id}</code>
+                          {c.description ? ` — ${c.description}` : ""}
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                          {c.actions.length} action{c.actions.length > 1 ? "s" : ""}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {Object.keys(plan.properties).length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold">{t("World rules")}</p>
+                    {Object.entries(plan.properties).map(([k, v]) => (
+                      <p key={k} className="text-[10px] text-muted-foreground">
+                        <code className="font-mono">{k}</code> = {v}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button size="sm" variant="gradient" onClick={() => void installPlan()} disabled={busy}>
+                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    {t("Install everything on this server")}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setPlan(null); setPlanPreviews({}); }}>
+                    {t("Discard plan")}
+                  </Button>
+                </div>
               </div>
             )}
           </div>

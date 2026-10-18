@@ -101,6 +101,8 @@ pub enum StructureKind {
     Cottage,
     Obelisk,
     Ruin,
+    Mine,
+    Prison,
 }
 
 impl StructureKind {
@@ -110,6 +112,8 @@ impl StructureKind {
             "cottage" => StructureKind::Cottage,
             "obelisk" => StructureKind::Obelisk,
             "ruin" => StructureKind::Ruin,
+            "mine" => StructureKind::Mine,
+            "prison" => StructureKind::Prison,
             _ => return None,
         })
     }
@@ -489,12 +493,190 @@ fn generate_ruin(seed: u64) -> GeneratedStructure {
     }
 }
 
+/// A PRISON MINE — the owner's Prison case: a proper mining gallery with
+/// timber supports, rails on the floor, torch light and REAL ore veins in
+/// the walls. The ore type rotates with the seed (coal/iron/redstone/
+/// lapis/gold/diamond/emerald), so every rank can have its own mine.
+fn generate_mine(seed: u64) -> GeneratedStructure {
+    // 25x9 gallery, 6 tall: tunnel with side alcoves and ore pockets
+    let len = 25;
+    let w = 9;
+    let h = 6;
+    let ores = [
+        "minecraft:coal_ore",
+        "minecraft:iron_ore",
+        "minecraft:redstone_ore",
+        "minecraft:lapis_ore",
+        "minecraft:gold_ore",
+        "minecraft:diamond_ore",
+        "minecraft:emerald_ore",
+    ];
+    let ore = ores[pick(seed, 50, ores.len() as u32) as usize];
+    let mut blocks = Vec::new();
+
+    for x in 0..len {
+        for z in 0..w {
+            for y in 0..h {
+                let shell = x == 0 || z == 0 || x == len - 1 || z == w - 1 || y == 0 || y == h - 1;
+                if !shell {
+                    blocks.push(block([x, y, z], "minecraft:air"));
+                    continue;
+                }
+                // floor: stone with rails down the middle lane
+                if y == 0 {
+                    if z == w / 2 && x % 2 == 1 && x > 1 && x < len - 2 {
+                        blocks.push(block_with([x, y, z], "minecraft:rail", &[("shape", "east_west")]));
+                    } else {
+                        blocks.push(block([x, y, z], "minecraft:stone"));
+                    }
+                    continue;
+                }
+                // ceiling: stone with occasional timber beam
+                if y == h - 1 {
+                    let beam = z == 2 || z == w - 3;
+                    blocks.push(block([x, y, z], if beam { "minecraft:spruce_planks" } else { "minecraft:stone" }));
+                    continue;
+                }
+                // walls: ore veins in deterministic pockets + timber frames
+                let pocket = hash_seed(seed ^ (x as u64) << 8, (z as u32) ^ 7) % 100 < 22;
+                let support = (z == 1 || z == w - 2) && x % 6 == 0;
+                if support {
+                    blocks.push(block([x, y, z], "minecraft:spruce_log"));
+                } else if pocket {
+                    blocks.push(block([x, y, z], ore));
+                } else {
+                    blocks.push(block([x, y, z], "minecraft:stone"));
+                }
+            }
+            // torches along the walls every 5 blocks
+            if (x + 1) % 5 == 0 && (z == 0 || z == w - 1) {
+                blocks.push(block_with([x, 1, z], "minecraft:wall_torch", &[("facing", if z == 0 { "south" } else { "north" })]));
+            }
+        }
+    }
+    // entrance carved through the back wall (a clean opening to walk in)
+    for y in 1..4 {
+        for z in 2..w - 2 {
+            blocks.push(block([len - 1, y, z], "minecraft:air"));
+        }
+    }
+    // side alcoves with extra ore clusters (the profitable corners)
+    for &(ax, az) in [(0, 2), (0, w - 3), (len - 1, 2), (len - 1, w - 3)].iter() {
+        for dy in 1..h - 1 {
+            for d in 0..2 {
+                blocks.push(block([ax, dy, (az + d as i32).min(w - 1)], ore));
+            }
+        }
+    }
+
+    GeneratedStructure {
+        size: [len, h, w],
+        blocks,
+    }
+}
+
+/// A PRISON BLOCK — walled yard with corner towers, iron-bar gates, and
+/// four cells with bunks: the prison the owner's rank system deserves.
+fn generate_prison(seed: u64) -> GeneratedStructure {
+    let w = 21; // 21x21 yard
+    let wall_h = 5;
+    let tower_h = 8;
+    let mut blocks = Vec::new();
+
+    // yard floor: polished floor with a stone-brick border
+    for x in 0..w {
+        for z in 0..w {
+            let edge = x == 0 || z == 0 || x == w - 1 || z == w - 1;
+            blocks.push(block([x, 0, z], if edge { "minecraft:stone_bricks" } else { "minecraft:polished_andesite" }));
+        }
+    }
+    // walls with an iron-bar gate on each face + torch light
+    for y in 1..=wall_h {
+        for x in 0..w {
+            for z in 0..w {
+                let edge = x == 0 || z == 0 || x == w - 1 || z == w - 1;
+                if !edge {
+                    continue;
+                }
+                let gate = (y == 2 || y == 3) && ((x == w / 2 - 1 || x == w / 2 || x == w / 2 + 1) || (z == w / 2 - 1 || z == w / 2 || z == w / 2 + 1));
+                let name = if gate { "minecraft:iron_bars" } else { "minecraft:stone_bricks" };
+                blocks.push(block([x, y, z], name));
+            }
+        }
+    }
+    // corner towers: 3x3 hollow shells with battlements, one per corner
+    for &(sx, sz) in [(0i32, 0i32), (1, 0), (0, 1), (1, 1)].iter() {
+        for y in 1..=tower_h {
+            for dx in 0..3i32 {
+                for dz in 0..3i32 {
+                    let x = if sx == 0 { dx } else { w - 1 - dx };
+                    let z = if sz == 0 { dz } else { w - 1 - dz };
+                    let shell = dx == 0 || dz == 0 || dx == 2 || dz == 2;
+                    let crenel = y == tower_h && (dx + dz) % 2 == 0;
+                    if (y < tower_h && shell) || crenel {
+                        blocks.push(block([x, y, z], if y <= 2 { "minecraft:cobblestone" } else { "minecraft:stone_bricks" }));
+                    } else if y < tower_h {
+                        blocks.push(block([x, y, z], "minecraft:air"));
+                    }
+                }
+            }
+        }
+        // a torch inside each tower so the corners glow
+        let tx = if sx == 0 { 1 } else { w - 2 };
+        let tz = if sz == 0 { 1 } else { w - 2 };
+        blocks.push(block([tx, 1, tz], "minecraft:lantern"));
+    }
+    // four cells against the inner faces: 3x4 rooms with iron-bar fronts,
+    // a bunk (red wool bed substitute) and a lantern each
+    for &(ox, oz, fx) in [(4, 1, true), (w - 5, 1, true), (4, w - 5, false), (w - 5, w - 5, false)].iter() {
+        for dx in 0..4 {
+            for dz in 0..3 {
+                let x = ox + dx;
+                let z = oz + dz;
+                // walls of the cell
+                for y in 1..=3 {
+                    let is_front = if fx { dz == 0 } else { dz == 2 };
+                    let name = if is_front && dx != 1 && dx != 2 {
+                        "minecraft:iron_bars"
+                    } else if dz == 1 && dx == 3 {
+                        "minecraft:air" // doorway into the yard
+                    } else {
+                        "minecraft:stone_bricks"
+                    };
+                    blocks.push(block([x, y, z], name));
+                }
+            }
+            // bunk + lantern
+            blocks.push(block([ox + 1, 1, oz + 2], "minecraft:red_wool"));
+            blocks.push(block([ox + 2, 2, oz + 1], "minecraft:lantern"));
+        }
+    }
+    // center of the yard: a small watch platform with a lantern pole
+    let c = w / 2;
+    for y in 1..=3 {
+        blocks.push(block([c, y, c], "minecraft:spruce_log"));
+    }
+    blocks.push(block_with([c, 4, c], "minecraft:lantern", &[("hanging", "false")]));
+    for dx in -1i32..=1 {
+        for dz in -1i32..=1 {
+            blocks.push(block([(c + dx).max(0).min(w - 1), 3, (c + dz).max(0).min(w - 1)], "minecraft:spruce_planks"));
+        }
+    }
+
+    GeneratedStructure {
+        size: [w, tower_h + 1, w],
+        blocks,
+    }
+}
+
 pub fn generate_structure(kind: StructureKind, seed: u64) -> GeneratedStructure {
     match kind {
         StructureKind::Watchtower => generate_watchtower(seed),
         StructureKind::Cottage => generate_cottage(seed),
         StructureKind::Obelisk => generate_obelisk(seed),
         StructureKind::Ruin => generate_ruin(seed),
+        StructureKind::Mine => generate_mine(seed),
+        StructureKind::Prison => generate_prison(seed),
     }
 }
 
@@ -665,7 +847,7 @@ pub async fn structure_generate(payload: StructureGenPayload) -> Result<Structur
 
 pub fn structure_generate_impl(payload: StructureGenPayload) -> Result<StructureGenResult, String> {
     let kind = StructureKind::from_str(payload.kind.trim())
-        .ok_or_else(|| format!("Unknown structure kind \"{}\" — use watchtower|cottage|obelisk|ruin", payload.kind))?;
+        .ok_or_else(|| format!("Unknown structure kind \"{}\" — use watchtower|cottage|obelisk|ruin|mine|prison", payload.kind))?;
     safe_structure_id(&payload.structure_id)?;
     let mc = payload.mc_version.trim();
     if mc.is_empty() {
