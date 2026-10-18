@@ -11,5 +11,11 @@ export default defineConfig({
       "packages/core/src/**/*.test.ts",
     ],
     environment: "node",
+    // render smoke tests run in a DOM — they prove the dialogs actually
+    // render instead of dying inside the overlay (the owner's "only a
+    // scrollbar appears and nothing happens" report)
+    environmentMatchGlobs: [
+      ["**/*.render.test.tsx", "jsdom"],
+    ],
   },
 });

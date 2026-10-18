@@ -7,6 +7,7 @@ export type BuildErrorCategory =
   | "java"
   | "dependency"
   | "configuration"
+  | "environment"
   | "unknown";
 
 export interface BuildError {
@@ -58,6 +59,69 @@ export function parseBuildErrors(logs: Array<{ line: string }>): BuildError[] {
         errors.push({
           category: "dependency",
           message: `Dependency problem: ${dep}`,
+          file: null,
+          line: null,
+          raw: trimmed,
+        });
+      }
+      continue;
+    }
+
+    // ENVIRONMENT problems — the owner's "build just failed" cases:
+    // no Java, wrong Java, network down, wrapper issues. Each with a FIX.
+    if (/(?:'java' is not recognized|java: command not found|Neither the JAVA_HOME| JAVA_HOME variable (?:is not|could not be) set)/i.test(trimmed)) {
+      const key = "env:java-missing";
+      if (!seen.has(key)) {
+        seen.add(key);
+        errors.push({
+          category: "environment",
+          message:
+            "Java was not found — Gradle cannot even start. Install Java 21 (e.g. from adoptium.net) and, if you use a custom install, point Settings → Java to it.",
+          file: null,
+          line: null,
+          raw: trimmed,
+        });
+      }
+      continue;
+    }
+    if (/(?:Unsupported class file major version|requires a Java (?:version|runtime)|UnsupportedClassVersionError|invalid source release)/i.test(trimmed)) {
+      const key = "env:java-version";
+      if (!seen.has(key)) {
+        seen.add(key);
+        errors.push({
+          category: "environment",
+          message:
+            "The installed Java version does not match this project. Minecraft 1.20.1 projects need Java 17 or 21 (26.x needs Java 25) — set the right one in Settings → Java.",
+          file: null,
+          line: null,
+          raw: trimmed,
+        });
+      }
+      continue;
+    }
+    if (/(?:Could not download|Read timed out|Connection (?:refused|reset)|UnknownHost|network|offline)/i.test(trimmed) && /(?:gradle|wrapper|maven|fabricmc|neoforged|minecraft|libraries)/i.test(trimmed)) {
+      const key = "env:network";
+      if (!seen.has(key)) {
+        seen.add(key);
+        errors.push({
+          category: "environment",
+          message:
+            "A download failed mid-build (Gradle, libraries or mappings). Check your internet/firewall/antivirus and click Build again — the first build downloads the toolchain, later ones reuse it.",
+          file: null,
+          line: null,
+          raw: trimmed,
+        });
+      }
+      continue;
+    }
+    if (/(?:No space left on device|disk (?:full|quota)|Permission denied)/i.test(trimmed)) {
+      const key = "env:disk";
+      if (!seen.has(key)) {
+        seen.add(key);
+        errors.push({
+          category: "environment",
+          message:
+            "The build could not write its files — check free disk space and folder permissions for your workspace.",
           file: null,
           line: null,
           raw: trimmed,

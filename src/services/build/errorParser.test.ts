@@ -51,3 +51,31 @@ describe("parseBuildErrors", () => {
     expect(prompt).toContain("never delete files");
   });
 });
+
+describe("environment diagnosis (the build that failed before compiling)", () => {
+  it("names a missing Java with the exact fix", () => {
+    const errors = parseBuildErrors([{ line: "'java' is not recognized as an internal or external command" }]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].category).toBe("environment");
+    expect(errors[0].message).toContain("Install Java 21");
+    expect(errors[0].message).toContain("Settings → Java");
+  });
+
+  it("recognizes a Java version mismatch (Windows wording)", () => {
+    const errors = parseBuildErrors([{ line: "error: invalid source release: 21 with -source 8" }]);
+    expect(errors[0].category).toBe("environment");
+    expect(errors[0].message).toContain("Java 17 or 21");
+  });
+
+  it("recognizes mid-build download failures with the retry guidance", () => {
+    const errors = parseBuildErrors([{ line: "Could not download gradle-8.8-bin.zip ... Read timed out" }]);
+    expect(errors[0].category).toBe("environment");
+    expect(errors[0].message).toContain("first build downloads");
+  });
+
+  it("recognizes a full disk", () => {
+    const errors = parseBuildErrors([{ line: "java.io.IOException: No space left on device" }]);
+    expect(errors[0].category).toBe("environment");
+    expect(errors[0].message).toContain("disk space");
+  });
+});
