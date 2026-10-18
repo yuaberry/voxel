@@ -140,7 +140,13 @@ export async function deleteProjectFromDisk(
   basePath: string,
   projectRel: string,
 ): Promise<void> {
-  await invoke("delete_project_entry", { basePath, projectRel });
+  // The dedicated command stops the project's Gradle daemon first (it
+  // holds the folder on Windows), retries, and names the blocked file.
+  const slug = projectRel.trim().replace(/^projects\//, "").replace(/\/$/, "");
+  if (!slug || slug.includes("/") || slug.includes("..")) {
+    throw new Error("Invalid project path");
+  }
+  await invoke("project_delete", { basePath, projectSlug: slug });
 }
 
 // ---------------------------------------------------------------------------

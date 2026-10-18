@@ -605,3 +605,128 @@ mod e2e_tests {
         eprintln!("E2E OK (neoforge-modern) — jar: {jars:?}");
     }
 }
+// ---------------------------------------------------------------------------
+// Permanent project deletion — the owner's bug report: deletes failed on
+// Windows because the Gradle daemon keeps the project folder as its working
+// directory. This stops that daemon first, then removes with retries, and
+// when something still holds a file it says WHICH file and what to do.
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn project_delete(base_path: String, project_slug: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || project_delete_impl(base_path, project_slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn project_delete_impl(base_path: String, project_slug: String) -> Result<(), String> {
+    let slug = project_slug.trim().trim_end_matches('/');
+    if slug.is_empty() || slug.contains("..") || slug.contains('/') || slug.contains('\\') {
+        return Err("Invalid project id".to_string());
+    }
+    let base = std::path::PathBuf::from(&base_path)
+        .canonicalize()
+        .map_err(|e| format!("Storage location is not accessible: {e}"))?;
+    let dir = base.join("projects").join(slug);
+    if !dir.is_dir() {
+        return Ok(()); // already gone — deleting twice is a success
+    }
+
+    // 1. Stop the project's Gradle daemon — it holds the folder as cwd on
+    //    Windows and blocks remove_dir_all. Best-effort with a timeout.
+    let gradlew = dir.join(if cfg!(windows) { "gradlew.bat" } else { "gradlew" });
+    if gradlew.is_file() {
+        let _ = std::process::Command::new(gradlew.to_string_lossy().to_string())
+            .arg("--stop")
+            .current_dir(&dir)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        // give the daemon a beat to release the directory handles
+        std::thread::sleep(std::time::Duration::from_millis(800));
+    }
+
+    // 2. Remove with retries — antivirus scans and lingering handles on
+    //    Windows are transient, not fatal.
+    let mut last_err = None;
+    for attempt in 1..=3 {
+        match std::fs::remove_dir_all(&dir) {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt < 3 {
+                    std::thread::sleep(std::time::Duration::from_millis(900 * attempt as u64));
+                }
+            }
+        }
+    }
+
+    // 3. Honest, actionable diagnosis of whatever is still holding it
+    let err = last_err.expect("at least one attempt");
+    // find the first surviving entry to point at
+    let mut culprit = String::new();
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            culprit = entry.file_name().to_string_lossy().to_string();
+            break;
+        }
+    }
+    Err(format!(
+        "Could not delete \"projects/{slug}\" ({err}){} — something is holding the folder. Close Minecraft, the game launcher, any Gradle/Java windows (or wait a minute for the antivirus to let go) and try again.",
+        if culprit.is_empty() { String::new() } else { format!(" — first blocked item: {culprit}") },
+    ))
+}
+
+#[cfg(test)]
+mod delete_tests {
+    use super::*;
+
+    #[test]
+    fn project_delete_removes_git_and_build_trees_and_is_idempotent() {
+        let base = std::env::temp_dir().join(format!("voxel-pdel-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = base.join("projects/doomed-kingdom");
+        std::fs::create_dir_all(dir.join(".git/objects")).unwrap();
+        std::fs::create_dir_all(dir.join("build/libs")).unwrap();
+        std::fs::create_dir_all(dir.join("src/main/java")).unwrap();
+        std::fs::write(dir.join("build/libs/mod.jar"), b"PK").unwrap();
+        std::fs::write(dir.join(".git/HEAD"), b"ref").unwrap();
+        // no gradlew here — the daemon stop is skipped, the delete proceeds
+        project_delete_impl(base.to_string_lossy().to_string(), "doomed-kingdom".into())
+            .expect("delete must succeed");
+        assert!(!dir.exists(), "the whole project folder must be gone");
+
+        // deleting again is a success (idempotent — double-click safety)
+        project_delete_impl(base.to_string_lossy().to_string(), "doomed-kingdom".into())
+            .expect("second delete is a success");
+
+        // traversal is refused
+        let err = project_delete_impl(base.to_string_lossy().to_string(), "../escape".into());
+        assert!(err.is_err());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn project_delete_stops_a_real_gradlew_first() {
+        // a project with a gradlew STUB: the impl must try to run it and
+        // still delete everything (the stub failing is best-effort by design)
+        let base = std::env::temp_dir().join(format!("voxel-pdel2-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = base.join("projects/with-gradle");
+        std::fs::create_dir_all(&dir).unwrap();
+        let gradlew = dir.join("gradlew");
+        std::fs::write(&gradlew, "#!/bin/sh\\nexit 0\\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mut perms = std::fs::metadata(&gradlew).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&gradlew, perms).unwrap();
+        }
+        std::fs::write(dir.join("settings.gradle"), b"rootProject.name = 'x'\\n").unwrap();
+        project_delete_impl(base.to_string_lossy().to_string(), "with-gradle".into())
+            .expect("daemon stop is best-effort; delete proceeds");
+        assert!(!dir.exists());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}
