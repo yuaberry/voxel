@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (49 sessões)
+## 5. Histórico de sessões (50 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 50 | Delete fix + AI Studio + rename | **Causa raiz do delete no Windows** (daemon do Gradle segura a pasta → project_delete: stop + retries + erro que nomeia o item) · **AI Studio** (prompt → plano validado → previews reais → install) · kinds **mine/prison** procedurais (o caso Prison com veios de minério) · renomear servidor + v0.8.0 | newline em key de properties; torre torta; chars de heredoc |
 | 49 | Dossiê profissional + classe trava final | **PDF reconstruído**: capa, TOC com páginas reais (2 passadas), footer Page N of M, tabelas com banda roxa+zebra, código em caixas, WinAnsi-safe; DOCX com w:tbl reais; curadoria do conteúdo. **14 commands pesados → async** (create_project, server_delete, git push/commit, snapshots, search, modpack trio, structure, ledger×5). Testes pescaram: wrap quebrava por palavra (67→31 páginas honestas), TOC page 0, footer duplicado, em-dash WinAnsi + v0.7.1 | — |
 | 48 | Dossiê + Moeda + Comandos de mod | **Dossiê do servidor 30+ páginas em 6 formatos reais** (PDF writer próprio, DOCX/ODT válidos, HTML, TXT, MD; gerado no create + salvo onde quiser); **moeda própria com economia REAL** (BCE ao vivo USD→BRL/EUR, diluição mais-tokens-menos-valor, supply do ledger, compliance in-game honesto); **comandos custom que viajam DENTRO do jar** (datapack do mod remapeado, editor compartilhado) + v0.7.0 | entidades decodificadas 2×; nexus_ strip; tags do mod no lugar errado; stub de appendix |
 | 47 | Autonomia total | **Briefing docs** (.txt/.md/.pdf/.docx reais: docx unzipped, pdf-extract) lidos pelo agente; **Customize Server** (import world .zip atômico, estruturas .nbt com /place, **comandos customizados com mobs NBT + /convert → wallet chain**, plugins Paper do Modrinth); world setup no wizard; defaults de servidor nas settings; v0.6.0 | entidades decodificadas pelo pipeline (code points); routing do convert fora do gate; extensão antes do conteúdo |
@@ -265,13 +266,13 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 49, v0.7.1)
+## 8. Estado atual (verificado — Sessão 50, v0.8.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (85) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (87) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Rust unit (88) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Vitest (90) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -285,7 +286,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.7.1 (latest)** | Desktop: **Dossiê profissional (capa, sumário com páginas, rodapé, tabelas diagramadas) + 14 commands pesados agora async — nada trava** + APK mobile 0.3.1 |
+| **v0.8.0 (latest)** | Desktop: **delete de projetos corrigido (daemon Gradle) + AI Studio (prompt gera tudo com preview) + kinds mine/prison + renomear servidor** + APK mobile 0.3.1 |
+| v0.7.1 | Desktop: **Dossiê profissional (capa, sumário com páginas, rodapé, tabelas diagramadas) + 14 commands pesados agora async — nada trava** + APK mobile 0.3.1 |
 | v0.7.0 | Desktop: **Dossiê 30+ páginas × 6 formatos + moeda própria com FX real (USD/BRL/EUR) + comandos dentro dos mods** + APK mobile 0.3.1 |
 | v0.6.0 | Desktop: **era de autonomia** — briefing docs próprios que o agente lê + Customize Server (worlds .zip, estruturas .nbt, comandos custom com mobs e /convert, plugins Paper) + defaults nas settings + APK mobile 0.3.1 |
 | v0.5.12 | Desktop: **downloads à prova de travamento (timeout+retry) + diagnósticos reais + self-heal disco↔DB + banner de emergência** + APK mobile 0.3.1 |
@@ -326,7 +328,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 85 unit
+cd src-tauri && cargo test          # 88 unit
 cargo test --lib -- --ignored --nocapture # 11 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -1222,3 +1224,23 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (35) ✓ · vitest 87/87 ✓ · cargo **85/85** ✓ (11 E2E) · vite build 1m39s ✓ · boot vivo 0 panics ✓. Release **v0.7.1**.
 
 **Regra reforçada**: quando um teste novo falhar, NUNCA afrouxar o teste antes de debugar o artefato real (o dump do PDF provou o bug de wrap em 30 segundos).
+
+---
+
+## 50. Sessão 50 — Excluir projetos (causa raiz de Windows) + AI Studio + renomear servidor
+
+**Pedido do dono**: "ainda não consigo excluir os projetos" (2º report); servidores 100% autoria do usuário/IA — a IA gera TUDO (construções, mundo, estruturas, comandos; Prison: minas/construções) com **preview** de tudo; o usuário só dá o comando; usar os melhores modelos do mercado; editar nome do servidor etc.
+
+**Delete de projetos — causa raiz encontrada**: no Windows, o **daemon do Gradle** (vivo ~3h após qualquer build) mantém a pasta do projeto como cwd — `remove_dir_all` não remove diretório em uso por processo vivo → delete falhava. **`project_delete`** novo (async): 1) `gradlew --stop` do projeto (best-effort), 2) rmtree com **3 retries + backoff** (antivírus/handles transitórios), 3) se ainda falhar, o erro **nomeia o primeiro item bloqueado** e diz o que fazer. Idempotente (2º delete = sucesso). Testes: .git+build, gradlew stub real, idempotência, traversal.
+
+**AI Studio (Customize → AI Studio)**: o usuário descreve ("prisão com 3 minas por rank + /warp") → o modelo configurado (Settings → AI — o dono escolhe os melhores do mercado lá) responde com um **plano JSON estrito** → o app **gera previews REAIS** (IsoStructureCanvas com os blocos exatos de cada estrutura planejada) → Apply instala tudo: .nbt no datapack do servidor, comandos pelo gerador datapack, regras no server.properties, dossiê regenerado. **Parser validador** (3 testes): kinds só os 6 reais, ids vanilla-safe, **chaves de propriedade com charset** (newline em key corromperia o properties — pescado pelo teste), `online-mode` nunca vem da IA, caps 6 estruturas/4 comandos.
+
+**Novos kinds procedurais REAIS (o caso Prison)**: `mine` (galeria 25×9: suportes de madeira, trilhos, tochas e **veios de minério de verdade** — o minério gira com a seed: carvão→esmeralda) e `prison` (pátio murado 21×21, portões de ferro, 4 torres com bateguas, 4 celas com beliches, plataforma central). O Structure Studio ganha ambos automaticamente.
+
+**Renomear servidor** (Customize → World): `server_update_metadata` (async) atualiza voxel-server.json + server.properties (porta) + README juntos; validação de limites; repository UPDATE; a lista sincroniza no polling de 5s.
+
+**Bugs caçados (3)**: daemon do Gradde segurando a pasta (a causa raiz do delete); chave de propriedade com newline vindas do modelo (corromperia server.properties); torres do prison com cálculo torto (reescrito limpo antes de qualquer teste apontar).
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (35) ✓ · vitest **90/90** (+3 planner) ✓ · cargo **88/88** (+2 delete +1 metadata; 11 E2E) ✓ · vite build 1m40s ✓ · boot vivo 0 panics ✓. Release **v0.8.0**.
+
+**Nota de honestidade**: "melhores modelos do mercado" = o que o dono configura (OpenRouter/Anthropic/OpenAI/Ollama/NIM) — o app não inventa modelo; o system prompt do planner é validado para QUALQUER modelo.
