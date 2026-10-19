@@ -34,7 +34,51 @@ import {
 import { toast } from "sonner";
 import { useUiStore } from "@/stores/uiStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useEffect, useState } from "react";
 import { useProjectsStore } from "@/stores/projectsStore";
+import { invoke } from "@tauri-apps/api/core";
+import { Server as ServerIcon, FileText } from "lucide-react";
+
+interface WorkspaceHit {
+  category: "project" | "server" | "shaderpack" | "modpack" | "file";
+  title: string;
+  detail: string;
+  relPath: string;
+}
+
+/** Unified search (Super Prompt §34): debounced, typed, honest — only real
+ * things on the workspace come back, from Rust, off the main thread. */
+function useWorkspaceSearch(open: boolean) {
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<WorkspaceHit[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setHits([]);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const basePath = useSettingsStore.getState().settings.storage.basePath;
+        if (!basePath) return;
+        const result = await invoke<WorkspaceHit[]>("search_workspace", {
+          basePath,
+          query: trimmed,
+        });
+        if (!cancelled) setHits(result);
+      } catch {
+        if (!cancelled) setHits([]);
+      }
+    }, 260);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query, open]);
+  return { query, setQuery, hits };
+}
 import { secretsGet, AI_API_KEY_ID } from "@/services/secrets/secretsService";
 import { openInFileManager } from "@/services/storage/storageService";
 import { testAiConnection } from "@/services/ai/connectionService";
@@ -69,6 +113,7 @@ export function CommandPalette() {
   const setAboutOpen = useUiStore((s) => s.setAboutOpen);
   const settings = useSettingsStore((s) => s.settings);
   const projects = useProjectsStore((s) => s.projects);
+  const search = useWorkspaceSearch(open);
   const setCreateWizardOpen = useUiStore((s) => s.setCreateWizardOpen);
 
   const go = (to: string) => {
@@ -125,9 +170,57 @@ export function CommandPalette() {
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content className="fixed left-1/2 top-[20%] z-50 w-full max-w-xl -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-popover shadow-2xl shadow-black/60 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           <Command loop>
-            <CommandInput placeholder="Type a command or search…" />
+            <CommandInput
+              placeholder="Type a command or search…"
+              value={search.query}
+              onValueChange={search.setQuery}
+            />
             <CommandList>
               <CommandEmpty>No results found.</CommandEmpty>
+
+              {search.hits.length > 0 && (
+                <CommandGroup heading="Workspace results">
+                  {search.hits.map((hit) => (
+                    <PaletteItem
+                      key={hit.relPath + hit.title}
+                      icon={
+                        hit.category === "server"
+                          ? ServerIcon
+                          : hit.category === "file"
+                            ? FileText
+                            : hit.category === "modpack"
+                              ? Package
+                              : Boxes
+                      }
+                      label={hit.title}
+                      hint={`${hit.category}${hit.detail ? ` — ${hit.detail}` : ""}`}
+                      onSelect={() => {
+                        setOpen(false);
+                        if (hit.category === "server") {
+                          go("/servers");
+                        } else if (hit.category === "project") {
+                          const found = projects.find(
+                            (p) => p.slug === hit.title || hit.relPath.endsWith(p.slug),
+                          );
+                          if (found) go(`/projects/${found.id}`);
+                          else go("/projects");
+                        } else if (hit.category === "shaderpack") {
+                          go("/shaders");
+                        } else if (hit.category === "modpack") {
+                          go("/modpacks");
+                        } else {
+                          // a file hit — open its project workspace
+                          const slug = hit.relPath.split("/")[1];
+                          const found = projects.find((p) => p.slug === slug);
+                          if (found) go(`/projects/${found.id}`);
+                          else go("/projects");
+                        }
+                      }}
+                    />
+                  ))}
+                  <CommandSeparator />
+                </CommandGroup>
+              )}
 
               <CommandGroup heading="Projects">
                 <PaletteItem
@@ -212,16 +305,23 @@ export function CommandPalette() {
 function PaletteItem({
   icon: Icon,
   label,
+  hint,
   onSelect,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  hint?: string;
   onSelect: () => void;
 }) {
   return (
     <CommandItem onSelect={onSelect}>
       <Icon className="h-4 w-4" />
-      {label}
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate">{label}</span>
+        {hint && (
+          <span className="truncate text-[10px] text-muted-foreground">{hint}</span>
+        )}
+      </span>
     </CommandItem>
   );
 }

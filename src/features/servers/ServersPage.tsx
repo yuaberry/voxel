@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, Radar, Server as ServerIcon, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateServerDialog, type CreateServerInitials } from "./CreateServerDialog";
 import { ServerConsoleDialog } from "./ServerConsoleDialog";
@@ -143,7 +144,21 @@ export function ServersPage() {
         </Button>
       </div>
 
-      {loaded && servers.length === 0 ? (
+      {!loaded ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="rounded-xl border border-border/70 bg-card/60 p-5">
+              <Skeleton className="h-5 w-2/3" />
+              <Skeleton className="mt-2 h-3 w-1/3" />
+              <div className="mt-4 flex gap-1.5">
+                <Skeleton className="h-5 w-16" />
+                <Skeleton className="h-5 w-20" />
+              </div>
+              <Skeleton className="mt-5 h-8 w-24" />
+            </div>
+          ))}
+        </div>
+      ) : loaded && servers.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border/80 px-6 py-16 text-center">
           <div className="rounded-xl bg-secondary/60 p-4">
             <ServerIcon className="h-8 w-8 text-muted-foreground/70" />

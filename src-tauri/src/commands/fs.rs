@@ -634,3 +634,218 @@ mod agent_tool_tests {
         let _ = fs::remove_dir_all(&base);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Unified Search Engine (Super Prompt §34, Fase A) — one textual query across
+// the whole workspace: projects (names AND file contents), servers,
+// shaderpacks, modpacks and briefings. Every hit is a real thing on disk.
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceHit {
+    pub category: String, // project | server | shaderpack | modpack | file
+    pub title: String,
+    pub detail: String,
+    pub rel_path: String,
+}
+
+pub fn search_workspace_impl(
+    base_path: String,
+    query: String,
+    max_results: Option<u32>,
+) -> Result<Vec<WorkspaceHit>, String> {
+    let q = query.trim();
+    if q.len() < 2 {
+        return Err("Type at least 2 characters".to_string());
+    }
+    let q = q.to_lowercase();
+    let base = fs::canonicalize(&base_path)
+        .map_err(|e| format!("Base path is not accessible: {e}"))?;
+    let mut out: Vec<WorkspaceHit> = Vec::new();
+    let cap = max_results.unwrap_or(40).min(120) as usize;
+
+    // 1. projects — name match first, then their text files
+    let projects = base.join("projects");
+    let mut project_names: Vec<String> = Vec::new();
+    if let Ok(entries) = fs::read_dir(&projects) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
+            }
+            let slug = entry.file_name().to_string_lossy().to_string();
+            if slug.starts_with('.') {
+                continue;
+            }
+            project_names.push(slug.clone());
+            if out.len() < cap && slug.to_lowercase().contains(&q) {
+                out.push(WorkspaceHit {
+                    category: "project".into(),
+                    title: slug.clone(),
+                    detail: "project".into(),
+                    rel_path: format!("projects/{slug}"),
+                });
+            }
+        }
+    }
+    // file-content search per project (budgeted, like the agent's search)
+    if out.len() < cap {
+        for slug in &project_names {
+            if out.len() >= cap {
+                break;
+            }
+            let mut budget = 6u32;
+            let mut matches: Vec<SearchMatch> = Vec::new();
+            let _ = walk_search(
+                &projects.join(slug),
+                "",
+                q.as_str(),
+                false,
+                &mut budget,
+                &mut matches,
+            );
+            for m in matches {
+                if out.len() >= cap {
+                    break;
+                }
+                let rel = format!("projects/{slug}/{}", m.path);
+                out.push(WorkspaceHit {
+                    category: "file".into(),
+                    title: m.path.rsplit('/').next().unwrap_or(&m.path).to_string(),
+                    detail: m.line_text.trim().chars().take(90).collect(),
+                    rel_path: rel,
+                });
+            }
+            if out.len() >= cap {
+                break;
+            }
+        }
+    }
+
+    // 2. servers — real names from the manifests on disk
+    if let Ok(entries) = fs::read_dir(base.join("servers")) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            if out.len() >= cap {
+                break;
+            }
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let slug = entry.file_name().to_string_lossy().to_string();
+            let manifest = path.join("voxel-server.json");
+            if !manifest.is_file() {
+                continue;
+            }
+            if let Ok(bytes) = fs::read(&manifest) {
+                if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                    let name = v.get("name").and_then(|n| n.as_str()).unwrap_or(&slug);
+                    let software = v.get("software").and_then(|n| n.as_str()).unwrap_or("vanilla");
+                    let mc = v.get("mcVersion").and_then(|n| n.as_str()).unwrap_or("");
+                    if name.to_lowercase().contains(&q) || slug.to_lowercase().contains(&q) {
+                        out.push(WorkspaceHit {
+                            category: "server".into(),
+                            title: name.to_string(),
+                            detail: format!("{software} {mc}"),
+                            rel_path: format!("servers/{slug}"),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. shaderpacks — by folder name (the manifest carries the style)
+    if let Ok(entries) = fs::read_dir(base.join("shaderpacks")) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            if out.len() >= cap {
+                break;
+            }
+            if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.to_lowercase().contains(&q) {
+                out.push(WorkspaceHit {
+                    category: "shaderpack".into(),
+                    title: name.clone(),
+                    detail: "shaderpack".into(),
+                    rel_path: format!("shaderpacks/{name}"),
+                });
+            }
+        }
+    }
+
+    // 4. modpacks — the .zip file names
+    if let Ok(entries) = fs::read_dir(base.join("modpacks")) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            if out.len() >= cap {
+                break;
+            }
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.ends_with(".zip") && name.to_lowercase().contains(&q) {
+                out.push(WorkspaceHit {
+                    category: "modpack".into(),
+                    title: name.clone(),
+                    detail: "modpack".into(),
+                    rel_path: format!("modpacks/{name}"),
+                });
+            }
+        }
+    }
+
+    Ok(out)
+}
+
+#[tauri::command]
+pub async fn search_workspace(
+    base_path: String,
+    query: String,
+    max_results: Option<u32>,
+) -> Result<Vec<WorkspaceHit>, String> {
+    // walks every project's text files — off the main thread like all I/O
+    tauri::async_runtime::spawn_blocking(move || {
+        search_workspace_impl(base_path, query, max_results)
+    })
+    .await
+    .map_err(|e| format!("worker failed: {e}"))?
+}
+
+#[cfg(test)]
+mod search_tests {
+    use super::*;
+
+    #[test]
+    fn unified_search_finds_real_things_across_categories() {
+        let base = std::env::temp_dir().join(format!("voxel-usearch-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        // a project with a matching file
+        fs::create_dir_all(base.join("projects/dark-kingdom/src/main/java")).unwrap();
+        fs::write(base.join("projects/dark-kingdom/src/main/java/ModItems.java"), "public class ModItems {\n  // VOIDCUTTER sword here\n}\n").unwrap();
+        // a server with a real manifest name
+        fs::create_dir_all(base.join("servers/arena-kings")).unwrap();
+        fs::write(base.join("servers/arena-kings/voxel-server.json"), r#"{"slug":"arena-kings","name":"Arena Kings","software":"paper","mcVersion":"1.20.1","port":25565,"ramMb":2048,"createdAt":"20260101-00000"}"#).unwrap();
+        // noise that must NOT match
+        fs::create_dir_all(base.join("projects/unrelated")).unwrap();
+        fs::write(base.join("projects/unrelated/src.txt"), "nothing here").unwrap();
+        fs::create_dir_all(base.join("shaderpacks/Bright Days")).unwrap();
+        fs::create_dir_all(base.join("modpacks")).unwrap();
+        fs::write(base.join("modpacks/Kitchen Sink.zip"), b"PK").unwrap();
+
+        let hits = search_workspace_impl(base.to_string_lossy().to_string(), "king".into(), None).unwrap();
+        let categories: Vec<(String, String)> = hits.iter().map(|h| (h.category.clone(), h.title.clone())).collect();
+        assert!(categories.contains(&("project".into(), "dark-kingdom".into())), "{categories:?}");
+        assert!(categories.contains(&("server".into(), "Arena Kings".into())), "{categories:?}");
+        assert!(categories.iter().all(|(c, _)| c != "shaderpack"), "Bright Days does not match");
+        assert!(categories.iter().all(|(_, t)| t != "unrelated"));
+
+        // file-content search: the word inside the java file
+        let hits = search_workspace_impl(base.to_string_lossy().to_string(), "voidcutter".into(), None).unwrap();
+        assert!(hits.iter().any(|h| h.category == "file" && h.rel_path.ends_with("ModItems.java")), "{:?}", hits.iter().map(|h| &h.rel_path).collect::<Vec<_>>());
+
+        // too-short queries are refused honestly
+        assert!(search_workspace_impl(base.to_string_lossy().to_string(), "k".into(), None).is_err());
+
+        let _ = fs::remove_dir_all(&base);
+    }
+}

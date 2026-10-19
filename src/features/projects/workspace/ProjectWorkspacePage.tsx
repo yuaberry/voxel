@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
-import { ChevronRight, Github, Loader2, Play, Save, Trash2, Upload, X, MessageSquareCode } from "lucide-react";
+import { ChevronRight, Github, Loader2, Play, Save, Trash2, Upload, X, MessageSquareCode, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,7 @@ import { PublishDialog } from "./PublishDialog";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
 import { DeployToServerDialog } from "./DeployToServerDialog";
 import { ModCommandsDialog } from "./ModCommandsDialog";
+import { TimelineDialog } from "./TimelineDialog";
 import type { ProjectFileEntry } from "@/types";
 
 interface OpenTab {
@@ -52,6 +53,7 @@ export function ProjectWorkspacePage() {
   const [publishOpen, setPublishOpen] = useState(false);
   const [deployOpen, setDeployOpen] = useState(false);
   const [modCommandsOpen, setModCommandsOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const [files, setFiles] = useState<ProjectFileEntry[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [tabs, setTabs] = useState<OpenTab[]>([]);
@@ -232,6 +234,15 @@ export function ProjectWorkspacePage() {
           <Button
             size="sm"
             variant="outline"
+            onClick={() => setTimelineOpen(true)}
+            title="The factual history of this project: builds, agent actions, snapshots"
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Timeline
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => setModCommandsOpen(true)}
             title="Design custom commands that ship inside this mod"
           >
@@ -407,6 +418,14 @@ export function ProjectWorkspacePage() {
 
       {/* Publish to GitHub */}
       <PublishDialog project={project} open={publishOpen} onOpenChange={setPublishOpen} />
+
+      {/* The unified, factual project history */}
+      <TimelineDialog
+        project={project}
+        open={timelineOpen}
+        onOpenChange={setTimelineOpen}
+        basePath={basePath}
+      />
 
       {/* Custom commands designed by the author, shipped by the jar */}
       <ModCommandsDialog

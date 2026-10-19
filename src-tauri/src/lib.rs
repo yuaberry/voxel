@@ -66,6 +66,7 @@ pub fn run() {
             commands::fs::import_project_file,
             commands::fs::edit_project_file,
             commands::fs::search_project,
+            commands::fs::search_workspace,
             commands::git::project_create_snapshot,
             commands::git::project_list_snapshots,
             commands::git::project_snapshot_restore,
