@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (51 sessões)
+## 5. Histórico de sessões (52 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 52 | Fase A fechada | **Search Engine unificado** (Ctrl+K vivo: projetos+arquivos+servidores+shaderpacks+modpacks, walker guardado, +1 teste) · **Project Timeline** (builds+auditoria do agent+snapshots+sessões, filtros, botão no workspace) · componente Skeleton aplicado + v0.9.0 | budget u32 vs usize; campo preview inexistente |
 | 51 | Fase A: auditoria + 2 reports | **Build provado são (E2E 306s)** + Error Center categoria `environment` (Java/rede/disco com FIX, +4 testes) · **dialogs provados vivos** (render-smoke jsdom 5/5 suite permanente) · 3 docs de auditoria (classificação honesta por sistema, Fases A-G) + v0.8.1 | jsdom 27 ESM conflito (→@24) |
 | 50 | Delete fix + AI Studio + rename | **Causa raiz do delete no Windows** (daemon do Gradle segura a pasta → project_delete: stop + retries + erro que nomeia o item) · **AI Studio** (prompt → plano validado → previews reais → install) · kinds **mine/prison** procedurais (o caso Prison com veios de minério) · renomear servidor + v0.8.0 | newline em key de properties; torre torta; chars de heredoc |
 | 49 | Dossiê profissional + classe trava final | **PDF reconstruído**: capa, TOC com páginas reais (2 passadas), footer Page N of M, tabelas com banda roxa+zebra, código em caixas, WinAnsi-safe; DOCX com w:tbl reais; curadoria do conteúdo. **14 commands pesados → async** (create_project, server_delete, git push/commit, snapshots, search, modpack trio, structure, ledger×5). Testes pescaram: wrap quebrava por palavra (67→31 páginas honestas), TOC page 0, footer duplicado, em-dash WinAnsi + v0.7.1 | — |
@@ -267,12 +268,12 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 51, v0.8.1)
+## 8. Estado atual (verificado — Sessão 52, v0.9.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (88) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
+| Rust unit (89) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (99) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
@@ -287,7 +288,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.8.1 (latest)** | Desktop: **Error Center com diagnóstico de ambiente (Java/rede/disco) + auditoria profunda documentada** + APK mobile 0.3.1 |
+| **v0.9.0 (latest)** | Desktop: **Fase A do Super Prompt fechada — Search Engine unificado (Ctrl+K) + Project Timeline + Skeletons** + APK mobile 0.3.1 |
+| v0.8.1 | Desktop: **Error Center com diagnóstico de ambiente (Java/rede/disco) + auditoria profunda documentada** + APK mobile 0.3.1 |
 | v0.8.0 | Desktop: **delete de projetos corrigido (daemon Gradle) + AI Studio (prompt gera tudo com preview) + kinds mine/prison + renomear servidor** + APK mobile 0.3.1 |
 | v0.7.1 | Desktop: **Dossiê profissional (capa, sumário com páginas, rodapé, tabelas diagramadas) + 14 commands pesados agora async — nada trava** + APK mobile 0.3.1 |
 | v0.7.0 | Desktop: **Dossiê 30+ páginas × 6 formatos + moeda própria com FX real (USD/BRL/EUR) + comandos dentro dos mods** + APK mobile 0.3.1 |
@@ -330,7 +332,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ```bash
 cd ~/nexuscraft-studio
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 88 unit
+cd src-tauri && cargo test          # 89 unit
 cargo test --lib -- --ignored --nocapture # 11 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
@@ -1262,3 +1264,19 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors ✓ · vitest **99/99** (+4 environment, +5 render-smoke; jsdom@24 após o 27 conflitar com o workspace hoisted) ✓ · cargo 88/88 ✓ · E2E fabric 306s ✓ · vite build 1m50s ✓ · boot vivo 0 panics ✓. Release **v0.8.1**.
 
 **Pendências para o dono**: confirmar a versão do app (About dialog) e mandar o texto do erro do build — agora o card diz exatamente o que fazer.
+
+---
+
+## 52. Sessão 52 — Fase A do Super Prompt FECHADA: Search Engine unificado + Project Timeline
+
+**Pedido do dono**: "faça tudo que ele pede e continue" (o Super Prompt 02 — que manda implementar por fases, sem protótipos, com auditoria antes).
+
+**Search Engine unificado (§34, textual-first como pedido)**: `search_workspace` (async) — uma query, todo o workspace: nomes de projetos E **conteúdo dos arquivos** (walker guardado do agent, budget por projeto), servidores pelos **nomes reais dos manifests**, shaderpacks, modpacks. Teste cobre as categorias com rejeição honesta de ruído e mínimo de 2 caracteres. Integrado ao **Ctrl+K**: grupo vivo "Workspace results" com navegação por categoria e hint de contexto.
+
+**Project Timeline (§23)**: a história FACTUAL do projeto num lugar — builds (tabela logs), ações do agent (auditoria join pelas sessões do projeto), snapshots (commits git reais) e sessões de IA. Filtros por tipo, status (build falhou = vermelho), 100 eventos, botão Timeline no header do workspace.
+
+**Design system**: componente `Skeleton` criado e aplicado na grade de servidores (loading honesto em vez de vazio).
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors ✓ · vitest **99/99** ✓ · cargo **89/89** (+1 unified search) ✓ · vite build 2m21s ✓ · boot vivo 0 panics ✓. Release **v0.9.0**.
+
+**Estado da Fase A**: auditoria ✓ · correções ✓ · search ✓ · timeline ✓ · skeleton ✓ — pendente rastreado: migração dos ~35 warns `set-state-in-effect` (próxima passada). **Fase B (Visual Logic Studio com React Flow gerando datapacks reais) é a próxima.**

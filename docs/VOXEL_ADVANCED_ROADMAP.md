@@ -2,13 +2,13 @@
 
 > Ordem do Super Prompt §41 adaptada ao estado real (ver VOXEL_ADVANCED_AUDIT.md). Cada fase termina com bateria completa + release + relatório.
 
-## FASE A — Fundação (CORRENTE — Sessão 51)
+## FASE A — Fundação (fechada na Sessão 52, exceto warns rastreados)
 - [x] Auditoria real executada (E2E build + render smoke + bateria) → `VOXEL_ADVANCED_AUDIT.md`
 - [x] **Correção de diagnóstico**: Error Center aprende a categoria `environment` (Java ausente/versão, download/rede, disco) com fix acionável por card — resposta direta ao "Build deu erro" do dono
 - [x] Render smoke permanente dos 5 dialogs críticos (suite jsdom — guarda contra "overlay morto")
-- [ ] Migrar warns `set-state-in-effect` (~35)
-- [ ] Search Engine textual unificado (projetos/arquivos/assets/logs — Rust `search_project` já existe como base)
-- [ ] Project Timeline (hoje disperso em snapshots/logs/DB)
+- [ ] Migrar warns `set-state-in-effect` (~35) — único item aberto da Fase A, rastreado para a próxima passada
+- [x] Search Engine textual unificado (Ctrl+K → 'Workspace results'; projects+files+servers+shaderpacks+modpacks; testado)
+- [x] Project Timeline (builds + agent audit + snapshots + sessions; filtros; botão no workspace)
 
 ## FASE B — Criação avançada
 - Visual Logic Studio (React Flow; o grafo gera datapack/mcfunction REAL — semântica validada, não mock)
