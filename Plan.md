@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (53 sessões)
+## 5. Histórico de sessões (54 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 54 | Fase B: Gameplay Designer | **Editor nos arquivos REAIS do mod**: scanner nos 3 estilos de loader, status de implementação por item (java/model/lang/texture/recipe), criar item escreve tudo coerente (lang MERGEADO), receitas shaped/shapeless reais + 6 testes + rota /designer + v0.11.0 | tupla de rows; vírgula dupla; 3 dups ptBR |
 | 53 | Fase B: Visual Logic Studio | **Grafo de nós → mcfunctions REAIS** (19 kinds mapeados em padrões vanilla provados; compilador com chains Token-Chain + predicates; validador que compila nada com erro; 6 testes) + canvas React Flow com Preview real, AI designer estrito, Save/Install + rota /logic + v0.10.0 | typo });; compilador misturado; var morta |
 | 52 | Fase A fechada | **Search Engine unificado** (Ctrl+K vivo: projetos+arquivos+servidores+shaderpacks+modpacks, walker guardado, +1 teste) · **Project Timeline** (builds+auditoria do agent+snapshots+sessões, filtros, botão no workspace) · componente Skeleton aplicado + v0.9.0 | budget u32 vs usize; campo preview inexistente |
 | 51 | Fase A: auditoria + 2 reports | **Build provado são (E2E 306s)** + Error Center categoria `environment` (Java/rede/disco com FIX, +4 testes) · **dialogs provados vivos** (render-smoke jsdom 5/5 suite permanente) · 3 docs de auditoria (classificação honesta por sistema, Fases A-G) + v0.8.1 | jsdom 27 ESM conflito (→@24) |
@@ -269,7 +270,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 53, v0.10.0)
+## 8. Estado atual (verificado — Sessão 54, v0.11.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -289,7 +290,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.10.0 (latest)** | Desktop: **Visual Logic Studio** (grafo de nós → datapack real, com validador, preview das mcfunctions e AI designer) + APK mobile 0.3.1 |
+| **v0.11.0 (latest)** | Desktop: **Gameplay Designer** (registro real do mod, status por item, criação coerente, receitas reais) + APK mobile 0.3.1 |
+| v0.10.0 | Desktop: **Visual Logic Studio** (grafo de nós → datapack real, com validador, preview das mcfunctions e AI designer) + APK mobile 0.3.1 |
 | v0.9.0 | Desktop: **Fase A do Super Prompt fechada — Search Engine unificado (Ctrl+K) + Project Timeline + Skeletons** + APK mobile 0.3.1 |
 | v0.8.1 | Desktop: **Error Center com diagnóstico de ambiente (Java/rede/disco) + auditoria profunda documentada** + APK mobile 0.3.1 |
 | v0.8.0 | Desktop: **delete de projetos corrigido (daemon Gradle) + AI Studio (prompt gera tudo com preview) + kinds mine/prison + renomear servidor** + APK mobile 0.3.1 |
@@ -1300,3 +1302,21 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Bugs caçados (3)**: typo `});` no validador; final do compilador com estratégia misturada (reescrito com flows nomeados); var morta na condição de chance.
 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (37) ✓ · vitest **105/105** (+6) ✓ · vite build 2m39s ✓ · boot vivo 0 panics ✓. Release **v0.10.0**.
+
+---
+
+## 54. Sessão 54 — Fase B segue: Gameplay Designer (o editor que mexe nos arquivos REAIS do mod)
+
+**Pedido do dono**: "continue" (Super Prompt §4 — Gameplay Designer, com a regra "não considere funcionalidade concluída só porque existe um botão").
+
+**Scanner universal (3 estilos de loader que embarcamos)**: parse de `ModItems.java` nos três dialetos — fabric (`Registry.register`), Forge/NeoForge (`DeferredRegister`/`RegistryObject`), 26.x (`registerSimpleItem`) — ids reais + constantes. **Status de implementação por item** (o consistency checker visível): java/model/lang/texture/receita em pílulas verde/vermelho.
+
+**Criar item escreve TUDO coerente**: `ModItems.java` (snippet no estilo detectado, inserido antes da creative tab — e a tab fabric ganha o `entries.add`), model JSON, **lang MERGEADO** (nunca sobrescreve edições não relacionadas), textura real pelo mesmo engine do Studio. Receitas: designer shaped (grade 3×3 com símbolos vinculados) e shapeless (lista com limites 1-9) → JSON de datapack de verdade, com as validações da vanilla (vínculos, largura de linha, namespaces).
+
+**6 testes**: scanner nos TRÊS estilos reais dos templates (anchors de CONST acima do call), shaped/shapeless + recusas (símbolo sem vínculo, sem namespace, linha >3, 0 ingredientes).
+
+**Bugs caçados (3)**: vírgula dupla em import lucide (regex multiline), tupla de rows no teste, 3 chaves duplicadas ptBR.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (39) ✓ · vitest **111/111** (+6) ✓ · vite build 2m01s ✓ · boot vivo 0 panics ✓. Release **v0.11.0**.
+
+**Fase B status**: Visual Logic ✓ · Gameplay Designer (items+recipes) ✓ — próximos: Asset Lab Pro (library+checker), Style Memory versionada, Compatibility Lab.

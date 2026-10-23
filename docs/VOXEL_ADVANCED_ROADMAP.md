@@ -12,7 +12,7 @@
 
 ## FASE B — Criação avançada
 - [x] Visual Logic Studio (/logic — React Flow, 19 kinds, compilador real com chains/predicates, validador, AI designer, 6 testes)
-- Gameplay Designer (formulários → arquivos reais via agent tools, sync sem sobrescrever)
+- [x] Gameplay Designer (/designer — scanner nos 3 estilos de loader, status de implementação por item, criação coerente java+model+lang+textura, receitas shaped/shapeless reais, 6 testes)
 - Asset Lab Pro (library com tags/versões/consistency checker)
 - Style Memory versionada (bibles editáveis + detecção de contradição)
 - Compatibility Lab (matriz por versão com evidências)
