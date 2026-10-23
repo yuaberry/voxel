@@ -10,12 +10,12 @@
 - [x] Search Engine textual unificado (Ctrl+K → 'Workspace results'; projects+files+servers+shaderpacks+modpacks; testado)
 - [x] Project Timeline (builds + agent audit + snapshots + sessions; filtros; botão no workspace)
 
-## FASE B — Criação avançada
+## FASE B — Criação avançada (COMPLETA: Visual Logic ✓ Gameplay Designer ✓ Asset Lab ✓ Style Memory ✓ Compatibility Lab ✓)
 - [x] Visual Logic Studio (/logic — React Flow, 19 kinds, compilador real com chains/predicates, validador, AI designer, 6 testes)
 - [x] Gameplay Designer (/designer — scanner nos 3 estilos de loader, status de implementação por item, criação coerente java+model+lang+textura, receitas shaped/shapeless reais, 6 testes)
 - [x] Asset Lab (/assets — biblioteca real com previews, busca e filtros; consistency checker com referências quebradas/ausências/órfãs/duplicatas por byte-hash; importação validada de PNG; 3 testes)
-- Style Memory versionada (bibles editáveis + detecção de contradição)
-- Compatibility Lab (matriz por versão com evidências)
+- [x] Style Memory (painel no workspace: 5 bibles editáveis + fallback .nexus; verificação de contradições por IA onde todo achado cita as passagens; 3 testes)
+- [x] Compatibility Lab (/compat: 4 checks com evidência+fix — loader×versão, Java da era vs máquina, era experimental, gradle.properties real; matriz versão×loader; 6 testes)
 
 ## FASE C — IA
 - AI Command Center (filas, estados, pausar/cancelar, limites de consumo)
