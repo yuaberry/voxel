@@ -14,6 +14,7 @@ import {
   Server,
   Palette,
   Info,
+  Workflow,
 } from "lucide-react";
 import { NexusLogo, NexusMark } from "@/components/brand/NexusLogo";
 import {
@@ -44,6 +45,7 @@ const workspaceItems: NavItem[] = [
   { to: "/ai-creator", label: "AI Creator", icon: Sparkles, enabled: true },
   { to: "/shaders", label: "Shaders", icon: Palette, enabled: true },
   { to: "/servers", label: "Servers", icon: Server, enabled: true },
+  { to: "/logic", label: "Visual Logic", icon: Workflow, enabled: true },
 ];
 
 export function Sidebar() {
