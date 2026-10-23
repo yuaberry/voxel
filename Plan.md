@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (52 sessões)
+## 5. Histórico de sessões (53 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 53 | Fase B: Visual Logic Studio | **Grafo de nós → mcfunctions REAIS** (19 kinds mapeados em padrões vanilla provados; compilador com chains Token-Chain + predicates; validador que compila nada com erro; 6 testes) + canvas React Flow com Preview real, AI designer estrito, Save/Install + rota /logic + v0.10.0 | typo });; compilador misturado; var morta |
 | 52 | Fase A fechada | **Search Engine unificado** (Ctrl+K vivo: projetos+arquivos+servidores+shaderpacks+modpacks, walker guardado, +1 teste) · **Project Timeline** (builds+auditoria do agent+snapshots+sessões, filtros, botão no workspace) · componente Skeleton aplicado + v0.9.0 | budget u32 vs usize; campo preview inexistente |
 | 51 | Fase A: auditoria + 2 reports | **Build provado são (E2E 306s)** + Error Center categoria `environment` (Java/rede/disco com FIX, +4 testes) · **dialogs provados vivos** (render-smoke jsdom 5/5 suite permanente) · 3 docs de auditoria (classificação honesta por sistema, Fases A-G) + v0.8.1 | jsdom 27 ESM conflito (→@24) |
 | 50 | Delete fix + AI Studio + rename | **Causa raiz do delete no Windows** (daemon do Gradle segura a pasta → project_delete: stop + retries + erro que nomeia o item) · **AI Studio** (prompt → plano validado → previews reais → install) · kinds **mine/prison** procedurais (o caso Prison com veios de minério) · renomear servidor + v0.8.0 | newline em key de properties; torre torta; chars de heredoc |
@@ -268,13 +269,13 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 52, v0.9.0)
+## 8. Estado atual (verificado — Sessão 53, v0.10.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
 | Rust unit (89) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (99) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Vitest (105) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -288,7 +289,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.9.0 (latest)** | Desktop: **Fase A do Super Prompt fechada — Search Engine unificado (Ctrl+K) + Project Timeline + Skeletons** + APK mobile 0.3.1 |
+| **v0.10.0 (latest)** | Desktop: **Visual Logic Studio** (grafo de nós → datapack real, com validador, preview das mcfunctions e AI designer) + APK mobile 0.3.1 |
+| v0.9.0 | Desktop: **Fase A do Super Prompt fechada — Search Engine unificado (Ctrl+K) + Project Timeline + Skeletons** + APK mobile 0.3.1 |
 | v0.8.1 | Desktop: **Error Center com diagnóstico de ambiente (Java/rede/disco) + auditoria profunda documentada** + APK mobile 0.3.1 |
 | v0.8.0 | Desktop: **delete de projetos corrigido (daemon Gradle) + AI Studio (prompt gera tudo com preview) + kinds mine/prison + renomear servidor** + APK mobile 0.3.1 |
 | v0.7.1 | Desktop: **Dossiê profissional (capa, sumário com páginas, rodapé, tabelas diagramadas) + 14 commands pesados agora async — nada trava** + APK mobile 0.3.1 |
@@ -1280,3 +1282,21 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors ✓ · vitest **99/99** ✓ · cargo **89/89** (+1 unified search) ✓ · vite build 2m21s ✓ · boot vivo 0 panics ✓. Release **v0.9.0**.
 
 **Estado da Fase A**: auditoria ✓ · correções ✓ · search ✓ · timeline ✓ · skeleton ✓ — pendente rastreado: migração dos ~35 warns `set-state-in-effect` (próxima passada). **Fase B (Visual Logic Studio com React Flow gerando datapacks reais) é a próxima.**
+
+---
+
+## 53. Sessão 53 — Fase B abre com o Visual Logic Studio: grafo de nós → mcfunctions REAIS
+
+**Pedido do dono**: "continue" (seguindo o Super Prompt 02 — Fase B, §3: Visual Logic Studio).
+
+**Regra do prompt respeitada**: "não apresente um grafo como funcional sem semântica, validação e implementação correspondentes" — por isso o NÚCLEO veio primeiro: o compilador.
+
+**Domínio (19 kinds × 3 roles, cada um mapeado em padrão vanilla PROVADO nos módulos)**: `event_command` (/trigger — Token Chain), `event_mine` (estatística REAL `minecraft.mined` — Prison), `event_interval` (timer 20 tps), condições de score/tag/chance (predicate `random_chance` de verdade), ações completas (tellraw escapado, give, matemática de scoreboard, tags, tp, effect, sound, summon com NBT, comando vanilla COM ALLOWLIST — `op`/`ban` recusados).
+
+**Compilador** (`logicGraph.ts`): grafo → datapack completo (pack.mcmeta, tags load/tick, funções de evento com execute chains; condição com filhos vira chain function — o MESMO aninhamento do Token Chain em produção desde a Wave 1; chance vira predicate JSON real). **Validador**: params ausentes, ids inválidos, edges soltos, eventos como destino, evento sem ação no fluxo, limites de chance, comandos perigosos — **grafo com erro compila pra NADA**. 6 testes (fluxo mine→rank→recompensa ponta a ponta, trigger+predicate, intervalo, galáxia de validações, paridade de escapes, schema da paleta).
+
+**Canvas (React Flow)**: paleta por role, conectar arrastando, painel de propriedades por nó com badges de erro ao vivo, **Preview mostrando as mcfunctions REAIS**, **AI designer** (descreva → grafo parseado ESTRITAMENTE: kinds inventados pela IA são descartados → cai no canvas para revisão), Save (`logic/*.json`), Install (datapack compilado num servidor escolhido). Rota `/logic`, sidebar, Ctrl+K, PT-BR.
+
+**Bugs caçados (3)**: typo `});` no validador; final do compilador com estratégia misturada (reescrito com flows nomeados); var morta na condição de chance.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (37) ✓ · vitest **105/105** (+6) ✓ · vite build 2m39s ✓ · boot vivo 0 panics ✓. Release **v0.10.0**.

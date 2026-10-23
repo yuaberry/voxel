@@ -11,7 +11,7 @@
 - [x] Project Timeline (builds + agent audit + snapshots + sessions; filtros; botão no workspace)
 
 ## FASE B — Criação avançada
-- Visual Logic Studio (React Flow; o grafo gera datapack/mcfunction REAL — semântica validada, não mock)
+- [x] Visual Logic Studio (/logic — React Flow, 19 kinds, compilador real com chains/predicates, validador, AI designer, 6 testes)
 - Gameplay Designer (formulários → arquivos reais via agent tools, sync sem sobrescrever)
 - Asset Lab Pro (library com tags/versões/consistency checker)
 - Style Memory versionada (bibles editáveis + detecção de contradição)
