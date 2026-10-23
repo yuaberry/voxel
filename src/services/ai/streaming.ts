@@ -307,6 +307,50 @@ export async function* streamChat(
     return;
   }
 
+  // Model Router v2 (Phase C): if the primary model fails BEFORE any content
+  // arrives (provider outage, model retired), exactly one retry happens on
+  // the configured fallback model. Failures mid-stream are real failures —
+  // a fallback would duplicate partial content.
+  let sawDelta = false;
+  let failureMessage: string | null = null;
+  const primary = tryStream(settings, apiKey, messages);
+  for await (const event of primary) {
+    if (event.type === "delta") sawDelta = true;
+    if (event.type === "error" && !sawDelta) {
+      failureMessage = event.message;
+      continue; // hold the error — the fallback gets a chance first
+    }
+    yield event;
+  }
+  if (failureMessage !== null && !sawDelta && settings.fallbackModel.trim()) {
+    const fallbackSettings: AiSettings = { ...settings, model: settings.fallbackModel.trim() };
+    let fallbackSawDelta = false;
+    let fallbackFailed = false;
+    for await (const event of tryStream(fallbackSettings, apiKey, messages)) {
+      if (event.type === "delta") {
+        fallbackSawDelta = true;
+        yield event;
+      } else if (event.type === "error") {
+        fallbackFailed = true;
+      } else {
+        yield event;
+      }
+    }
+    if (!fallbackSawDelta && fallbackFailed) {
+      yield { type: "error", message: failureMessage };
+    }
+    return;
+  }
+  if (failureMessage !== null && !sawDelta) {
+    yield { type: "error", message: failureMessage };
+  }
+}
+
+async function* tryStream(
+  settings: AiSettings,
+  apiKey: string | null,
+  messages: ChatMessage[],
+): AsyncGenerator<StreamEvent, void, unknown> {
   try {
     switch (settings.provider) {
       case "openrouter":

@@ -25,6 +25,13 @@ pub fn run() {
             sql: include_str!("migrations/002_version_catalog.sql"),
             kind: MigrationKind::Up,
         },
+        // v3 — Phase C: AI task queue + model metrics (AI Command Center)
+        Migration {
+            version: 3,
+            description: "task_queue_and_ai_metrics",
+            sql: include_str!("migrations/003_task_queue.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
