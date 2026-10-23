@@ -23,6 +23,7 @@ import { MarketplacePage } from "@/features/marketplace/MarketplacePage";
 import { VisualLogicPage } from "@/features/logic/VisualLogicPage";
 import { GameplayDesignerPage } from "@/features/gameplay/GameplayDesignerPage";
 import { AssetLabPage } from "@/features/assets/AssetLabPage";
+import { CompatibilityPage } from "@/features/compat/CompatibilityPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 
 export default function App() {
@@ -212,6 +213,7 @@ export default function App() {
               <Route path="logic" element={<VisualLogicPage />} />
               <Route path="designer" element={<GameplayDesignerPage />} />
               <Route path="assets" element={<AssetLabPage />} />
+              <Route path="compat" element={<CompatibilityPage />} />
               <Route path="projects/:projectId" element={<ProjectWorkspacePage />} />
               <Route path="ai-creator" element={<AiCreatorPage />} />
               <Route path="servers" element={<ServersPage />} />

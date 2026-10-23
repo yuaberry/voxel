@@ -97,6 +97,7 @@ const NAV_TARGETS = [
   { to: "/logic", label: "Go to Visual Logic", icon: Boxes, group: "Navigate" },
   { to: "/designer", label: "Go to Gameplay Designer", icon: Boxes, group: "Navigate" },
   { to: "/assets", label: "Go to Asset Lab", icon: Boxes, group: "Navigate" },
+  { to: "/compat", label: "Go to Compatibility Lab", icon: Boxes, group: "Navigate" },
   { to: "/settings/general", label: "Settings · General", icon: Settings, group: "Settings" },
   { to: "/settings/appearance", label: "Settings · Appearance", icon: Palette, group: "Settings" },
   { to: "/settings/ai", label: "Settings · AI", icon: Plug, group: "Settings" },
