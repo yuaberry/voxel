@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (54 sessões)
+## 5. Histórico de sessões (55 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 55 | Fase B: Asset Lab | **Biblioteca real** (previews de pixel, busca/filtros) + **consistency checker** (referências quebradas/ausências/lang órfã/duplicatas por hash de bytes) + **import validado** (header PNG real, rejeitado é removido) + rota /assets + v0.12.0 | — |
 | 54 | Fase B: Gameplay Designer | **Editor nos arquivos REAIS do mod**: scanner nos 3 estilos de loader, status de implementação por item (java/model/lang/texture/recipe), criar item escreve tudo coerente (lang MERGEADO), receitas shaped/shapeless reais + 6 testes + rota /designer + v0.11.0 | tupla de rows; vírgula dupla; 3 dups ptBR |
 | 53 | Fase B: Visual Logic Studio | **Grafo de nós → mcfunctions REAIS** (19 kinds mapeados em padrões vanilla provados; compilador com chains Token-Chain + predicates; validador que compila nada com erro; 6 testes) + canvas React Flow com Preview real, AI designer estrito, Save/Install + rota /logic + v0.10.0 | typo });; compilador misturado; var morta |
 | 52 | Fase A fechada | **Search Engine unificado** (Ctrl+K vivo: projetos+arquivos+servidores+shaderpacks+modpacks, walker guardado, +1 teste) · **Project Timeline** (builds+auditoria do agent+snapshots+sessões, filtros, botão no workspace) · componente Skeleton aplicado + v0.9.0 | budget u32 vs usize; campo preview inexistente |
@@ -270,7 +271,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 54, v0.11.0)
+## 8. Estado atual (verificado — Sessão 55, v0.12.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -290,7 +291,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.11.0 (latest)** | Desktop: **Gameplay Designer** (registro real do mod, status por item, criação coerente, receitas reais) + APK mobile 0.3.1 |
+| **v0.12.0 (latest)** | Desktop: **Asset Lab** (biblioteca de assets + verificador de consistência + import validado) + APK mobile 0.3.1 |
+| v0.11.0 | Desktop: **Gameplay Designer** (registro real do mod, status por item, criação coerente, receitas reais) + APK mobile 0.3.1 |
 | v0.10.0 | Desktop: **Visual Logic Studio** (grafo de nós → datapack real, com validador, preview das mcfunctions e AI designer) + APK mobile 0.3.1 |
 | v0.9.0 | Desktop: **Fase A do Super Prompt fechada — Search Engine unificado (Ctrl+K) + Project Timeline + Skeletons** + APK mobile 0.3.1 |
 | v0.8.1 | Desktop: **Error Center com diagnóstico de ambiente (Java/rede/disco) + auditoria profunda documentada** + APK mobile 0.3.1 |
@@ -1320,3 +1322,21 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (39) ✓ · vitest **111/111** (+6) ✓ · vite build 2m01s ✓ · boot vivo 0 panics ✓. Release **v0.11.0**.
 
 **Fase B status**: Visual Logic ✓ · Gameplay Designer (items+recipes) ✓ — próximos: Asset Lab Pro (library+checker), Style Memory versionada, Compatibility Lab.
+
+---
+
+## 55. Sessão 55 — Fase B: Asset Lab (biblioteca real + consistency checker + import validado)
+
+**Pedido do dono**: "continue" (Super Prompt §6 — Asset Lab Pro, com a regra "não alegar equivalência/perfeição que não pode garantir").
+
+**Library real**: todo asset do workspace (textures/models/lang/recipes/structures/advancements de todos os projetos + shaderpacks) classificado pelas pastas reais, busca + filtros + **previews de pixel de verdade** (base64 dos arquivos reais).
+
+**Consistency Checker** (por projeto, lendo os arquivos + o registro do Gameplay Designer nos 3 estilos): **referências quebradas** (layer0 de cada model resolvido pro path da textura — inexistente = flag), **ausências por item** (model/lang/texture — o tabuleiro xadrez do jogo nomeado antes de aparecer), **lang órfã** (chave sem item registrado), **texturas duplicadas** (hash de bytes reais, agrupadas).
+
+**Import validado**: PNG próprio com **inspeção REAL do header** (assinatura + IHDR big-endian), quadrado 16/32/64/128, ≤1MB — rejeitado é REMOVIDO na hora (nada inválido fica).
+
+**3 testes**: header PNG real (dims lidas dos bytes; não-PNG recusado com motivo), truncado, classificação de pastas. Rota `/assets`, sidebar, Ctrl+K, PT-BR.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (41) ✓ · vitest **114/114** (+3) ✓ · vite build 1m34s ✓ · boot vivo 0 panics ✓. Release **v0.12.0**.
+
+**Fase B status**: Visual Logic ✓ · Gameplay Designer ✓ · Asset Lab ✓ — próximos: Style Memory versionada, Compatibility Lab.

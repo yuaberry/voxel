@@ -1,6 +1,6 @@
 [package]
 name = "nexuscraft-studio"
-version = "0.11.0"
+version = "0.12.0"
 description = "NexusCraft Studio - AI Minecraft Creation Studio"
 authors = ["Yua Devs"]
 edition = "2021"
