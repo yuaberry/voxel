@@ -95,6 +95,7 @@ const NAV_TARGETS = [
   { to: "/shaders", label: "Go to Shaders", icon: Palette, group: "Navigate" },
   { to: "/servers", label: "Go to Servers", icon: Server, group: "Navigate" },
   { to: "/logic", label: "Go to Visual Logic", icon: Boxes, group: "Navigate" },
+  { to: "/designer", label: "Go to Gameplay Designer", icon: Boxes, group: "Navigate" },
   { to: "/settings/general", label: "Settings · General", icon: Settings, group: "Settings" },
   { to: "/settings/appearance", label: "Settings · Appearance", icon: Palette, group: "Settings" },
   { to: "/settings/ai", label: "Settings · AI", icon: Plug, group: "Settings" },

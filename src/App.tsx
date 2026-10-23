@@ -21,6 +21,7 @@ import { ModpacksPage } from "@/features/modpacks/ModpacksPage";
 import { AssetStudioPage } from "@/features/studio/AssetStudioPage";
 import { MarketplacePage } from "@/features/marketplace/MarketplacePage";
 import { VisualLogicPage } from "@/features/logic/VisualLogicPage";
+import { GameplayDesignerPage } from "@/features/gameplay/GameplayDesignerPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 
 export default function App() {
@@ -208,6 +209,7 @@ export default function App() {
               <Route path="studio" element={<AssetStudioPage />} />
               <Route path="marketplace" element={<MarketplacePage />} />
               <Route path="logic" element={<VisualLogicPage />} />
+              <Route path="designer" element={<GameplayDesignerPage />} />
               <Route path="projects/:projectId" element={<ProjectWorkspacePage />} />
               <Route path="ai-creator" element={<AiCreatorPage />} />
               <Route path="servers" element={<ServersPage />} />
