@@ -31,6 +31,12 @@ export interface AiSettings {
    * falls back to the global `model`. Same provider & key as the main one.
    */
   phaseModels: AiPhaseModels;
+  /**
+   * Model Router v2 (Phase C): if the primary model fails BEFORE any
+   * content arrives (provider outage, model retired), one retry happens
+   * with this model. Empty = no fallback.
+   */
+  fallbackModel: string;
 }
 
 export interface AiPhaseModels {

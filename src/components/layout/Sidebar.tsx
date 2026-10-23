@@ -17,7 +17,7 @@ import {
   Workflow,
   Swords,
   Images,
-  GitCompare } from "lucide-react";
+  GitCompare, Cpu } from "lucide-react";
 import { NexusLogo, NexusMark } from "@/components/brand/NexusLogo";
 import {
   Tooltip,
@@ -51,6 +51,7 @@ const workspaceItems: NavItem[] = [
   { to: "/designer", label: "Gameplay Designer", icon: Swords, enabled: true },
   { to: "/assets", label: "Asset Lab", icon: Images, enabled: true },
   { to: "/compat", label: "Compatibility", icon: GitCompare, enabled: true },
+  { to: "/command", label: "AI Command", icon: Cpu, enabled: true },
 ];
 
 export function Sidebar() {

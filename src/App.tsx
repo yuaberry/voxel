@@ -24,6 +24,8 @@ import { VisualLogicPage } from "@/features/logic/VisualLogicPage";
 import { GameplayDesignerPage } from "@/features/gameplay/GameplayDesignerPage";
 import { AssetLabPage } from "@/features/assets/AssetLabPage";
 import { CompatibilityPage } from "@/features/compat/CompatibilityPage";
+import { CommandCenterPage } from "@/features/command/CommandCenterPage";
+import { bootTaskEngine } from "@/services/ai/taskEngineBoot";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 
 export default function App() {
@@ -37,6 +39,7 @@ export default function App() {
   const hydrateProjects = useProjectsStore((s) => s.hydrate);
 
   useEffect(() => {
+    bootTaskEngine(); // the AI task queue is alive from the first second
     void hydrate();
     void hydrateProjects();
     // Version catalog auto-refresh on boot (12h TTL — no-op when fresh)
@@ -214,6 +217,7 @@ export default function App() {
               <Route path="designer" element={<GameplayDesignerPage />} />
               <Route path="assets" element={<AssetLabPage />} />
               <Route path="compat" element={<CompatibilityPage />} />
+              <Route path="command" element={<CommandCenterPage />} />
               <Route path="projects/:projectId" element={<ProjectWorkspacePage />} />
               <Route path="ai-creator" element={<AiCreatorPage />} />
               <Route path="servers" element={<ServersPage />} />

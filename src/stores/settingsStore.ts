@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     maxTokens: 4096,
     baseUrl: "",
     phaseModels: { architect: "", developer: "", reviewer: "" },
+    fallbackModel: "",
   },
   minecraft: {
     defaultVersion: "1.20.1",

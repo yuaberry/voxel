@@ -325,6 +325,20 @@ export function AiSettings() {
         </div>
       </Field>
 
+      <Field
+        label="Fallback model"
+        hint="Model Router: if the primary model fails BEFORE any content arrives (provider outage, model retired), exactly one retry happens with this model. Empty = no fallback."
+      >
+        <Input
+          className="max-w-sm"
+          placeholder="e.g. anthropic/claude-sonnet-4.5"
+          value={ai.fallbackModel}
+          onChange={(e) =>
+            void update("ai", { fallbackModel: e.target.value }).catch(() => {})
+          }
+        />
+      </Field>
+
       {/* API key */}
       {meta.requiresKey && (
         <Field
