@@ -18,11 +18,11 @@
 - [x] Compatibility Lab (/compat: 4 checks com evidência+fix — loader×versão, Java da era vs máquina, era experimental, gradle.properties real; matriz versão×loader; 6 testes)
 
 ## FASE C — IA
-- AI Command Center (filas, estados, pausar/cancelar, limites de consumo)
-- Workflow Engine persistido (recovery, aprovação em etapas críticas)
-- Model Router v2 (fallback, orçamento, relatórios de consumo/latência — só métricas reais)
-- Knowledge Center (índice local + fontes oficiais, versão-sensível)
-- QA Lab (unit/build/compat por projeto; "runtime test passed" ≠ "build succeeded")
+- [x] AI Command Center (/command: fila viva DB-backed, estados, cancel/retry, limites 1-paralelo/20-fila, métricas reais)
+- [x] Workflow Engine v1 (Fix Build formalizado com 6 etapas checkpointadas: preflight→build→analyze→agent fix→rebuild→verdict)
+- [x] Model Router v2 (fallbackModel: retry 1× só antes do primeiro delta; ai_metrics reais por task)
+- [ ] Knowledge Center (índice local + fontes oficiais, versão-sensível)
+- [ ] QA Lab ("runtime test passed" ≠ "build succeeded" já honesto no verdict do workflow; painel dedicado pendente)
 
 ## FASE D — Servidores
 - Economy Simulator (simulações de progressão Prison — valores rotulados como simulação)

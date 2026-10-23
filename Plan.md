@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (56 sessões)
+## 5. Histórico de sessões (57 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 57 | Fase C: Task Engine + Command Center | **Engine de fila real** (storage injetável, cancel cooperativo, retry, limites 1/20, +7 testes) · **runners**: agent headless (política autônoma) + workflow Fix Build 6 etapas checkpointadas · **Model Router v2** (fallback 1× pré-delta; métricas reais em ai_metrics) · **/command** (fila viva + métricas honestas) + v0.14.0 | template string no bash; icons regex 3ª vez; queue privada |
 | 56 | Fase B COMPLETA | **Compatibility Lab** (4 checks com evidência+fix, Java da era vs máquina, gradle.properties real, matriz versão×loader, +6 testes) + **Style Memory** (bibles editáveis com fallback .nexus; contradições por IA onde todo achado cita as passagens — parser descarta inventados, +3 testes) + v0.13.0 | regra Java severa demais (teste reprovou); title no Lucide |
 | 55 | Fase B: Asset Lab | **Biblioteca real** (previews de pixel, busca/filtros) + **consistency checker** (referências quebradas/ausências/lang órfã/duplicatas por hash de bytes) + **import validado** (header PNG real, rejeitado é removido) + rota /assets + v0.12.0 | — |
 | 54 | Fase B: Gameplay Designer | **Editor nos arquivos REAIS do mod**: scanner nos 3 estilos de loader, status de implementação por item (java/model/lang/texture/recipe), criar item escreve tudo coerente (lang MERGEADO), receitas shaped/shapeless reais + 6 testes + rota /designer + v0.11.0 | tupla de rows; vírgula dupla; 3 dups ptBR |
@@ -272,7 +273,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 56, v0.13.0)
+## 8. Estado atual (verificado — Sessão 57, v0.14.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -292,7 +293,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.13.0 (latest)** | Desktop: **Fase B completa — Compatibility Lab (vereditos com evidência) + Style Memory (bibles + contradições por IA)** + APK mobile 0.3.1 |
+| **v0.14.0 (latest)** | Desktop: **AI Command Center** (fila de tarefas autônomas com checkpoints + Fix Build workflow + fallback de modelo + métricas reais) + APK mobile 0.3.1 |
+| v0.13.0 | Desktop: **Fase B completa — Compatibility Lab (vereditos com evidência) + Style Memory (bibles + contradições por IA)** + APK mobile 0.3.1 |
 | v0.12.0 | Desktop: **Asset Lab** (biblioteca de assets + verificador de consistência + import validado) + APK mobile 0.3.1 |
 | v0.11.0 | Desktop: **Gameplay Designer** (registro real do mod, status por item, criação coerente, receitas reais) + APK mobile 0.3.1 |
 | v0.10.0 | Desktop: **Visual Logic Studio** (grafo de nós → datapack real, com validador, preview das mcfunctions e AI designer) + APK mobile 0.3.1 |
@@ -1358,3 +1360,23 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (46) ✓ · vitest **123/123** (+3 memory; +6 compat) ✓ · vite build 1m49s ✓ · boot vivo 0 panics ✓. Release **v0.13.0**.
 
 **FASE B COMPLETA**: Visual Logic Studio ✓ · Gameplay Designer ✓ · Asset Lab ✓ · Style Memory ✓ · Compatibility Lab ✓. Próxima: **Fase C — IA** (AI Command Center, Workflow Engine, Model Router v2, Knowledge Center, QA Lab).
+
+---
+
+## 57. Sessão 57 — Fase C abre: Task Engine + AI Command Center + Model Router v2
+
+**Pedido do dono**: "Avance para a próxima fase. Sempre com a melhor qualidade, algo bonito, profissional e escalável" (Fase C — IA, §8-10).
+
+**Task Engine** (o alicerce, escalável de verdade): migration 003 (`tasks` com steps/artifacts/elapsed/model + `ai_metrics`), engine com **storage INJETÁVEL** (SQLite na produção, fakes nos testes — 7 testes da disciplina: completar com artefato, prova de serialização MAX_CONCURRENT=1, cancel na fila, fail→retry com reset honesto de steps, cancelamento cooperativo mid-run, cap de 20, ordenação running→queued→histórico).
+
+**Runners reais**: agent headless com o MESMO sandbox e a política autônoma (destrutivos negados, writes liberados, auditoria em ai_tool_calls via session criada); **Fix Build workflow** = o Auto-Fix de produção formalizado em 6 etapas checkpointadas (preflight honesto do Java → build → parser real de erros → agent fix → rebuild → **verdict que distingue "compilou" de "provado em runtime"**, regra do §14).
+
+**Model Router v2** (§10): `fallbackModel` nas settings (+campo na UI) e o streamChat cai pra ele **exatamente 1×, só antes do primeiro delta** (fallback no meio duplicaria conteúdo); `aiMetrics` grava o desfecho REAL por task (provider/model/ok/latência/attempts) — nenhum número inventado.
+
+**AI Command Center** (`/command`): fila viva (poll 2.5s), chips de estado, steps checkpointadas expansíveis, artefato/erro/model, cancel + retry, cards de métricas honestas (chamadas, taxa de sucesso, latência média, fallbacks) + badges por modelo. Boot com o app (runners registrados e envolvidos pela métrica).
+
+**Bugs caçados (3)**: template string engolida pelo bash (uuid fallback); regex multiline de icons (vírgula dupla, 3ª vez); queue privada nos testes → hook `unqueue` honesto.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (48) ✓ · vitest **130/130** (+7 engine) ✓ · vite build 1m24s ✓ · boot vivo 0 panics ✓. Release **v0.14.0**.
+
+**Fase C status**: Command Center ✓ · Workflow v1 ✓ · Model Router v2 ✓ — próximos: Knowledge Center, QA Lab.
