@@ -185,7 +185,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (61 sessões)
+## 5. Histórico de sessões (62 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -211,6 +211,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 62 | Fase D COMPLETA: Automation | **Server Automation** (allowlist no perímetro: 2 triggers/3 ações; motor de transições com baseline; cooldown 5min; run log migration 005 — nada silencioso) + 2 Rust + 10 TS + v0.19.0 | lastFired=0 bloqueava 1ª execução; teste sem rules; ramMb→ram_mb |
 | 61 | Fase D: Backup Pro | **Retenção** (cap-N + idade, no manifest; auto-prune pós-create; mais novo nunca deletado) + **Verify real** (lê todo zip validando CRC; confere level.dat) + **Agendamento honesto** (app aberto + servidor parado; falha alerta, skip não) + 7 Rust + 10 TS + v0.18.0 | fixtures na pasta errada; count=1 nos replaces; stamps de janeiro não são recentes; tuple abortou write |
 | 60 | Fase D: Players + Moderation | **Player Management** (5 arquivos vanilla reais via server_players_read; ações pelo console stdin; ban exige motivo; histórico migration 004) + **Moderation Assistant** (heurística local + IA cuja sugestão exige evidence LITERAL do log; ban da IA vira watch; aplicar é sempre clique) + 15 TS + 4 Rust + v0.17.0 | replace vazou no lib.rs; helper morto; assert antes do write; .settings.ai |
 | 59 | Fase D: Simulator + Security | **Economy Simulator** (progressão Prison REAL com prestígio composto, exploits e gargalo; disclaimer SIMULATION) + **Security Center** (RCON plain-text/sem senha, online-mode do DISCO, backups com idade, plugins com caveat de origem; nunca "totalmente seguro") + 13 testes + v0.16.0 | evidence sem "plain text"; var morta; dup ptBR |
@@ -297,7 +298,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 61, v0.18.0)
+## 8. Estado atual (verificado — Sessão 62, v0.19.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -317,7 +318,8 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.18.0 (latest)** | Desktop: **Fase D — Backup Pro** (retenção, verify com CRC, agendamento) + APK mobile 0.3.1 |
+| **v0.19.0 (latest)** | Desktop: **Fase D COMPLETA — Server Automation** (transições com limites, run log, nada silencioso) + APK mobile 0.3.1 |
+| v0.18.0 | Desktop: **Fase D — Backup Pro** (retenção, verify com CRC, agendamento) + APK mobile 0.3.1 |
 | v0.17.0 | Desktop: **Fase D — Player Management + Moderation Assistant** (Players tab, histórico de punições, IA grounded) + APK mobile 0.3.1 |
 | v0.16.0 | Desktop: **Fase D abre — Economy Simulator (progressão Prison com exploits) + Security Center (RCON/online-mode/backups)** + APK mobile 0.3.1 |
 | v0.15.0 | Desktop: **Fase C completa — Knowledge Center (docs verificadas ligadas aos erros) + QA Lab (a matriz de vereditos honesta)** + APK mobile 0.3.1 |
@@ -388,13 +390,13 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 | **A — Fundação** | ✅ COMPLETA | Auditoria real (3 docs em docs/VOXEL_ADVANCED_*) · Error Center categoria `environment` (Java/rede/disco com fix) · Search Engine unificado (Ctrl+K) · Project Timeline · Skeletons · render-smoke permanente |
 | **B — Criação avançada** | ✅ COMPLETA | Visual Logic Studio (grafo→mcfunctions reais, 6 kinds events/conds/actions, AI designer) · Gameplay Designer (scanner 3 estilos de loader, criação coerente, receitas shaped/shapeless) · Asset Lab (library + checker de referências/duplicatas + import validado) · Style Memory (bibles editáveis + contradições por IA) · Compatibility Lab (vereditos com evidência) |
 | **C — IA** | ✅ COMPLETA | AI Command Center (/command: fila DB-backed, cancel/retry, limites 1/20) · Workflow Fix Build (6 etapas checkpointadas) · Model Router v2 (fallbackModel pré-delta + métricas reais) · Knowledge Center (8 artigos VERIFICADOS ligados aos erros) · QA Lab (matriz 4 níveis, runtime nunca fingido) |
-| **D — Servidores** | 🟡 EM ANDAMENTO (4.5/5) | ✅ Economy Simulator · ✅ Security Center · ✅ Player Management · ✅ Moderation Assistant · ✅ Backup Pro (retenção+verify CRC+agendamento honesto) — resta **Server Automation (§22)** |
+| **D — Servidores** | ✅ **COMPLETA (S62)** | ✅ Economy Simulator · ✅ Security Center · ✅ Player Management · ✅ Moderation Assistant (IA nunca bane sozinha) · ✅ Backup Pro (retenção+verify CRC) · ✅ Server Automation (allowlist, transições, run log — nada silencioso) |
 | **E — Colaboração** | ⬜ não iniciada | (bloqueada por backend: documentado como dependência) |
 | **F — Mobile** | ⬜ não iniciada | (Bridge já existe; Remote Build é a fatia principal) |
 | **G — Polimento** | ⬜ não iniciada | (migration dos ~51 warns set-state-in-effect é o item A pendente) |
 
-**NEXT MOVE (pós-compactação) — continuar a Fase D**, nesta ordem:
-1. ~~Player Management (§19) + Moderation Assistant (§20)~~ → **ENTREGUES (S60)**. ~~Backup Pro (§21)~~ → **ENTREGUE (S61: retenção cap-N/idade com auto-prune, verify lendo todo zip — CRC real, agendamento app-aberto+parado com alerta)**. Próximo: **Server Automation (§22)** — gatilho→condição→ação com limites (alerta offline via polling existente, backup pré-update, restart por política); nada destrutivo silencioso.
+**NEXT MOVE — Fase D está COMPLETA (S62)**. Próxima sessão: **Fase G item A** — migrar os ~52 warns `set-state-in-effect` (a família conhecida; polimento barato que limpa a bateria antes de E/F, que dependem de infra externa — backend de colaboração, keystore mobile). Depois, se o dono quiser E/F: documentar as dependências e implementar as fatias locais possíveis.
+1. ~~Player Management (§19) + Moderation Assistant (§20)~~ → **ENTREGUES (S60)**. ~~Backup Pro (§21)~~ → **ENTREGUE (S61)**. ~~Server Automation (§22)~~ → **ENTREGUE (S62)** — **FASE D 5/5 COMPLETA**.
 2. ~~Backup Pro (§21)~~ → **ENTREGUE (S61)**.
 3. **Server Automation (§22)**: gatilho→condição→ação com limites (alerta offline via polling existente, backup pré-update, restart por política); nada destrutivo silencioso.
 4. Depois: fechar Fase G migrando os warns `set-state-in-effect`, e só então F/E conforme infra.
@@ -562,7 +564,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 61 — Fases A/B/C COMPLETAS e Fase D em andamento (4.5/5: Simulator, Security, Players+Moderation, Backup Pro entregues; resta Server Automation §22). 60 releases até a v0.16.0. Testes: vitest 169 · cargo 93 (+11 E2E) · render-smoke 5 dialogs. Migration 004 (server_punishments). Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
+*Última atualização: Sessão 62 — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 189 · cargo 102 (+11 E2E) · render-smoke 5 dialogs. Migrations 004 (server_punishments) + 005 (automation_runs). Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
 
 ---
 
@@ -597,3 +599,24 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: typecheck 0 ✓ · lint 0 errors (52) ✓ · vitest **179/179** (+10) ✓ · cargo **100/100** (+7) ✓ · vite build 2m20s ✓ · boot vivo 0 panics ✓. Release **v0.18.0**.
 
 **Fase D status (4.5/5)**: Economy Simulator ✓ · Security Center ✓ · Player Management + Moderation ✓ · **Backup Pro ✓** — resta: **Server Automation (§22)**.
+
+---
+
+## 62. Sessão 62 — Fase D COMPLETA: Server Automation (§22)
+
+**Pedido do dono**: "continue" (última fatia da Fase D).
+
+**Server Automation (§22)** (Customize → **Automation**): automação chega com os limites EMBUTIDOS, não colados:
+- **A allowlist É o perímetro**: só 2 triggers (offline/online) e 3 ações revisadas (notify/backup/restart) existem — o Rust recusa todo o resto. Nada de comandos arbitrários.
+- **Motor de TRANSIÇÕES, não de estados**: regra dispara na transição running→stopped (ou volta), UMA vez; a primeira leitura pós-boot é **baseline e não dispara nada** (abrir o app nunca reinicia servidor parado); **cooldown de 5min anti-thrash** (servidor flapping nunca vira loop de restart).
+- **NADA roda em silêncio** (regra dura do §22): toda ação aplicada vai pro **run log (migration 005)**; restart = notificação; falha (java sumiu, disco cheio) = notificação; skips honestos ("voltou sozinho", "rodando — backup pulado por world safety") registrados como skip.
+- Backup herda a world-safety do §21: nunca com servidor rodando.
+- Motor: função pura de transição com deps injetáveis; loop singleton de 60s booted com o app (limitação escrita na UI).
+
+**12 testes novos** (2 Rust + 10 TS): roundtrip no manifest sobrevivendo a rename + allowlist recusando ação desconhecida/trigger desconhecido/id duplicado/11ª regra; transições disparam 1×, baseline nunca, math do cooldown, disabled não dispara; crash→restart registrado+notificado, restart falhando registrado+alertado, backup em offline registrado, self-heal = skip, servidor sem regras não custa nem um ping.
+
+**Bugs caçados (3)**: `lastFired` default `0` bloqueava a primeira execução com clocks pequenos (virou `-Infinity` — pescado pelos testes); meu teste chamava evaluateTransition sem o array de rules ("rules is not iterable"); `ramMb`→`ram_mb` no ServerRecord.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (52) ✓ · vitest **189/189** (+10) ✓ · cargo **102/102** (+2) ✓ · vite build 4m27s ✓ · boot vivo 0 panics ✓. Release **v0.19.0**.
+
+**FASE D COMPLETA (5/5)**: Economy Simulator ✓ · Security Center ✓ · Player Management ✓ · Moderation Assistant ✓ · Backup Pro ✓ · Server Automation ✓. Próximo NEXT MOVE: **Fase G item A** (migrar ~52 warns `set-state-in-effect` — polimento antes de E/F que dependem de infra externa), conforme §8.9.

@@ -24,7 +24,7 @@
 - [x] Security Center (Customize → Security: RCON plain-text/sem senha, online-mode do DISCO, whitelist, EULA, idade de backups, origem de plugins — nunca "totalmente seguro"; 7 testes)
 - [x] Player Management (Customize → Players: usercache/whitelist/banned-ips/ops.json reais, ações via console stdin, histórico de punições migration 004; ban sem motivo é recusado) + Moderation Assistant (heurística local de floods/spam + IA cuja sugestão só sobrevive citando evidência LITERAL do log; ban da IA vira 'watch', aplicar é sempre clique do dono; 15 TS + 4 Rust)
 - Backup Pro por servidor (retenção, integridade, teste de restauração)
-- Server Automation (gatilho/condição/ação com limites; nada destrutivo silencioso)
+- [x] Server Automation (Customize → Automation: allowlist NO perímetro (2 triggers, 3 ações revisadas), motor de TRANSIÇÕES com baseline sem disparo, cooldown 5min anti-thrash, run log migration 005 — nada silencioso; 2 Rust + 10 TS)
 
 ## FASE E — Colaboração (bloqueada por infra)
 - Workspace Sync (Git/config já existe para projetos; conflitos explícitos)
