@@ -11,6 +11,7 @@ import {
   Plus,
   Trash2,
   Users,
+  Archive,
 } from "lucide-react";
 import {
   Dialog,
@@ -79,6 +80,16 @@ import {
   type PunishmentRecord,
   type PunishmentStore,
 } from "@/services/servers/playerManagement";
+import {
+  getBackupsConfig,
+  setBackupsConfig,
+  verifyBackup,
+  deleteBackup,
+  pruneBackups,
+  type BackupsConfig,
+  type BackupVerifyReport,
+} from "@/services/servers/backupPro";
+import { restoreServerBackup } from "@/services/servers/serverService";
 import { streamChat } from "@/services/ai/streaming";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { secretsGet, AI_API_KEY_ID } from "@/services/secrets/secretsService";
@@ -94,7 +105,7 @@ import {
 import { updateServerRecord } from "@/services/db/repositories/serversRepository";
 import type { StructureGenResult } from "@/services/assets/structureService";
 
-type Tab = "briefing" | "world" | "structures" | "commands" | "plugins" | "currency" | "dossier" | "ai" | "security" | "players";
+type Tab = "briefing" | "world" | "structures" | "commands" | "plugins" | "currency" | "dossier" | "ai" | "security" | "players" | "backups";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "briefing", label: "Briefing", icon: <FileText className="h-3.5 w-3.5" /> },
@@ -107,6 +118,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "ai", label: "AI Studio", icon: <Sparkles className="h-3.5 w-3.5" /> },
   { id: "security", label: "Security", icon: <ShieldAlert className="h-3.5 w-3.5" /> },
   { id: "players", label: "Players", icon: <Users className="h-3.5 w-3.5" /> },
+  { id: "backups", label: "Backups", icon: <Archive className="h-3.5 w-3.5" /> },
 ];
 
 /**
@@ -191,6 +203,18 @@ export function ServerCustomizeDialog({
   const [moderationBusy, setModerationBusy] = useState(false);
   const [banForm, setBanForm] = useState<{ player: ManagedPlayer; reason: string } | null>(null);
 
+  // ---- backups tab state (§21)
+  const [backupsConfig, setBackupsConfigState] = useState<BackupsConfig>({
+    maxKeep: 0,
+    maxAgeDays: 0,
+    scheduleHours: null,
+  });
+  const [backupsList, setBackupsList] = useState<{ file_name: string; path: string; size_bytes: number; created_at: string }[] | null>(null);
+  const [verifyReports, setVerifyReports] = useState<Record<string, BackupVerifyReport>>({});
+  const [backupsBusy, setBackupsBusy] = useState(false);
+  const [deleteCandidate, setDeleteCandidate] = useState<{ file_name: string; path: string } | null>(null);
+  const [restoreCandidate, setRestoreCandidate] = useState<{ file_name: string; path: string } | null>(null);
+
   // §19 — load the REAL player files + running status when the tab opens
   useEffect(() => {
     if (!open || tab !== "players") return;
@@ -219,6 +243,52 @@ export function ServerCustomizeDialog({
       cancelled = true;
     };
   }, [open, tab, basePath, slug]);
+
+  // §21 — backups: the config from the manifest + the real zip list
+  useEffect(() => {
+    if (!open || tab !== "backups") return;
+    let cancelled = false;
+    getBackupsConfig(basePath, slug)
+      .then((config) => {
+        if (!cancelled) setBackupsConfigState(config);
+      })
+      .catch(() => undefined);
+    invoke<{ file_name: string; path: string; size_bytes: number; created_at: string }[]>(
+      "server_list_backups",
+      { basePath, slug },
+    )
+      .then((rows) => {
+        if (!cancelled) setBackupsList(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setBackupsList([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tab, basePath, slug]);
+
+  const saveBackupsConfig = async () => {
+    setBackupsBusy(true);
+    try {
+      const saved = await setBackupsConfig(basePath, slug, backupsConfig);
+      setBackupsConfigState(saved);
+      toast.success(t("Backup policy saved"));
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setBackupsBusy(false);
+    }
+  };
+
+  const runVerify = async (fileName: string, path: string) => {
+    try {
+      const report = await verifyBackup(basePath, slug, path);
+      setVerifyReports((prev) => ({ ...prev, [fileName]: report }));
+    } catch (e) {
+      toast.error(String(e));
+    }
+  };
 
   const refreshPlayers = async () => {
     const files = await invoke<PlayersFiles>("server_players_read", { basePath, slug }).catch(
@@ -1325,6 +1395,282 @@ export function ServerCustomizeDialog({
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => { setPlan(null); setPlanPreviews({}); }}>
                     {t("Discard plan")}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "backups" && (
+          <div className="space-y-3">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t(
+                "Retention runs automatically after every backup. Scheduled backups run while the app is open, and only when the server is stopped (world safety) — a failure alerts you, a skip does not.",
+              )}
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <label className="space-y-1">
+                <span className="text-[10px] text-muted-foreground">
+                  {t("keep last N (0 = all)")}
+                </span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={backupsConfig.maxKeep}
+                  onChange={(e) =>
+                    setBackupsConfigState({
+                      ...backupsConfig,
+                      maxKeep: Math.max(0, Number(e.target.value) || 0),
+                    })
+                  }
+                  className="h-8 text-xs"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-[10px] text-muted-foreground">
+                  {t("delete older than N days (0 = off)")}
+                </span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={365}
+                  value={backupsConfig.maxAgeDays}
+                  onChange={(e) =>
+                    setBackupsConfigState({
+                      ...backupsConfig,
+                      maxAgeDays: Math.max(0, Number(e.target.value) || 0),
+                    })
+                  }
+                  className="h-8 text-xs"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-[10px] text-muted-foreground">
+                  {t("backup every N hours (empty = off)")}
+                </span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={168}
+                  value={backupsConfig.scheduleHours ?? ""}
+                  onChange={(e) =>
+                    setBackupsConfigState({
+                      ...backupsConfig,
+                      scheduleHours: e.target.value ? Math.max(1, Number(e.target.value)) : null,
+                    })
+                  }
+                  placeholder={t("off")}
+                  className="h-8 text-xs"
+                />
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="gradient" onClick={() => void saveBackupsConfig()} disabled={backupsBusy}>
+                {t("Save backup policy")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={backupsBusy}
+                onClick={async () => {
+                  setBackupsBusy(true);
+                  try {
+                    const deleted = await pruneBackups(basePath, slug, backupsConfig);
+                    toast.success(
+                      deleted.length > 0
+                        ? t("Removed") + `: ${deleted.length} ` + t("old backups")
+                        : t("Nothing to remove — every backup fits the policy"),
+                    );
+                    setBackupsList(
+                      await invoke<{ file_name: string; path: string; size_bytes: number; created_at: string }[]>("server_list_backups", { basePath, slug }).catch(() => []),
+                    );
+                  } catch (e) {
+                    toast.error(String(e));
+                  } finally {
+                    setBackupsBusy(false);
+                  }
+                }}
+              >
+                {t("Apply retention now")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={backupsBusy || playersRunning}
+                title={playersRunning ? t("Stop the server before backing it up (world safety)") : undefined}
+                onClick={async () => {
+                  setBackupsBusy(true);
+                  try {
+                    await invoke("server_backup", { basePath, slug });
+                    toast.success(t("Backup created"));
+                    setBackupsList(
+                      await invoke<{ file_name: string; path: string; size_bytes: number; created_at: string }[]>("server_list_backups", { basePath, slug }).catch(() => []),
+                    );
+                  } catch (e) {
+                    toast.error(String(e));
+                  } finally {
+                    setBackupsBusy(false);
+                  }
+                }}
+              >
+                {t("Backup now")}
+              </Button>
+            </div>
+            {backupsList === null ? (
+              <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t("Reading the backups…")}
+              </div>
+            ) : backupsList.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {t("No backups yet — create the first one with Backup now.")}
+              </p>
+            ) : (
+              <div className="max-h-64 space-y-1.5 overflow-y-auto">
+                {backupsList.map((backup) => {
+                  const report = verifyReports[backup.file_name];
+                  return (
+                    <div
+                      key={backup.path}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-mono text-[11px]">{backup.file_name}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {(backup.size_bytes / 1_048_576).toFixed(1)} MB
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {report && (
+                          <Badge
+                            variant="outline"
+                            className={
+                              report.ok
+                                ? report.hasLevelDat
+                                  ? "border-emerald-500/40 text-[9px] text-emerald-400"
+                                  : "border-amber-500/40 text-[9px] text-amber-400"
+                                : "border-destructive/40 text-[9px] text-destructive"
+                            }
+                            title={report.error ?? undefined}
+                          >
+                            {report.ok
+                              ? report.hasLevelDat
+                                ? t("integrity ok")
+                                : t("no level.dat!")
+                              : t("corrupt!")}
+                            {report.ok ? ` · ${report.entryCount} ${t("entries")}` : ""}
+                          </Badge>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-[10px]"
+                          disabled={backupsBusy}
+                          onClick={() => void runVerify(backup.file_name, backup.path)}
+                        >
+                          {t("Verify")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-[10px]"
+                          disabled={playersRunning}
+                          title={playersRunning ? t("Stop the server before restoring") : undefined}
+                          onClick={() => setRestoreCandidate(backup)}
+                        >
+                          {t("Restore")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-[10px] text-destructive"
+                          disabled={backupsBusy}
+                          onClick={() => setDeleteCandidate(backup)}
+                        >
+                          {t("Delete")}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {deleteCandidate && (
+              <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2">
+                <p className="text-xs font-semibold">
+                  {t("Delete")} {deleteCandidate.file_name}?
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {t("This removes the zip from disk. The world is not touched.")}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-8"
+                    onClick={async () => {
+                      try {
+                        await deleteBackup(basePath, slug, deleteCandidate.path);
+                        toast.success(t("Backup deleted"));
+                        setDeleteCandidate(null);
+                        setBackupsList(
+                          await invoke<{ file_name: string; path: string; size_bytes: number; created_at: string }[]>("server_list_backups", { basePath, slug }).catch(() => []),
+                        );
+                      } catch (e) {
+                        toast.error(String(e));
+                      }
+                    }}
+                  >
+                    {t("Delete")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8"
+                    onClick={() => setDeleteCandidate(null)}
+                  >
+                    {t("Cancel")}
+                  </Button>
+                </div>
+              </div>
+            )}
+            {restoreCandidate && (
+              <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-2">
+                <p className="text-xs font-semibold">
+                  {t("Restore")} {restoreCandidate.file_name}?
+                </p>
+                <p className="text-[10px] leading-relaxed text-muted-foreground">
+                  {t(
+                    "The current server files are replaced by the backup's content. Stop the server first — and verify the backup before trusting it.",
+                  )}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-8"
+                    disabled={playersRunning}
+                    onClick={async () => {
+                      try {
+                        await restoreServerBackup(basePath, slug, restoreCandidate.path);
+                        toast.success(t("Backup restored"));
+                        setRestoreCandidate(null);
+                      } catch (e) {
+                        toast.error(String(e));
+                      }
+                    }}
+                  >
+                    {t("Restore")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8"
+                    onClick={() => setRestoreCandidate(null)}
+                  >
+                    {t("Cancel")}
                   </Button>
                 </div>
               </div>

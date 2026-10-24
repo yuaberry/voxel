@@ -645,7 +645,335 @@ pub async fn server_log_tail(
 }
 
 // ---------------------------------------------------------------------------
-// Backups
+// Backups Pro (Super Prompt §21) — retention, integrity, scheduling config
+// ---------------------------------------------------------------------------
+
+/// Per-server backup policy, persisted inside voxel-server.json (the disk
+/// manifest survives self-heal). Defaults keep everything: max_keep=0 means
+/// no count cap, max_age_days=0 means no age purge, schedule_hours=None
+/// means no scheduled backups.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupsConfig {
+    pub max_keep: u32,
+    pub max_age_days: u32,
+    pub schedule_hours: Option<u32>,
+}
+
+impl Default for BackupsConfig {
+    fn default() -> Self {
+        Self { max_keep: 0, max_age_days: 0, schedule_hours: None }
+    }
+}
+
+/// What an integrity check proved about one backup zip.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupVerifyReport {
+    pub file_name: String,
+    pub entry_count: u32,
+    pub total_bytes: u64,
+    pub has_level_dat: bool,
+    pub ok: bool,
+    pub error: Option<String>,
+}
+
+/// Parses a compact_timestamp (YYYYMMDD-SSSSS) back to epoch seconds (UTC).
+fn compact_to_epoch(stamp: &str) -> Option<u64> {
+    let digits: Vec<u32> = stamp.split('-').collect::<Vec<_>>().iter().map(|p| p.parse().unwrap_or(u32::MAX)).collect();
+    if digits.len() != 2 || digits[0] == u32::MAX || digits[1] == u32::MAX {
+        return None;
+    }
+    let date = digits[0];
+    let secs = digits[1];
+    let (year, month, day) = (date / 10000, (date / 100) % 100, date % 100);
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) || secs >= 86_400 {
+        return None;
+    }
+    // days since epoch (civil algorithm — same math the TS side does via Date.UTC)
+    let y = if month <= 2 { year - 1 } else { year } as i64;
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = (y - era * 400) as u64;
+    let mp = if month > 2 { month - 3 } else { month + 9 } as u64;
+    let doy = (153 * mp + 2) / 5 + day as u64 - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era as u64 * 146_097 + doe - 719_468;
+    Some(days * 86_400 + secs as u64)
+}
+
+fn read_backups_config(dir: &Path) -> BackupsConfig {
+    std::fs::read(dir.join("voxel-server.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .and_then(|m| m.get("backups").cloned())
+        .and_then(|c| serde_json::from_value(c).ok())
+        .unwrap_or_default()
+}
+
+fn write_backups_config(dir: &Path, config: &BackupsConfig) -> Result<(), String> {
+    let manifest_path = dir.join("voxel-server.json");
+    let mut manifest: serde_json::Value = std::fs::read(&manifest_path)
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .ok_or_else(|| "voxel-server.json missing or unreadable".to_string())?;
+    manifest["backups"] = serde_json::to_value(config).map_err(|e| format!("{e}"))?;
+    let pretty = serde_json::to_string_pretty(&manifest).map_err(|e| format!("{e}"))?;
+    std::fs::write(&manifest_path, &pretty).map_err(|e| format!("write manifest: {e}"))
+}
+
+pub fn server_backups_config_get_impl(
+    base_path: String,
+    slug: String,
+) -> Result<BackupsConfig, String> {
+    validate_slug(&slug)?;
+    let dir = server_dir(Path::new(&base_path), &slug);
+    if !dir.is_dir() {
+        return Err(format!("Server \"{slug}\" not found"));
+    }
+    Ok(read_backups_config(&dir))
+}
+
+pub fn server_backups_config_set_impl(
+    base_path: String,
+    slug: String,
+    config: BackupsConfig,
+) -> Result<BackupsConfig, String> {
+    validate_slug(&slug)?;
+    if config.max_keep > 100 {
+        return Err("Keep at most 100 backups (0 = keep all)".to_string());
+    }
+    if config.max_age_days > 365 {
+        return Err("Age purge is capped at 365 days (0 = off)".to_string());
+    }
+    if let Some(h) = config.schedule_hours {
+        if !(1..=168).contains(&h) {
+            return Err("Schedule must be between 1 and 168 hours (a week)".to_string());
+        }
+    }
+    let dir = server_dir(Path::new(&base_path), &slug);
+    if !dir.is_dir() {
+        return Err(format!("Server \"{slug}\" not found"));
+    }
+    write_backups_config(&dir, &config)?;
+    Ok(config)
+}
+
+#[tauri::command]
+pub async fn server_backups_config_get(
+    base_path: String,
+    slug: String,
+) -> Result<BackupsConfig, String> {
+    tauri::async_runtime::spawn_blocking(move || server_backups_config_get_impl(base_path, slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn server_backups_config_set(
+    base_path: String,
+    slug: String,
+    config: BackupsConfig,
+) -> Result<BackupsConfig, String> {
+    tauri::async_runtime::spawn_blocking(move || server_backups_config_set_impl(base_path, slug, config))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Deletes one backup — the path must live inside this server's backups dir.
+pub fn server_backup_delete_impl(
+    base_path: String,
+    slug: String,
+    backup_path: String,
+) -> Result<(), String> {
+    validate_slug(&slug)?;
+    let base = Path::new(&base_path);
+    let root = backups_dir(base, &slug);
+    let canonical = Path::new(&backup_path)
+        .canonicalize()
+        .map_err(|e| format!("Backup not found: {e}"))?;
+    if !canonical.starts_with(&root.canonicalize().unwrap_or(root.clone())) {
+        return Err("Backup path must be inside this server's backups".to_string());
+    }
+    if canonical.extension().and_then(|e| e.to_str()) != Some("zip") {
+        return Err("Backup must be a zip".to_string());
+    }
+    std::fs::remove_file(&canonical).map_err(|e| format!("delete backup: {e}"))
+}
+
+#[tauri::command]
+pub async fn server_backup_delete(
+    base_path: String,
+    slug: String,
+    backup_path: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        server_backup_delete_impl(base_path, slug, backup_path)
+    })
+    .await
+    .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Integrity check: opens the zip and READS every entry — the zip container
+/// verifies each entry's CRC as it decompresses, so a corrupted backup is
+/// caught here, not at restore time when it is too late.
+pub fn server_backup_verify_impl(
+    base_path: String,
+    slug: String,
+    backup_path: String,
+) -> Result<BackupVerifyReport, String> {
+    validate_slug(&slug)?;
+    let base = Path::new(&base_path);
+    let root = backups_dir(base, &slug);
+    let canonical = Path::new(&backup_path)
+        .canonicalize()
+        .map_err(|e| format!("Backup not found: {e}"))?;
+    if !canonical.starts_with(&root.canonicalize().unwrap_or(root.clone())) {
+        return Err("Backup path must be inside this server's backups".to_string());
+    }
+    let file_name = canonical
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let file = std::fs::File::open(&canonical).map_err(|e| format!("open backup: {e}"))?;
+    let mut zip = match zip::ZipArchive::new(file) {
+        Ok(z) => z,
+        Err(e) => {
+            return Ok(BackupVerifyReport {
+                file_name,
+                entry_count: 0,
+                total_bytes: 0,
+                has_level_dat: false,
+                ok: false,
+                error: Some(format!("zip open: {e}")),
+            })
+        }
+    };
+
+    let mut entry_count = 0u32;
+    let mut total_bytes = 0u64;
+    let mut has_level_dat = false;
+    let mut first_error: Option<String> = None;
+    for i in 0..zip.len() {
+        let mut entry = match zip.by_index(i) {
+            Ok(e) => e,
+            Err(e) => {
+                first_error = Some(format!("entry {i}: {e}"));
+                break;
+            }
+        };
+        if entry.is_dir() {
+            continue;
+        }
+        // the world without level.dat is not a world
+        if entry.name().ends_with("/level.dat") || entry.name() == "level.dat" {
+            has_level_dat = true;
+        }
+        let mut bytes = Vec::new();
+        match std::io::Read::read_to_end(&mut entry, &mut bytes) {
+            Ok(n) => {
+                entry_count += 1;
+                total_bytes += n as u64;
+            }
+            Err(e) => {
+                // CRC mismatch lands here — the backup is corrupt
+                first_error = Some(format!("entry {}: {e}", entry.name()));
+                break;
+            }
+        }
+    }
+
+    let ok = first_error.is_none();
+    Ok(BackupVerifyReport {
+        file_name,
+        entry_count,
+        total_bytes,
+        has_level_dat,
+        ok,
+        error: first_error,
+    })
+}
+
+#[tauri::command]
+pub async fn server_backup_verify(
+    base_path: String,
+    slug: String,
+    backup_path: String,
+) -> Result<BackupVerifyReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        server_backup_verify_impl(base_path, slug, backup_path)
+    })
+    .await
+    .map_err(|e| format!("worker failed: {e}"))?
+}
+
+/// Applies the retention policy: keeps the `max_keep` most recent, and among
+/// the rest deletes the ones older than `max_age_days`. Rules with 0 mean
+/// "no limit" for that axis — with both at 0 nothing is ever deleted. The
+/// most recent backup is ALWAYS kept when any retention rule is active.
+/// Returns the file names that were deleted.
+pub fn server_backup_prune_impl(
+    base_path: String,
+    slug: String,
+    config: BackupsConfig,
+) -> Result<Vec<String>, String> {
+    validate_slug(&slug)?;
+    let keep_cap = config.max_keep > 0;
+    let age_cap = config.max_age_days > 0;
+    if !keep_cap && !age_cap {
+        return Ok(Vec::new()); // no policy, nothing to do
+    }
+    let backups = server_list_backups_impl(base_path.clone(), slug.clone())?;
+    if backups.is_empty() {
+        return Ok(Vec::new());
+    }
+    // server_list_backups_impl returns newest-first by created_at stamp
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let age_secs = config.max_age_days as u64 * 86_400;
+
+    let mut deleted = Vec::new();
+    for (index, backup) in backups.iter().enumerate() {
+        // the newest backup is NEVER deleted — a policy must not leave the
+        // server with zero safety nets
+        if index == 0 {
+            continue;
+        }
+        // count cap: outside the newest N → delete
+        let outside_keep = keep_cap && index >= config.max_keep as usize;
+        // age purge: older than max_age_days → delete (unparsable stamp =
+        // keep it — we never delete what we cannot date)
+        let too_old = age_cap
+            && compact_to_epoch(&backup.created_at)
+                .map(|t| now.saturating_sub(t) > age_secs)
+                .unwrap_or(false);
+        if outside_keep || too_old {
+            match std::fs::remove_file(&backup.path) {
+                Ok(()) => deleted.push(backup.file_name.clone()),
+                Err(e) => {
+                    return Err(format!("prune {}: {e}", backup.file_name));
+                }
+            }
+        }
+    }
+    Ok(deleted)
+}
+
+#[tauri::command]
+pub async fn server_backup_prune(
+    base_path: String,
+    slug: String,
+    config: BackupsConfig,
+) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || server_backup_prune_impl(base_path, slug, config))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+// ---------------------------------------------------------------------------
+// Backups (original)
 // ---------------------------------------------------------------------------
 
 #[derive(Serialize, Clone)]
@@ -715,6 +1043,12 @@ fn server_backup_impl(base_path: String, slug: String) -> Result<BackupInfo, Str
     }
 
     let size = std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
+    // §21 — retention runs right after every backup: create + prune is one
+    // atomic policy, never a manual chore. Prune failures never fail the
+    // backup that just succeeded.
+    let policy = read_backups_config(&dir);
+    let _ = server_backup_prune_impl(base_path.clone(), slug.clone(), policy);
+
     Ok(BackupInfo {
         id: format!("{slug}/{file_name}"),
         file_name,
@@ -2272,6 +2606,325 @@ mod metadata_tests {
             None,
         );
         assert!(err.unwrap_err().contains("512"));
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}
+
+#[cfg(test)]
+mod backups_pro_tests {
+    use super::*;
+
+    fn setup_server(base: &Path, slug: &str) -> PathBuf {
+        let dir = base.join("servers").join(slug);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("voxel-server.json"),
+            format!(
+                r#"{{"slug":"{slug}","name":"Test","software":"paper","mcVersion":"1.20.1","port":25565,"ramMb":2048,"createdAt":"20260101-00000"}}"#
+            ),
+        )
+        .unwrap();
+        dir
+    }
+
+    fn bdir(base: &Path, slug: &str) -> PathBuf {
+        base.join("backups").join("servers").join(slug)
+    }
+
+    fn write_backup_zip(base: &Path, slug: &str, stamp: &str, corrupt: bool, with_level: bool) {
+        std::fs::create_dir_all(bdir(base, slug)).unwrap();
+        let dest = bdir(base, slug).join(format!("backup-{stamp}.zip"));
+        let file = std::fs::File::create(&dest).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default();
+        zip.start_file(format!("{slug}/server.properties"), options).unwrap();
+        std::io::Write::write_all(&mut zip, b"motd=hello\nserver-port=25565\n").unwrap();
+        if with_level {
+            zip.start_file(format!("{slug}/world/level.dat"), options).unwrap();
+            std::io::Write::write_all(&mut zip, b"\x00\x00NBTBYTES").unwrap();
+        }
+        zip.finish().unwrap();
+        if corrupt {
+            // truncate the zip tail — a broken container a real disk can produce
+            let bytes = std::fs::read(&dest).unwrap();
+            std::fs::write(&dest, &bytes[..bytes.len() / 3]).unwrap();
+        }
+    }
+
+    #[test]
+    fn verify_passes_a_healthy_backup_and_reports_its_facts() {
+        let base = std::env::temp_dir().join(format!("voxel-bkp-verify-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = setup_server(&base, "verify-server");
+        write_backup_zip(&base, "verify-server", "20260101-00000", false, true);
+
+        let report = server_backup_verify_impl(
+            base.to_string_lossy().to_string(),
+            "verify-server".into(),
+            bdir(&base, "verify-server").join("backup-20260101-00000.zip").to_string_lossy().to_string(),
+        )
+        .expect("verify");
+        assert!(report.ok, "error: {:?}", report.error);
+        assert!(report.has_level_dat);
+        assert_eq!(report.entry_count, 2);
+        assert!(report.total_bytes > 0);
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn verify_catches_corruption_and_missing_level_dat() {
+        let base = std::env::temp_dir().join(format!("voxel-bkp-corrupt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = setup_server(&base, "corrupt-server");
+        write_backup_zip(&base, "corrupt-server", "20260101-00001", true, true);
+        write_backup_zip(&base, "corrupt-server", "20260101-00002", false, false);
+
+        let corrupt = server_backup_verify_impl(
+            base.to_string_lossy().to_string(),
+            "corrupt-server".into(),
+            bdir(&base, "corrupt-server").join("backup-20260101-00001.zip").to_string_lossy().to_string(),
+        )
+        .expect("verify corrupt");
+        assert!(!corrupt.ok, "a truncated zip must not pass");
+        assert!(corrupt.error.is_some());
+
+        let no_world = server_backup_verify_impl(
+            base.to_string_lossy().to_string(),
+            "corrupt-server".into(),
+            bdir(&base, "corrupt-server").join("backup-20260101-00002.zip").to_string_lossy().to_string(),
+        )
+        .expect("verify no-world");
+        // a backup without level.dat is not corrupt — but it is flagged:
+        // restoring it would lose the world
+        assert!(no_world.ok);
+        assert!(!no_world.has_level_dat);
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn prune_respects_the_count_cap_and_always_keeps_the_newest() {
+        let base = std::env::temp_dir().join(format!("voxel-bkp-prune-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = setup_server(&base, "prune-server");
+        for day in 1..=12 {
+            write_backup_zip(&base, "prune-server", &format!("202601{day:02}-00000"), false, true);
+        }
+        assert_eq!(
+            server_list_backups_impl(base.to_string_lossy().to_string(), "prune-server".into())
+                .unwrap()
+                .len(),
+            12
+        );
+
+        // keep the newest 10 → the 2 oldest are deleted
+        let deleted = server_backup_prune_impl(
+            base.to_string_lossy().to_string(),
+            "prune-server".into(),
+            BackupsConfig { max_keep: 10, max_age_days: 0, schedule_hours: None },
+        )
+        .expect("prune");
+        assert_eq!(deleted.len(), 2);
+        assert!(deleted.contains(&"backup-20260101-00000.zip".to_string()));
+        assert_eq!(
+            server_list_backups_impl(base.to_string_lossy().to_string(), "prune-server".into())
+                .unwrap()
+                .len(),
+            10
+        );
+
+        // no policy → nothing is ever deleted
+        let deleted = server_backup_prune_impl(
+            base.to_string_lossy().to_string(),
+            "prune-server".into(),
+            BackupsConfig::default(),
+        )
+        .expect("prune noop");
+        assert!(deleted.is_empty());
+
+        // count cap of 1 still keeps the newest backup alive
+        let deleted = server_backup_prune_impl(
+            base.to_string_lossy().to_string(),
+            "prune-server".into(),
+            BackupsConfig { max_keep: 1, max_age_days: 0, schedule_hours: None },
+        )
+        .expect("prune hard");
+        assert_eq!(deleted.len(), 9);
+        assert_eq!(
+            server_list_backups_impl(base.to_string_lossy().to_string(), "prune-server".into())
+                .unwrap()
+                .len(),
+            1
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn prune_by_age_deletes_only_the_old_ones() {
+        let base = std::env::temp_dir().join(format!("voxel-bkp-age-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = setup_server(&base, "age-server");
+        let _ = dir; // the server folder itself is not used here
+        // stamps: 2 genuinely recent (today, real clock) + 2 from 2020 (ancient)
+        let now_stamp = compact_timestamp_pub();
+        let (date_part, secs_part) = now_stamp.split_once('-').unwrap();
+        let secs: u32 = secs_part.parse().unwrap();
+        let recent2 = format!("{date_part}-{:05}", secs.saturating_sub(3600).max(1));
+        write_backup_zip(&base, "age-server", &now_stamp, false, true);
+        write_backup_zip(&base, "age-server", &recent2, false, true);
+        write_backup_zip(&base, "age-server", "20200101-00000", false, true);
+        write_backup_zip(&base, "age-server", "20200102-00000", false, true);
+
+        // 30 days of retention kills the 2020 zips, keeps the 2026 ones
+        let deleted = server_backup_prune_impl(
+            base.to_string_lossy().to_string(),
+            "age-server".into(),
+            BackupsConfig { max_keep: 0, max_age_days: 30, schedule_hours: None },
+        )
+        .expect("prune by age");
+        assert_eq!(deleted.len(), 2, "only the 2020 zips: {deleted:?}");
+        assert!(deleted.iter().all(|f| f.starts_with("backup-2020")));
+        let remaining = server_list_backups_impl(
+            base.to_string_lossy().to_string(),
+            "age-server".into(),
+        )
+        .unwrap();
+        assert_eq!(remaining.len(), 2);
+        assert!(remaining.iter().all(|b| !b.file_name.starts_with("backup-2020")));
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn backup_config_roundtrips_in_the_manifest_and_validates_limits() {
+        let base = std::env::temp_dir().join(format!("voxel-bkp-cfg-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let _dir = setup_server(&base, "cfg-server");
+
+        // default when nothing was set: keep everything, no schedule
+        let before = server_backups_config_get_impl(
+            base.to_string_lossy().to_string(),
+            "cfg-server".into(),
+        )
+        .unwrap();
+        assert_eq!(before, BackupsConfig::default());
+
+        let config = BackupsConfig { max_keep: 5, max_age_days: 30, schedule_hours: Some(24) };
+        let set = server_backups_config_set_impl(
+            base.to_string_lossy().to_string(),
+            "cfg-server".into(),
+            config,
+        )
+        .unwrap();
+        assert_eq!(set, config);
+
+        let read_back = server_backups_config_get_impl(
+            base.to_string_lossy().to_string(),
+            "cfg-server".into(),
+        )
+        .unwrap();
+        assert_eq!(read_back, config);
+
+        // the manifest survives a rename (metadata rewrite) — config is not lost
+        server_update_metadata_impl(
+            base.to_string_lossy().to_string(),
+            "cfg-server".into(),
+            Some("Renamed".into()),
+            None,
+            None,
+        )
+        .expect("rename");
+        let after_rename = server_backups_config_get_impl(
+            base.to_string_lossy().to_string(),
+            "cfg-server".into(),
+        )
+        .unwrap();
+        assert_eq!(after_rename, config, "rename must keep the backup policy");
+
+        // limits are enforced — insane policies are refused
+        for bad in [
+            BackupsConfig { max_keep: 101, max_age_days: 0, schedule_hours: None },
+            BackupsConfig { max_keep: 0, max_age_days: 366, schedule_hours: None },
+            BackupsConfig { max_keep: 0, max_age_days: 0, schedule_hours: Some(0) },
+            BackupsConfig { max_keep: 0, max_age_days: 0, schedule_hours: Some(200) },
+        ] {
+            assert!(server_backups_config_set_impl(
+                base.to_string_lossy().to_string(),
+                "cfg-server".into(),
+                bad,
+            )
+            .is_err());
+        }
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn creating_a_backup_applies_the_retention_policy_automatically() {
+        let base = std::env::temp_dir().join(format!("voxel-bkp-auto-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = setup_server(&base, "auto-server");
+        std::fs::write(dir.join("server.properties"), "motd=auto\n").unwrap();
+
+        // policy: keep 2. Two old backups exist on disk already.
+        server_backups_config_set_impl(
+            base.to_string_lossy().to_string(),
+            "auto-server".into(),
+            BackupsConfig { max_keep: 2, max_age_days: 0, schedule_hours: None },
+        )
+        .unwrap();
+        write_backup_zip(&base, "auto-server", "20260101-00000", false, true);
+        write_backup_zip(&base, "auto-server", "20260102-00000", false, true);
+
+        // a third backup is created through the real command impl → auto-prune
+        let info = server_backup_impl(base.to_string_lossy().to_string(), "auto-server".into())
+            .expect("backup");
+        assert!(info.file_name.starts_with("backup-"));
+
+        let remaining = server_list_backups_impl(
+            base.to_string_lossy().to_string(),
+            "auto-server".into(),
+        )
+        .unwrap();
+        assert_eq!(remaining.len(), 2, "keep-2 policy must have pruned the oldest");
+        assert!(!remaining.iter().any(|b| b.file_name == "backup-20260101-00000.zip"));
+        assert!(remaining
+            .iter()
+            .any(|b| b.file_name == info.file_name), "the fresh backup survives");
+        assert!(remaining
+            .iter()
+            .any(|b| b.file_name == "backup-20260102-00000.zip"), "second newest survives");
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn deleting_a_backup_is_guarded_to_the_workspace_backups() {
+        let base = std::env::temp_dir().join(format!("voxel-bkp-del-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = setup_server(&base, "del-server");
+        write_backup_zip(&base, "del-server", "20260101-00000", false, true);
+
+        let backup_path = base
+            .join("backups/servers/del-server/backup-20260101-00000.zip");
+        server_backup_delete_impl(
+            base.to_string_lossy().to_string(),
+            "del-server".into(),
+            backup_path.to_string_lossy().to_string(),
+        )
+        .expect("delete own backup");
+        assert!(!backup_path.exists());
+
+        // outside the backups root → refused (server.properties is not a backup)
+        assert!(server_backup_delete_impl(
+            base.to_string_lossy().to_string(),
+            "del-server".into(),
+            dir.join("server.properties").to_string_lossy().to_string(),
+        )
+        .is_err());
 
         let _ = std::fs::remove_dir_all(&base);
     }

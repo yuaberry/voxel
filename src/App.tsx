@@ -42,6 +42,9 @@ export default function App() {
 
   useEffect(() => {
     bootTaskEngine(); // the AI task queue is alive from the first second
+    import("@/services/servers/backupPro")
+      .then((m) => m.startBackupScheduler())
+      .catch(() => {}); // §21 — scheduled backups while the app is open
     void hydrate();
     void hydrateProjects();
     // Version catalog auto-refresh on boot (12h TTL — no-op when fresh)
