@@ -17,12 +17,7 @@
 - [x] Style Memory (painel no workspace: 5 bibles editáveis + fallback .nexus; verificação de contradições por IA onde todo achado cita as passagens; 3 testes)
 - [x] Compatibility Lab (/compat: 4 checks com evidência+fix — loader×versão, Java da era vs máquina, era experimental, gradle.properties real; matriz versão×loader; 6 testes)
 
-## FASE C — IA
-- [x] AI Command Center (/command: fila viva DB-backed, estados, cancel/retry, limites 1-paralelo/20-fila, métricas reais)
-- [x] Workflow Engine v1 (Fix Build formalizado com 6 etapas checkpointadas: preflight→build→analyze→agent fix→rebuild→verdict)
-- [x] Model Router v2 (fallbackModel: retry 1× só antes do primeiro delta; ai_metrics reais por task)
-- [ ] Knowledge Center (índice local + fontes oficiais, versão-sensível)
-- [ ] QA Lab ("runtime test passed" ≠ "build succeeded" já honesto no verdict do workflow; painel dedicado pendente)
+## FASE C — IA (COMPLETA: Command Center ✓ Workflow v1 ✓ Model Router v2 ✓ Knowledge Center ✓ QA Lab ✓)
 
 ## FASE D — Servidores
 - Economy Simulator (simulações de progressão Prison — valores rotulados como simulação)

@@ -165,7 +165,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (57 sessões)
+## 5. Histórico de sessões (58 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -191,6 +191,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 58 | Fase C COMPLETA | **Knowledge Center** (8 artigos com PROVA+fontes oficiais, busca ranking, link do Error Center por categoria, +5 testes) + **QA Lab** (matriz 4 níveis: runtime nunca fingido, limitação REGISTRADA, Fix Build no veredito, +6 testes) + v0.15.0 | patch degradou BuildDrawer (restaurado); import duplo |
 | 57 | Fase C: Task Engine + Command Center | **Engine de fila real** (storage injetável, cancel cooperativo, retry, limites 1/20, +7 testes) · **runners**: agent headless (política autônoma) + workflow Fix Build 6 etapas checkpointadas · **Model Router v2** (fallback 1× pré-delta; métricas reais em ai_metrics) · **/command** (fila viva + métricas honestas) + v0.14.0 | template string no bash; icons regex 3ª vez; queue privada |
 | 56 | Fase B COMPLETA | **Compatibility Lab** (4 checks com evidência+fix, Java da era vs máquina, gradle.properties real, matriz versão×loader, +6 testes) + **Style Memory** (bibles editáveis com fallback .nexus; contradições por IA onde todo achado cita as passagens — parser descarta inventados, +3 testes) + v0.13.0 | regra Java severa demais (teste reprovou); title no Lucide |
 | 55 | Fase B: Asset Lab | **Biblioteca real** (previews de pixel, busca/filtros) + **consistency checker** (referências quebradas/ausências/lang órfã/duplicatas por hash de bytes) + **import validado** (header PNG real, rejeitado é removido) + rota /assets + v0.12.0 | — |
@@ -273,7 +274,7 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 57, v0.14.0)
+## 8. Estado atual (verificado — Sessão 58, v0.15.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -293,7 +294,8 @@ src-tauri/capabilities/default.json  # ACL: sql, dialog, http (AI providers + Mo
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.14.0 (latest)** | Desktop: **AI Command Center** (fila de tarefas autônomas com checkpoints + Fix Build workflow + fallback de modelo + métricas reais) + APK mobile 0.3.1 |
+| **v0.15.0 (latest)** | Desktop: **Fase C completa — Knowledge Center (docs verificadas ligadas aos erros) + QA Lab (a matriz de vereditos honesta)** + APK mobile 0.3.1 |
+| v0.14.0 | Desktop: **AI Command Center** (fila de tarefas autônomas com checkpoints + Fix Build workflow + fallback de modelo + métricas reais) + APK mobile 0.3.1 |
 | v0.13.0 | Desktop: **Fase B completa — Compatibility Lab (vereditos com evidência) + Style Memory (bibles + contradições por IA)** + APK mobile 0.3.1 |
 | v0.12.0 | Desktop: **Asset Lab** (biblioteca de assets + verificador de consistência + import validado) + APK mobile 0.3.1 |
 | v0.11.0 | Desktop: **Gameplay Designer** (registro real do mod, status por item, criação coerente, receitas reais) + APK mobile 0.3.1 |
@@ -1380,3 +1382,19 @@ READMEs documentam os 3 com tabelas de comandos; o wizard oferece os checkboxes 
 **Verificação**: typecheck 0 ✓ · lint 0 errors (48) ✓ · vitest **130/130** (+7 engine) ✓ · vite build 1m24s ✓ · boot vivo 0 panics ✓. Release **v0.14.0**.
 
 **Fase C status**: Command Center ✓ · Workflow v1 ✓ · Model Router v2 ✓ — próximos: Knowledge Center, QA Lab.
+
+---
+
+## 58. Sessão 58 — Fase C COMPLETA: Knowledge Center + QA Lab
+
+**Pedido do dono**: "continue, e siga com as fases" (Super Prompt §11 + §14 — o que faltava da Fase C).
+
+**Knowledge Center** (`/knowledge`, +5 testes): 8 artigos técnicos **VERIFICADOS** — cada um declara **COMO foi provado** (qual E2E compilou, qual datapack de produção roda o padrão) + **fontes oficiais** linkadas. Conteúdo factual: eras do Minecraft (a quebra do 26.x que nosso E2E pescou), os 3 estilos de registro, os padrões vanilla de datapack (trigger/`minecraft.mined`/predicates — os MESMOS da produção), o primeiro build do Gradle, ler erros por família, vanilla vs Paper, o que o launcher baixa, roteamento de modelos IA. Busca com ranking honesto (título > tags > corpo) e **link direto dos erros**: cada card do Error Center ganha "Read the docs for <category> errors" com a busca pré-preenchida.
+
+**QA Lab** (`/qa`, +6 testes): a matriz de 4 níveis com a regra do §14 como lei: **build succeeded ≠ checks passed ≠ runtime proven**. Build = fato gravado (com botão Fix Build se falhou); Checks = consistência+compat só depois do build verde ("not-run" explícito no build quebrado — nunca veredito fingido); **Runtime NUNCA se finge provado** — "requires-manual" com a **limitação REGISTRADA** em texto claro + botão Launch; Manual = o sign-off humano por design.
+
+**Bugs caçados (2)**: patch estragou duas linhas do BuildDrawer (useState/useNavigate invertidos — restaurado); import duplicado de useNavigate.
+
+**Verificação**: typecheck 0 ✓ · lint 0 errors (51) ✓ · vitest **141/141** (+11) ✓ · vite build 1m54s ✓ · boot vivo 0 panics ✓. Release **v0.15.0**.
+
+**FASE C COMPLETA**: Command Center ✓ · Workflow v1 ✓ · Model Router v2 ✓ · Knowledge Center ✓ · QA Lab ✓. Próxima: **Fase D — Servidores** (Economy Simulator, Security Center, Player Management, Backup Pro, Server Automation).
