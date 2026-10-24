@@ -45,6 +45,9 @@ export default function App() {
     import("@/services/servers/backupPro")
       .then((m) => m.startBackupScheduler())
       .catch(() => {}); // §21 — scheduled backups while the app is open
+    import("@/services/servers/automation")
+      .then((m) => m.startAutomationLoop())
+      .catch(() => {}); // §22 — automation rules while the app is open
     void hydrate();
     void hydrateProjects();
     // Version catalog auto-refresh on boot (12h TTL — no-op when fresh)

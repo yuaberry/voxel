@@ -12,6 +12,7 @@ import {
   Trash2,
   Users,
   Archive,
+  Zap,
 } from "lucide-react";
 import {
   Dialog,
@@ -89,6 +90,14 @@ import {
   type BackupsConfig,
   type BackupVerifyReport,
 } from "@/services/servers/backupPro";
+import {
+  getAutomations,
+  setAutomations,
+  createSqlAutomationRunStore,
+  type AutomationRule,
+  type AutomationRunRecord,
+  type AutomationRunStore,
+} from "@/services/servers/automation";
 import { restoreServerBackup } from "@/services/servers/serverService";
 import { streamChat } from "@/services/ai/streaming";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -105,7 +114,7 @@ import {
 import { updateServerRecord } from "@/services/db/repositories/serversRepository";
 import type { StructureGenResult } from "@/services/assets/structureService";
 
-type Tab = "briefing" | "world" | "structures" | "commands" | "plugins" | "currency" | "dossier" | "ai" | "security" | "players" | "backups";
+type Tab = "briefing" | "world" | "structures" | "commands" | "plugins" | "currency" | "dossier" | "ai" | "security" | "players" | "backups" | "automation";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "briefing", label: "Briefing", icon: <FileText className="h-3.5 w-3.5" /> },
@@ -119,6 +128,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "security", label: "Security", icon: <ShieldAlert className="h-3.5 w-3.5" /> },
   { id: "players", label: "Players", icon: <Users className="h-3.5 w-3.5" /> },
   { id: "backups", label: "Backups", icon: <Archive className="h-3.5 w-3.5" /> },
+  { id: "automation", label: "Automation", icon: <Zap className="h-3.5 w-3.5" /> },
 ];
 
 /**
@@ -132,6 +142,11 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 let punishmentStoreSingleton: PunishmentStore | null = null;
 const punishmentStore = (): PunishmentStore =>
   (punishmentStoreSingleton ??= createSqlPunishmentStore());
+
+// the automation run store — same pattern
+let automationRunStoreSingleton: AutomationRunStore | null = null;
+const automationRunStore = (): AutomationRunStore =>
+  (automationRunStoreSingleton ??= createSqlAutomationRunStore());
 
 export function ServerCustomizeDialog({
   server,
@@ -215,6 +230,11 @@ export function ServerCustomizeDialog({
   const [deleteCandidate, setDeleteCandidate] = useState<{ file_name: string; path: string } | null>(null);
   const [restoreCandidate, setRestoreCandidate] = useState<{ file_name: string; path: string } | null>(null);
 
+  // ---- automation tab state (§22)
+  const [automationRules, setAutomationRules] = useState<AutomationRule[] | null>(null);
+  const [automationRuns, setAutomationRuns] = useState<AutomationRunRecord[]>([]);
+  const [automationAdd, setAutomationAdd] = useState<{ trigger: "offline" | "online"; action: "notify" | "backup" | "restart" } | null>(null);
+
   // §19 — load the REAL player files + running status when the tab opens
   useEffect(() => {
     if (!open || tab !== "players") return;
@@ -267,6 +287,36 @@ export function ServerCustomizeDialog({
       cancelled = true;
     };
   }, [open, tab, basePath, slug]);
+
+  // §22 — automation rules from the manifest + the run log
+  useEffect(() => {
+    if (!open || tab !== "automation") return;
+    let cancelled = false;
+    getAutomations(basePath, slug)
+      .then((rules) => {
+        if (!cancelled) setAutomationRules(rules);
+      })
+      .catch(() => setAutomationRules([]));
+    automationRunStore()
+      .list(slug, 20)
+      .then((rows) => {
+        if (!cancelled) setAutomationRuns(rows);
+      })
+      .catch(() => setAutomationRuns([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tab, basePath, slug]);
+
+  const persistRules = async (rules: AutomationRule[]) => {
+    try {
+      const saved = await setAutomations(basePath, slug, rules);
+      setAutomationRules(saved);
+      toast.success(t("Automation rules saved"));
+    } catch (e) {
+      toast.error(String(e));
+    }
+  };
 
   const saveBackupsConfig = async () => {
     setBackupsBusy(true);
@@ -1399,6 +1449,179 @@ export function ServerCustomizeDialog({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {tab === "automation" && (
+          <div className="space-y-3">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t(
+                "Rules with limits: when this server goes offline or comes back online, run one of the three reviewed actions. The engine runs while the app is open, a rule fires at most once every 5 minutes, and every applied action is written to the run log — nothing runs silently.",
+              )}
+            </p>
+            {automationRules === null ? (
+              <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t("Reading the automation rules…")}
+              </div>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  {automationRules.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {t("No automation rules yet — add one below.")}
+                    </p>
+                  )}
+                  {automationRules.map((rule) => (
+                    <div
+                      key={rule.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[9px]">
+                          {t("when")} {t(rule.trigger)}
+                        </Badge>
+                        <span className="text-[11px] text-muted-foreground">→</span>
+                        <Badge
+                          variant={rule.action === "restart" ? "destructive" : "secondary"}
+                          className="text-[9px]"
+                        >
+                          {rule.action}
+                        </Badge>
+                        <span className="font-mono text-[9px] text-muted-foreground">
+                          {rule.id}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={rule.enabled}
+                          onCheckedChange={(enabled) =>
+                            void persistRules(
+                              automationRules.map((r) =>
+                                r.id === rule.id ? { ...r, enabled } : r,
+                              ),
+                            )
+                          }
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-[10px] text-destructive"
+                          onClick={() =>
+                            void persistRules(automationRules.filter((r) => r.id !== rule.id))
+                          }
+                        >
+                          {t("Delete")}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {automationAdd ? (
+                  <div className="flex flex-wrap items-end gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2">
+                    <label className="space-y-1">
+                      <span className="text-[10px] text-muted-foreground">{t("when")}</span>
+                      <select
+                        value={automationAdd.trigger}
+                        onChange={(e) =>
+                          setAutomationAdd({
+                            ...automationAdd,
+                            trigger: e.target.value as "offline" | "online",
+                          })
+                        }
+                        className="h-8 rounded-md border bg-card px-2 text-xs"
+                      >
+                        <option value="offline">{t("offline")}</option>
+                        <option value="online">{t("online")}</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[10px] text-muted-foreground">{t("run")}</span>
+                      <select
+                        value={automationAdd.action}
+                        onChange={(e) =>
+                          setAutomationAdd({
+                            ...automationAdd,
+                            action: e.target.value as "notify" | "backup" | "restart",
+                          })
+                        }
+                        className="h-8 rounded-md border bg-card px-2 text-xs"
+                      >
+                        <option value="notify">notify</option>
+                        <option value="backup">backup</option>
+                        <option value="restart">restart</option>
+                      </select>
+                    </label>
+                    <Button
+                      size="sm"
+                      variant="gradient"
+                      className="h-8"
+                      onClick={() => {
+                        const newRule: AutomationRule = {
+                          id: `rule-${Date.now().toString(36)}`,
+                          trigger: automationAdd.trigger,
+                          action: automationAdd.action,
+                          enabled: true,
+                        };
+                        void persistRules([...automationRules, newRule]);
+                        setAutomationAdd(null);
+                      }}
+                    >
+                      {t("Add rule")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8"
+                      onClick={() => setAutomationAdd(null)}
+                    >
+                      {t("Cancel")}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setAutomationAdd({ trigger: "offline", action: "notify" })
+                    }
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    {t("Add rule")}
+                  </Button>
+                )}
+              </>
+            )}
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold">{t("Automation run log")}</p>
+              {automationRuns.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {t("No automation has fired on this server yet.")}
+                </p>
+              ) : (
+                automationRuns.map((run) => (
+                  <div
+                    key={run.id}
+                    className="flex flex-wrap items-center justify-between gap-1 rounded-lg border px-2 py-1 text-[11px]"
+                  >
+                    <span>
+                      <Badge
+                        variant={run.action === "restart" ? "destructive" : "secondary"}
+                        className="mr-2 text-[9px]"
+                      >
+                        {run.action}
+                      </Badge>
+                      <span className="font-mono text-[9px] text-muted-foreground">
+                        {run.ruleId}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      {run.detail} · {new Date(run.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
 

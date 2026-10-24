@@ -645,6 +645,114 @@ pub async fn server_log_tail(
 }
 
 // ---------------------------------------------------------------------------
+// Server Automation (Super Prompt §22) — triggers with limits, actions from
+// an allowlist, and one hard rule: NOTHING destructive runs silently.
+// ---------------------------------------------------------------------------
+
+const AUTOMATION_TRIGGERS: [&str; 2] = ["offline", "online"];
+const AUTOMATION_ACTIONS: [&str; 3] = ["notify", "backup", "restart"];
+const AUTOMATION_MAX_RULES: usize = 10;
+
+/// One automation rule per server, persisted in voxel-server.json.
+/// The triggers and actions are an ALLOWLIST enforced right here at the
+/// perimeter — the panel can never configure "shutdown" or arbitrary
+/// commands, only the three reviewed actions.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRule {
+    pub id: String,
+    pub trigger: String,
+    pub action: String,
+    pub enabled: bool,
+}
+
+pub fn server_automations_get_impl(
+    base_path: String,
+    slug: String,
+) -> Result<Vec<AutomationRule>, String> {
+    validate_slug(&slug)?;
+    let dir = server_dir(Path::new(&base_path), &slug);
+    if !dir.is_dir() {
+        return Err(format!("Server \"{slug}\" not found"));
+    }
+    Ok(read_automations(&dir))
+}
+
+fn read_automations(dir: &Path) -> Vec<AutomationRule> {
+    std::fs::read(dir.join("voxel-server.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .and_then(|m| m.get("automations").cloned())
+        .and_then(|a| serde_json::from_value(a).ok())
+        .unwrap_or_default()
+}
+
+pub fn server_automations_set_impl(
+    base_path: String,
+    slug: String,
+    rules: Vec<AutomationRule>,
+) -> Result<Vec<AutomationRule>, String> {
+    validate_slug(&slug)?;
+    if rules.len() > AUTOMATION_MAX_RULES {
+        return Err(format!("At most {AUTOMATION_MAX_RULES} automation rules per server"));
+    }
+    let mut seen_ids = std::collections::HashSet::new();
+    for rule in &rules {
+        if !AUTOMATION_TRIGGERS.contains(&rule.trigger.as_str()) {
+            return Err(format!("Unknown trigger \"{}\" — allowed: offline, online", rule.trigger));
+        }
+        if !AUTOMATION_ACTIONS.contains(&rule.action.as_str()) {
+            return Err(format!(
+                "Unknown action \"{}\" — allowed: notify, backup, restart",
+                rule.action
+            ));
+        }
+        let id = rule.id.trim();
+        if id.is_empty() || id.len() > 64 {
+            return Err("Rule id must be 1-64 characters".to_string());
+        }
+        if !seen_ids.insert(id.to_string()) {
+            return Err(format!("Duplicate rule id \"{id}\""));
+        }
+    }
+
+    let dir = server_dir(Path::new(&base_path), &slug);
+    if !dir.is_dir() {
+        return Err(format!("Server \"{slug}\" not found"));
+    }
+    let manifest_path = dir.join("voxel-server.json");
+    let mut manifest: serde_json::Value = std::fs::read(&manifest_path)
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .ok_or_else(|| "voxel-server.json missing or unreadable".to_string())?;
+    manifest["automations"] = serde_json::to_value(&rules).map_err(|e| format!("{e}"))?;
+    let pretty = serde_json::to_string_pretty(&manifest).map_err(|e| format!("{e}"))?;
+    std::fs::write(&manifest_path, &pretty).map_err(|e| format!("write manifest: {e}"))?;
+    Ok(rules)
+}
+
+#[tauri::command]
+pub async fn server_automations_get(
+    base_path: String,
+    slug: String,
+) -> Result<Vec<AutomationRule>, String> {
+    tauri::async_runtime::spawn_blocking(move || server_automations_get_impl(base_path, slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn server_automations_set(
+    base_path: String,
+    slug: String,
+    rules: Vec<AutomationRule>,
+) -> Result<Vec<AutomationRule>, String> {
+    tauri::async_runtime::spawn_blocking(move || server_automations_set_impl(base_path, slug, rules))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+// ---------------------------------------------------------------------------
 // Backups Pro (Super Prompt §21) — retention, integrity, scheduling config
 // ---------------------------------------------------------------------------
 
@@ -2925,6 +3033,126 @@ mod backups_pro_tests {
             dir.join("server.properties").to_string_lossy().to_string(),
         )
         .is_err());
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}
+
+#[cfg(test)]
+mod automation_tests {
+    use super::*;
+
+    fn setup(base: &Path, slug: &str) {
+        let dir = base.join("servers").join(slug);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("voxel-server.json"),
+            format!(
+                r#"{{"slug":"{slug}","name":"A","software":"paper","mcVersion":"1.20.1","port":25565,"ramMb":2048,"createdAt":"20260101-00000"}}"#
+            ),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn automations_roundtrip_in_the_manifest_and_survive_rename() {
+        let base = std::env::temp_dir().join(format!("voxel-auto-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        setup(&base, "auto-server");
+
+        let rules = vec![AutomationRule {
+            id: "crash-restart".into(),
+            trigger: "offline".into(),
+            action: "restart".into(),
+            enabled: true,
+        }];
+        let set = server_automations_set_impl(
+            base.to_string_lossy().to_string(),
+            "auto-server".into(),
+            rules.clone(),
+        )
+        .expect("set rules");
+        assert_eq!(set, rules);
+
+        let read = server_automations_get_impl(
+            base.to_string_lossy().to_string(),
+            "auto-server".into(),
+        )
+        .expect("get rules");
+        assert_eq!(read, rules);
+
+        // rename rewrites the manifest — the rules must survive it
+        server_update_metadata_impl(
+            base.to_string_lossy().to_string(),
+            "auto-server".into(),
+            Some("Renamed".into()),
+            None,
+            None,
+        )
+        .expect("rename");
+        let after = server_automations_get_impl(
+            base.to_string_lossy().to_string(),
+            "auto-server".into(),
+        )
+        .expect("rules survive rename");
+        assert_eq!(after, rules);
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn automations_reject_unknown_triggers_actions_and_duplicates() {
+        let base = std::env::temp_dir().join(format!("voxel-auto2-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        setup(&base, "guard-server");
+
+        let rule = |id: &str, trigger: &str, action: &str| AutomationRule {
+            id: id.into(),
+            trigger: trigger.into(),
+            action: action.into(),
+            enabled: true,
+        };
+
+        // an arbitrary action is refused at the perimeter — the allowlist is
+        // the whole point of §22's "limits"
+        assert!(server_automations_set_impl(
+            base.to_string_lossy().to_string(),
+            "guard-server".into(),
+            vec![rule("r", "offline", "delete-everything")],
+        )
+        .is_err());
+        assert!(server_automations_set_impl(
+            base.to_string_lossy().to_string(),
+            "guard-server".into(),
+            vec![rule("r", "every-tuesday", "notify")],
+        )
+        .is_err());
+        assert!(server_automations_set_impl(
+            base.to_string_lossy().to_string(),
+            "guard-server".into(),
+            vec![rule("r", "offline", "notify"), rule("r", "online", "backup")],
+        )
+        .is_err(), "duplicate ids must be refused");
+        assert!(server_automations_set_impl(
+            base.to_string_lossy().to_string(),
+            "guard-server".into(),
+            (0..11)
+                .map(|i| rule(&format!("r{i}"), "offline", "notify"))
+                .collect(),
+        )
+        .is_err(), "more than 10 rules must be refused");
+
+        // and the valid set passes cleanly
+        let ok = vec![
+            rule("a", "offline", "restart"),
+            rule("b", "online", "notify"),
+        ];
+        assert!(server_automations_set_impl(
+            base.to_string_lossy().to_string(),
+            "guard-server".into(),
+            ok,
+        )
+        .is_ok());
 
         let _ = std::fs::remove_dir_all(&base);
     }

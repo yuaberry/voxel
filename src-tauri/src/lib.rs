@@ -39,6 +39,13 @@ pub fn run() {
             sql: include_str!("migrations/004_player_management.sql"),
             kind: MigrationKind::Up,
         },
+        // v5 — Phase D: Server Automation run log
+        Migration {
+            version: 5,
+            description: "server automation run log",
+            sql: include_str!("migrations/005_automation_runs.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -125,6 +132,8 @@ pub fn run() {
             commands::servers::server_log_tail,
             commands::servers::server_backup,
             commands::servers::server_list_backups,
+            commands::servers::server_automations_get,
+            commands::servers::server_automations_set,
             commands::servers::server_backups_config_get,
             commands::servers::server_backups_config_set,
             commands::servers::server_backup_delete,
