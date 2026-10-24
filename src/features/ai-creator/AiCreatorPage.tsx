@@ -102,9 +102,10 @@ export function AiCreatorPage() {
     if (!projectsLoaded) void hydrateProjects();
   }, [projectsLoaded, hydrateProjects]);
 
-  useEffect(() => {
-    if (!projectId && projects.length > 0) setProjectId(projects[0].id);
-  }, [projectId, projects]);
+  // React's "adjust state during render": first project becomes the selection
+  if (!projectId && projects.length > 0) {
+    setProjectId(projects[0].id);
+  }
 
   // Studio handoff: pre-select the project and pre-fill the prompt (never auto-send)
   const [handoffDraft, setHandoffDraft] = useState<string | null>(null);
@@ -112,9 +113,12 @@ export function AiCreatorPage() {
   useEffect(() => {
     const handoff = useUiStore.getState().aiHandoff;
     if (!handoff) return;
-    setProjectId(handoff.projectId);
-    setHandoffDraft(handoff.prompt);
-    setAiHandoff(null);
+    // the Studio handoff is an arrival event — applied off the sync path
+    void Promise.resolve().then(() => {
+      setProjectId(handoff.projectId);
+      setHandoffDraft(handoff.prompt);
+      setAiHandoff(null);
+    });
   }, [setAiHandoff]);
 
   useEffect(() => {
@@ -124,11 +128,14 @@ export function AiCreatorPage() {
   // Load session + context + references when the project changes
   useEffect(() => {
     if (!project) {
-      setSession(null);
-      setContext(null);
-      setTimeline([]);
-      setReferences([]);
-      setSpecProposal(null);
+      // no-project reset runs off the synchronous effect path
+      void Promise.resolve().then(() => {
+        setSession(null);
+        setContext(null);
+        setTimeline([]);
+        setReferences([]);
+        setSpecProposal(null);
+      });
       return;
     }
     let cancelled = false;
@@ -421,7 +428,7 @@ export function AiCreatorPage() {
         await refreshContext();
       }
     },
-    [project, context, basePath, aiSettings, textHistory, refreshContext],
+    [project, context, basePath, aiSettings, textHistory, refreshContext, multiAgent],
   );
 
   const handleSend = useCallback(

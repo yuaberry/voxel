@@ -82,8 +82,10 @@ export function ModpacksPage() {
   const [selectedJars, setSelectedJars] = useState<Set<string>>(new Set());
   const [selectedPacks, setSelectedPacks] = useState<Set<string>>(new Set());
 
-  // compatibility (live, computed from the jars' own manifests)
-  const [compat, setCompat] = useState<ModpackCompatibility | null>(null);
+  // compatibility (live, computed from the jars' own manifests) — the shown
+  // value is DERIVED: no selection or no workspace means no verdict, with
+  // no synchronous reset in the effect
+  const [rawCompat, setCompat] = useState<ModpackCompatibility | null>(null);
 
   // Modrinth catalog (official API; file downloads are SHA-1-verified in Rust)
   const [modQuery, setModQuery] = useState("");
@@ -117,10 +119,11 @@ export function ModpacksPage() {
     } finally {
       setLoading(false);
     }
-  }, [basePath, importTarget]);
+  }, [basePath, importTarget, modTarget]);
 
   useEffect(() => {
-    void refresh();
+    // microtask: refresh settles loading synchronously on failure paths
+    void Promise.resolve().then(() => refresh());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [basePath]);
 
@@ -263,12 +266,12 @@ export function ModpacksPage() {
 
   const canExport = name.trim().length >= 2 && (selectedJars.size > 0 || selectedPacks.size > 0);
 
+  const compat =
+    basePath && selectedJars.size > 0 ? rawCompat : null;
+
   // Re-run compatibility whenever the mod selection changes
   useEffect(() => {
-    if (!basePath || selectedJars.size === 0) {
-      setCompat(null);
-      return;
-    }
+    if (!basePath || selectedJars.size === 0) return;
     let cancelled = false;
     (async () => {
       try {
@@ -284,7 +287,6 @@ export function ModpacksPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [basePath, selectedJars, assets.jars]);
 
   // Manifest facts come from the real project records — never invented.

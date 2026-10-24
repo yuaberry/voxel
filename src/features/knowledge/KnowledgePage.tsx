@@ -31,11 +31,13 @@ export function KnowledgePage() {
 
   useEffect(() => {
     const state = location.state as { q?: string } | null;
-    if (state?.q) {
-      setQuery(state.q);
-      const found = searchKnowledge(state.q);
+    if (!state?.q) return;
+    // navigation reactions run off the synchronous effect path
+    void Promise.resolve().then(() => {
+      setQuery(state.q!);
+      const found = searchKnowledge(state.q!);
       if (found[0]) setExpanded(found[0].id);
-    }
+    });
   }, [location.state]);
 
   const results = query.trim().length >= 2 ? searchKnowledge(query) : KNOWLEDGE_BASE;

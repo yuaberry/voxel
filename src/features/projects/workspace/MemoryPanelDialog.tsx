@@ -46,7 +46,7 @@ export function MemoryPanelDialog({
 
   useEffect(() => {
     if (!open) return;
-    setContradictions(null);
+    void Promise.resolve().then(() => setContradictions(null));
     listMemory(basePath, project.slug)
       .then((list) => {
         setFiles(list);
@@ -56,7 +56,6 @@ export function MemoryPanelDialog({
         setDirty(false);
       })
       .catch(() => setFiles([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, project.slug, basePath]);
 
   const current = files?.find((f) => f.id === selected) ?? null;

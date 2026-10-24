@@ -239,8 +239,12 @@ export function ServerCustomizeDialog({
   useEffect(() => {
     if (!open || tab !== "players") return;
     let cancelled = false;
-    setPlayers(null);
-    setModerationFindings(null);
+    // tab-reset runs off the synchronous effect path
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      setPlayers(null);
+      setModerationFindings(null);
+    });
     invoke<boolean>("server_status", { slug })
       .then((running) => {
         if (!cancelled) setPlayersRunning(running);
@@ -424,8 +428,16 @@ export function ServerCustomizeDialog({
 
   useEffect(() => {
     if (!open) return;
-    setTab("briefing");
-    setPlaced([]);
+    // open-reset runs off the synchronous effect path
+    void Promise.resolve().then(() => {
+      setTab("briefing");
+      setPlaced([]);
+      setDossier(null);
+      setPlan(null);
+      setPlanPreviews({});
+      setServerName(server.name);
+      setSecurity(null);
+    });
     // world facts from the REAL properties file
     readProjectFile(basePath, `${serverRel}/server.properties`)
       .then((content) => {
@@ -445,11 +457,6 @@ export function ServerCustomizeDialog({
       .then(() => setHasEconomy(true))
       .catch(() => setHasEconomy(false));
     listBriefingDocuments(basePath, `${serverRel}/.voxel/briefing`).then(setExistingBriefs);
-    setDossier(null);
-    setPlan(null);
-    setPlanPreviews({});
-    setServerName(server.name);
-    setSecurity(null);
     void (async () => {
       try {
         const properties = await readProjectFile(basePath, `${serverRel}/server.properties`)

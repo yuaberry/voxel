@@ -24,7 +24,10 @@ export function JavaSettings() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(refresh, []);
+  useEffect(() => {
+    // a microtask keeps the synchronous setLoading(true) out of the effect body
+    void Promise.resolve().then(refresh);
+  }, []);
 
   const javaOk = env?.java.found ?? false;
 

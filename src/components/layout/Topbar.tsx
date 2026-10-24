@@ -42,19 +42,18 @@ export function Topbar() {
   const navigate = useNavigate();
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const aiSettings = useSettingsStore((s) => s.settings.ai);
-  const [hasKey, setHasKey] = useState(false);
+  const [rawHasKey, setHasKey] = useState(false);
 
   const provider = getProviderMeta(aiSettings.provider);
   const needsKey = provider.requiresKey;
+  // derived during render: a keyless provider never shows a stale "has key"
+  const hasKey = !needsKey ? false : rawHasKey;
   const keyReady = !needsKey || hasKey;
   const aiReady = keyReady && aiSettings.model.trim().length > 0;
 
   useEffect(() => {
     let cancelled = false;
-    if (!needsKey) {
-      setHasKey(false);
-      return;
-    }
+    if (!needsKey) return; // keyless providers derive hasKey=false at render
     secretsHas(AI_API_KEY_ID)
       .then((result) => {
         if (!cancelled) setHasKey(result);

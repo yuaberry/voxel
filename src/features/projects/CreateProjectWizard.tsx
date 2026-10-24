@@ -83,8 +83,10 @@ export function CreateProjectWizard() {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setCatalogLoading(true);
-    (async () => {
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      setCatalogLoading(true);
+      void (async () => {
       try {
         await ensureCatalog(); // refreshes automatically when stale (12h TTL)
         const list = await getVersions();
@@ -106,7 +108,8 @@ export function CreateProjectWizard() {
       } finally {
         if (!cancelled) setCatalogLoading(false);
       }
-    })();
+      })();
+    });
     return () => {
       cancelled = true;
     };

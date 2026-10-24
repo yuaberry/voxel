@@ -74,7 +74,8 @@ export function ServersPage() {
         start();
       }
     };
-    void refresh();
+    // microtask: refresh settles state synchronously on its first tick
+    void Promise.resolve().then(() => refresh());
     start();
     document.addEventListener("visibilitychange", onVisibility);
     return () => {

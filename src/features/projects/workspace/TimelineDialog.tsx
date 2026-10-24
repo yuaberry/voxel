@@ -47,7 +47,7 @@ export function TimelineDialog({
 
   useEffect(() => {
     if (!open) return;
-    setEvents(null);
+    void Promise.resolve().then(() => setEvents(null));
     getProjectTimeline(project, basePath)
       .then(setEvents)
       .catch((error) => {

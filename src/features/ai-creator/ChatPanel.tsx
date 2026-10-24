@@ -110,13 +110,11 @@ export function ChatPanel({
   initialDraft,
 }: Props) {
   const [draft, setDraft] = useState("");
-
-  useEffect(() => {
-    if (initialDraft && draft === "") {
-      setDraft(initialDraft);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialDraft]);
+  // React's "adjust state during render": a handoff draft fills the empty
+  // input exactly once, without an effect
+  if (initialDraft && draft === "") {
+    setDraft(initialDraft);
+  }
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

@@ -69,16 +69,21 @@ export function CompatibilityPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!projectId && projects.length > 0) setProjectId(projects[0].id);
-  }, [projects, projectId]);
+  // React's "adjust state during render": first project becomes the selection
+  // the moment projects arrive — no effect, no synchronous write
+  if (!projectId && projects.length > 0) {
+    setProjectId(projects[0].id);
+  }
 
   useEffect(() => {
-    void loadMatrix();
+    // microtask: loadMatrix may settle matrix synchronously on failure
+    void Promise.resolve().then(() => loadMatrix());
   }, [loadMatrix]);
 
   useEffect(() => {
-    if (project) void run();
+    if (!project) return;
+    // microtask: run sets busy synchronously before its first await
+    void Promise.resolve().then(() => run());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 

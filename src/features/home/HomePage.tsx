@@ -44,7 +44,7 @@ export function HomePage() {
   const ai = useSettingsStore((s) => s.settings.ai);
   const storageBase = useSettingsStore((s) => s.settings.storage.basePath);
 
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [rawHasKey, setHasKey] = useState<boolean | null>(null);
   const [env, setEnv] = useState<EnvironmentInfo | null>(null);
   const [envLoading, setEnvLoading] = useState(true);
   const [stats, setStats] = useState<WorkspaceStats | null>(null);
@@ -85,15 +85,14 @@ export function HomePage() {
   }, [storageBase, projects.length]);
 
   const provider = getProviderMeta(ai.provider);
+  // derived at render — keyless providers never show a stale "has key"
+  const hasKey = provider.requiresKey ? rawHasKey : false;
   const aiReady =
     ai.model.trim().length > 0 && (!provider.requiresKey || hasKey === true);
   const storageReady = storageBase.trim().length > 0;
 
   useEffect(() => {
-    if (!provider.requiresKey) {
-      setHasKey(false);
-      return;
-    }
+    if (!provider.requiresKey) return; // derived false at render
     secretsHas(AI_API_KEY_ID)
       .then(setHasKey)
       .catch(() => setHasKey(false));
@@ -107,7 +106,10 @@ export function HomePage() {
       .finally(() => setEnvLoading(false));
   };
 
-  useEffect(refreshEnv, []);
+  useEffect(() => {
+    // microtask keeps the synchronous setEnvLoading(true) out of the effect
+    void Promise.resolve().then(refreshEnv);
+  }, []);
 
   return (
     <div className="relative">

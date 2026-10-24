@@ -94,7 +94,9 @@ export function ProjectWorkspacePage() {
   }, [basePath, projectRel]);
 
   useEffect(() => {
-    if (project) void refreshFiles();
+    if (!project) return;
+    // microtask: refreshFiles settles loading synchronously on failure paths
+    void Promise.resolve().then(() => refreshFiles());
   }, [project, refreshFiles]);
 
   useEffect(() => {

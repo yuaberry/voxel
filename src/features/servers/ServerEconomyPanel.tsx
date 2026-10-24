@@ -44,14 +44,16 @@ export function ServerEconomyPanel({ server, basePath }: Props) {
   const [tunnelAddress, setTunnelAddress] = useState<string | null>(null);
   const tunnelUnlisten = useRef<Array<() => void>>([]);
 
+  const slug = server.slug;
   const refresh = useCallback(async () => {
-    const snapshot = await listLedger(basePath, server.slug).catch(() => null);
+    const snapshot = await listLedger(basePath, slug).catch(() => null);
     setLedger(snapshot);
-    setTunnelRunning(await tunnelStatus(server.slug).catch(() => false));
-  }, [basePath, server.slug]);
+    setTunnelRunning(await tunnelStatus(slug).catch(() => false));
+  }, [basePath, slug]);
 
   useEffect(() => {
-    void refresh();
+    // microtask: refresh sets ledger synchronously on failure paths
+    void Promise.resolve().then(() => refresh());
     const interval = setInterval(() => void refresh(), 4000);
     return () => clearInterval(interval);
   }, [refresh]);
@@ -59,7 +61,7 @@ export function ServerEconomyPanel({ server, basePath }: Props) {
   // Tunnel log subscription
   useEffect(() => {
     void subscribeTunnelLog(
-      server.slug,
+      slug,
       (line) => {
         setTunnelLines((prev) => {
           const next = [...prev, line];
@@ -75,27 +77,27 @@ export function ServerEconomyPanel({ server, basePath }: Props) {
     return () => {
       tunnelUnlisten.current.forEach((fn) => fn());
     };
-  }, [server.slug]);
+  }, [slug]);
 
   // Process in-game purchases through the ledger (mint → debit → deliver)
   useEffect(() => {
     const interval = setInterval(async () => {
       if (!ledger || ledger.length === 0) return;
-      if (!tunnelRunning && !server) return;
-      const intents = await tailPurchaseIntents(basePath, server.slug).catch(() => []);
+      if (!tunnelRunning) return; // server is a required prop — nothing else to check
+      const intents = await tailPurchaseIntents(basePath, slug).catch(() => []);
       for (const intent of intents) {
         const item = MARKET_ITEMS[intent.itemId];
         if (!item) continue;
         try {
           await applyLedgerTx({
             basePath,
-            slug: server.slug,
+            slug: slug,
             tx: "transfer",
             from: intent.player,
             to: "nexus:market",
             amount: item.price,
           });
-          await sendServerCommand(server.slug, `give ${intent.player} ${item.giveCommand.replace("give @s ", "")}`);
+          await sendServerCommand(slug, `give ${intent.player} ${item.giveCommand.replace("give @s ", "")}`);
           toast.success(`${intent.player} bought ${item.name} (${item.price} ₦)`, {
             description: "Debited through the hash chain and delivered in-game.",
           });
@@ -103,19 +105,19 @@ export function ServerEconomyPanel({ server, basePath }: Props) {
         } catch {
           // insufficient or error — tell the player in-game
           await sendServerCommand(
-            server.slug,
+            slug,
             `tellraw ${intent.player} [{"text":"[VoxelCoin] ","color":"#f87171"},{"text":"insufficient balance or market error","color":"gray"}]`,
           ).catch(() => {});
         }
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [basePath, server.slug, ledger, tunnelRunning, refresh]);
+  }, [basePath, slug, ledger, tunnelRunning, refresh]);
 
   const handleInit = async () => {
     setBusy(true);
     try {
-      await initLedger(basePath, server.slug, "VoxelCoin");
+      await initLedger(basePath, slug, "VoxelCoin");
       toast.success("Token chain initialized", { description: "Genesis block created." });
       void refresh();
     } catch (error) {
@@ -131,7 +133,7 @@ export function ServerEconomyPanel({ server, basePath }: Props) {
     try {
       await applyLedgerTx({
         basePath,
-        slug: server.slug,
+        slug: slug,
         tx: "mint",
         from: "",
         to: mintTo.trim(),
@@ -152,7 +154,7 @@ export function ServerEconomyPanel({ server, basePath }: Props) {
   const handleVerify = async () => {
     setBusy(true);
     try {
-      const result = await verifyLedger(basePath, server.slug);
+      const result = await verifyLedger(basePath, slug);
       setVerify(result);
       if (result.valid) {
         toast.success(`Chain is valid — ${result.checked} blocks verified`, {
@@ -172,13 +174,13 @@ export function ServerEconomyPanel({ server, basePath }: Props) {
     setBusy(true);
     try {
       if (tunnelRunning) {
-        await tunnelStop(server.slug);
+        await tunnelStop(slug);
         setTunnelRunning(false);
         toast.info("Tunnel closed");
       } else {
         setTunnelLines([]);
         setTunnelAddress(null);
-        await tunnelStart({ basePath, slug: server.slug, port: server.port });
+        await tunnelStart({ basePath, slug: slug, port: server.port });
         setTunnelRunning(true);
         toast.success("Public tunnel starting", {
           description: "Watch for your playit.gg address below — share it with friends.",

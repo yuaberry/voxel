@@ -49,7 +49,8 @@ export function MinecraftSettings() {
   };
 
   useEffect(() => {
-    void loadCatalog(false);
+    // microtask: loadCatalog sets busy synchronously before its first await
+    void Promise.resolve().then(() => loadCatalog(false));
   }, []);
 
   const releases = versions.filter((v) => v.kind === "release").slice(0, 40);

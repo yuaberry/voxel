@@ -50,14 +50,14 @@ interface WorkspaceHit {
  * things on the workspace come back, from Rust, off the main thread. */
 function useWorkspaceSearch(open: boolean) {
   const [query, setQuery] = useState("");
-  const [hits, setHits] = useState<WorkspaceHit[]>([]);
+  const [rawHits, setHits] = useState<WorkspaceHit[]>([]);
+  // derived at render: no sync reset in the effect — the empty/short/close
+  // cases are expressions, not state writes
+  const hits = open && query.trim().length >= 2 ? rawHits : [];
   useEffect(() => {
     if (!open) return;
     const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setHits([]);
-      return;
-    }
+    if (trimmed.length < 2) return;
     let cancelled = false;
     const t = setTimeout(async () => {
       try {

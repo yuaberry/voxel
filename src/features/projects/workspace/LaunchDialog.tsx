@@ -76,7 +76,9 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
   }, [basePath, slug]);
 
   useEffect(() => {
-    if (open) void refreshStatus();
+    if (!open) return;
+    // microtask: refreshStatus settles phase synchronously on failure paths
+    void Promise.resolve().then(() => refreshStatus());
   }, [open, refreshStatus]);
 
   const handlePrepare = async () => {

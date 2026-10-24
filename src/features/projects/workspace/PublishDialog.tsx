@@ -49,8 +49,11 @@ export function PublishDialog({ project, open, onOpenChange }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    setRepoName(project.slug);
-    setPublishedUrl(null);
+    // open-reset runs off the synchronous effect path
+    void Promise.resolve().then(() => {
+      setRepoName(project.slug);
+      setPublishedUrl(null);
+    });
     void getGithubToken().then(async (token) => {
       if (!token) {
         setUser(null);

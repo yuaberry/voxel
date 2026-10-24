@@ -154,7 +154,8 @@ export function AiSettings() {
 
   // Live list as soon as credentials allow it — picking beats typing
   useEffect(() => {
-    void handleFetchModels(true);
+    // microtask: handleFetchModels flips fetchingModels before its first await
+    void Promise.resolve().then(() => handleFetchModels(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ai.provider, ai.baseUrl]);
 

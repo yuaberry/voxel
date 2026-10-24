@@ -101,17 +101,22 @@ export function AssetStudioPage() {
     [projects, slug],
   );
 
-  useEffect(() => {
-    if (!slug && projects.length > 0) setSlug(projects[0].slug);
-  }, [projects, slug]);
+  // React's "adjust state during render": first project becomes the selection
+  if (!slug && projects.length > 0) {
+    setSlug(projects[0].slug);
+  }
 
-  // the id field follows the tab (item id vs structure id)
-  useEffect(() => {
+  // the id field follows the tab (item id vs structure id) — React's
+  // "adjust state during render", applied only on real tab transitions:
+  // typing an id by hand is never overwritten
+  const [lastTab, setLastTab] = useState(tab);
+  if (lastTab !== tab) {
+    setLastTab(tab);
     if (tab === "structure" && itemId === "darksteel_ingot") setItemId("watch_post");
-    if (tab !== "structure" && itemId === "watch_post") setItemId("darksteel_ingot");
-    if (tab === "world" && itemId === "darksteel_ingot") setItemId("dark_realm");
-    if (tab !== "world" && itemId === "dark_realm") setItemId("darksteel_ingot");
-  }, [tab, itemId]);
+    else if (tab !== "structure" && itemId === "watch_post") setItemId("darksteel_ingot");
+    else if (tab === "world" && itemId === "darksteel_ingot") setItemId("dark_realm");
+    else if (tab !== "world" && itemId === "dark_realm") setItemId("darksteel_ingot");
+  }
 
   const invalidId = itemId.trim().length > 0 && !/^[a-z][a-z0-9_]*$/.test(itemId.trim());
 
@@ -119,7 +124,7 @@ export function AssetStudioPage() {
   useEffect(() => {
     if (tab === "structure" || tab === "world") return;
     if (!basePath || !project || !itemId.trim()) {
-      setPreview(null);
+      void Promise.resolve().then(() => setPreview(null));
       return;
     }
     let cancelled = false;

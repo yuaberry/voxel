@@ -48,22 +48,37 @@ export function QaPage() {
 
   const project = projects.find((p) => p.id === projectId) ?? null;
 
-  useEffect(() => {
-    if (!projectId && projects.length > 0) setProjectId(projects[0].id);
-  }, [projects, projectId]);
+  // React's "adjust state during render" recipe: the first project becomes
+  // the selection the moment projects arrive — no effect, no sync write
+  if (!projectId && projects.length > 0) {
+    setProjectId(projects[0].id);
+  }
 
   useEffect(() => {
     if (!basePath || !project) return;
-    setBusy(true);
-    getProjectQa(basePath, project)
-      .then(setVerdicts)
+    let cancelled = false;
+    Promise.resolve()
+      .then(() => {
+        if (cancelled) return;
+        setBusy(true);
+        return getProjectQa(basePath, project);
+      })
+      .then((v) => {
+        if (!cancelled) setVerdicts(v ?? null);
+      })
       .catch((error) => {
+        if (cancelled) return;
         toast.error("Could not build the verdict matrix", {
           description: error instanceof Error ? error.message : String(error),
         });
-        setVerdicts([]);
+        setVerdicts(null);
       })
-      .finally(() => setBusy(false));
+      .finally(() => {
+        if (!cancelled) setBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, basePath]);
 

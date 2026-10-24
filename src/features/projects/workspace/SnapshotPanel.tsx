@@ -51,7 +51,8 @@ export function SnapshotPanel({ basePath, projectRel, onAfterRestore }: Snapshot
   };
 
   useEffect(() => {
-    void refresh();
+    // microtask: refresh settles loading synchronously on failure paths
+    void Promise.resolve().then(() => refresh());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [basePath, projectRel]);
 

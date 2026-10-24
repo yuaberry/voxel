@@ -59,7 +59,9 @@ export function ServerConsoleDialog({ server, basePath, onClose }: Props) {
   const [log, setLog] = useState<Array<{ stream: string; line: string }>>([]);
   const [command, setCommand] = useState("");
   const [running, setRunning] = useState(false);
-  const [livePing, setLivePing] = useState<ServerPingData | null>(null);
+  const [rawLivePing, setLivePing] = useState<ServerPingData | null>(null);
+  // derived at render: a stopped server shows no ping, stale or not
+  const livePing = running ? rawLivePing : null;
   const [busy, setBusy] = useState(false);
   const [backups, setBackups] = useState<ServerBackupInfo[]>([]);
   const [properties, setProperties] = useState<string | null>(null);
@@ -100,13 +102,15 @@ export function ServerConsoleDialog({ server, basePath, onClose }: Props) {
   }, [open, slug]);
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    // open-reactions run off the synchronous effect path
+    void Promise.resolve().then(() => {
       setLog([]);
       void refreshBackups();
       void import("@/services/servers/serverService").then((m) => {
         void m.serverIsRunning(slug).then(setRunning).catch(() => setRunning(false));
       });
-    }
+    });
   }, [open, slug, refreshBackups]);
 
   // Live preview — real SLP self-ping while the server runs (the same
@@ -130,10 +134,6 @@ export function ServerConsoleDialog({ server, basePath, onClose }: Props) {
       clearInterval(interval);
     };
   }, [open, running, server]);
-
-  useEffect(() => {
-    if (!running) setLivePing(null);
-  }, [running]);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });

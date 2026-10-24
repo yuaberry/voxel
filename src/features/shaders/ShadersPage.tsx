@@ -116,7 +116,9 @@ export function ShadersPage() {
   }, [basePath]);
 
   useEffect(() => {
-    if (basePath) void refresh();
+    if (!basePath) return;
+    // microtask: refresh settles packs synchronously on failure paths
+    void Promise.resolve().then(() => refresh());
   }, [basePath, refresh]);
 
   const handleCreate = useCallback(async () => {

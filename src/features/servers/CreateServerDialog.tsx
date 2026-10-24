@@ -101,16 +101,21 @@ export function CreateServerDialog({
   // Settings → Minecraft defaults pre-fill the wizard every time it opens
   useEffect(() => {
     if (!open) return;
-    setSoftware(defaults.defaultServerSoftware);
-    setRam(defaults.defaultServerRamMb);
-    setPort(String(defaults.defaultServerPort));
+    // defaults pre-fill off the synchronous effect path
+    void Promise.resolve().then(() => {
+      setSoftware(defaults.defaultServerSoftware);
+      setRam(defaults.defaultServerRamMb);
+      setPort(String(defaults.defaultServerPort));
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Apply an import-panel handoff whenever the dialog opens with one
   useEffect(() => {
     if (!open) return;
-    if (initials) {
+    if (!initials) return;
+    // handoff pre-fill off the synchronous effect path
+    void Promise.resolve().then(() => {
       setPresetId(initials.preset?.id ?? null);
       setStyleProperties(initials.properties);
       if (initials.name) setName(initials.name);
@@ -139,7 +144,7 @@ export function CreateServerDialog({
         setRam(initials.preset.ramMb);
         setModules(new Set(initials.preset.modules));
       }
-    }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

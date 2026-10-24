@@ -102,13 +102,18 @@ export function AssetLabPage() {
     }
   }, [basePath, projects]);
 
-  useEffect(() => {
-    if (projects.length > 0 && !checkingProject) setCheckingProject(projects[0].id);
-    if (projects.length > 0 && !importProjectId) setImportProjectId(projects[0].id);
-  }, [projects, checkingProject, importProjectId]);
+  // React's "adjust state during render": the first project becomes both
+  // selections the moment projects arrive — no effect, no sync writes
+  if (projects.length > 0 && !checkingProject) {
+    setCheckingProject(projects[0].id);
+  }
+  if (projects.length > 0 && !importProjectId) {
+    setImportProjectId(projects[0].id);
+  }
 
   useEffect(() => {
-    void refresh();
+    // microtask: refresh settles state synchronously on failure paths
+    void Promise.resolve().then(() => refresh());
   }, [refresh]);
 
   const shown = useMemo(() => {

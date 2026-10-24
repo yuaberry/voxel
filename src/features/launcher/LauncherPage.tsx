@@ -53,7 +53,8 @@ export function LauncherPage() {
   }, [basePath]);
 
   useEffect(() => {
-    void refresh();
+    // microtask: refresh sets loading synchronously before its first await
+    void Promise.resolve().then(() => refresh());
   }, [refresh]);
 
   const projectFor = (slug: string) => projects.find((p) => p.slug === slug) ?? null;

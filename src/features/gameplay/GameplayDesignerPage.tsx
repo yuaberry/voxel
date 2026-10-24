@@ -78,12 +78,15 @@ export function GameplayDesignerPage() {
     }
   }, [basePath, project]);
 
-  useEffect(() => {
-    if (!projectId && projects.length > 0) setProjectId(projects[0].id);
-  }, [projects, projectId]);
+  // React's "adjust state during render": first project becomes the selection
+  // the moment projects arrive — no effect, no synchronous write
+  if (!projectId && projects.length > 0) {
+    setProjectId(projects[0].id);
+  }
 
   useEffect(() => {
-    void refresh();
+    // microtask: refresh sets busy synchronously before its first await
+    void Promise.resolve().then(() => refresh());
   }, [refresh]);
 
   const handleCreate = async () => {

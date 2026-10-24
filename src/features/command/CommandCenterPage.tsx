@@ -79,14 +79,17 @@ export function CommandCenterPage() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    // microtask: refresh flips state synchronously before its first await
+    void Promise.resolve().then(() => refresh());
     const timer = setInterval(() => void refresh(), 2500);
     return () => clearInterval(timer);
   }, [refresh]);
 
-  useEffect(() => {
-    if (projects.length > 0 && !projectId) setProjectId(projects[0].id);
-  }, [projects, projectId]);
+  // React's "adjust state during render": first project becomes the selection
+  // the moment projects arrive — no effect, no synchronous write
+  if (!projectId && projects.length > 0) {
+    setProjectId(projects[0].id);
+  }
 
   const create = async () => {
     const project = projects.find((p) => p.id === projectId);
