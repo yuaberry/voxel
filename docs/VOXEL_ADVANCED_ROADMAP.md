@@ -22,7 +22,7 @@
 ## FASE D — Servidores
 - [x] Economy Simulator (Customize → Currency: tabela de ranks, prestígio composto ×5, exploits e gargalo — disclaimer SIMULATION; 6 testes)
 - [x] Security Center (Customize → Security: RCON plain-text/sem senha, online-mode do DISCO, whitelist, EULA, idade de backups, origem de plugins — nunca "totalmente seguro"; 7 testes)
-- Player Management + Moderation Assistant (logs reais do servidor; IA nunca bane sem regra configurada)
+- [x] Player Management (Customize → Players: usercache/whitelist/banned-ips/ops.json reais, ações via console stdin, histórico de punições migration 004; ban sem motivo é recusado) + Moderation Assistant (heurística local de floods/spam + IA cuja sugestão só sobrevive citando evidência LITERAL do log; ban da IA vira 'watch', aplicar é sempre clique do dono; 15 TS + 4 Rust)
 - Backup Pro por servidor (retenção, integridade, teste de restauração)
 - Server Automation (gatilho/condição/ação com limites; nada destrutivo silencioso)
 
