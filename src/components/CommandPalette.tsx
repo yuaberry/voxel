@@ -99,6 +99,8 @@ const NAV_TARGETS = [
   { to: "/assets", label: "Go to Asset Lab", icon: Boxes, group: "Navigate" },
   { to: "/compat", label: "Go to Compatibility Lab", icon: Boxes, group: "Navigate" },
   { to: "/command", label: "Go to AI Command Center", icon: Boxes, group: "Navigate" },
+  { to: "/knowledge", label: "Go to Knowledge Center", icon: Boxes, group: "Navigate" },
+  { to: "/qa", label: "Go to QA Lab", icon: Boxes, group: "Navigate" },
   { to: "/settings/general", label: "Settings · General", icon: Settings, group: "Settings" },
   { to: "/settings/appearance", label: "Settings · Appearance", icon: Palette, group: "Settings" },
   { to: "/settings/ai", label: "Settings · AI", icon: Plug, group: "Settings" },

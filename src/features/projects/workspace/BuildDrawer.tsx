@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { BookMarked } from "lucide-react";
+import { articleForErrorCategory } from "@/services/knowledge/knowledgeBase";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ProjectRecord } from "@/types";
@@ -379,6 +381,18 @@ export function BuildDrawer({ project, open, onToggle, buildStatus }: Props) {
                       </p>
                     )}
                     <p className="text-[11px] leading-snug text-foreground/90">{error.message}</p>
+                    {articleForErrorCategory(error.category) && (
+                      <button
+                        type="button"
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-primary transition-colors hover:underline"
+                        onClick={() =>
+                          navigate("/knowledge", { state: { q: error.category } })
+                        }
+                      >
+                        <BookMarked className="h-3 w-3" />
+                        Read the docs for {error.category} errors
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

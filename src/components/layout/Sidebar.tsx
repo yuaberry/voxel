@@ -17,7 +17,7 @@ import {
   Workflow,
   Swords,
   Images,
-  GitCompare, Cpu } from "lucide-react";
+  GitCompare, Cpu, BookMarked, FlaskConical } from "lucide-react";
 import { NexusLogo, NexusMark } from "@/components/brand/NexusLogo";
 import {
   Tooltip,
@@ -52,6 +52,8 @@ const workspaceItems: NavItem[] = [
   { to: "/assets", label: "Asset Lab", icon: Images, enabled: true },
   { to: "/compat", label: "Compatibility", icon: GitCompare, enabled: true },
   { to: "/command", label: "AI Command", icon: Cpu, enabled: true },
+  { to: "/knowledge", label: "Knowledge", icon: BookMarked, enabled: true },
+  { to: "/qa", label: "QA Lab", icon: FlaskConical, enabled: true },
 ];
 
 export function Sidebar() {
