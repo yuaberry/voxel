@@ -515,6 +515,136 @@ pub fn server_send_command(slug: String, command_line: String) -> Result<(), Str
 }
 
 // ---------------------------------------------------------------------------
+// Player Management (Super Prompt §19) — the REAL player files from disk
+// ---------------------------------------------------------------------------
+
+/// One entry from the vanilla JSON player files. Every field but uuid/name
+/// depends on the source file (`reason`+`expires` for bans, `level` for ops).
+#[derive(Serialize, Clone, Default, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerRecord {
+    pub name: String,
+    pub uuid: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<i64>,
+}
+
+/// The five vanilla player files, read from the server's own directory.
+/// Missing files become empty lists — a server that never booted has no
+/// usercache yet, and that is an honest state, not an error.
+#[derive(Serialize, Clone, Default, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayersFiles {
+    pub usercache: Vec<PlayerRecord>,
+    pub whitelist: Vec<PlayerRecord>,
+    pub banned_players: Vec<PlayerRecord>,
+    pub banned_ips: Vec<String>,
+    pub ops: Vec<PlayerRecord>,
+}
+
+fn parse_player_file(path: &Path) -> Result<Vec<PlayerRecord>, String> {
+    if !path.is_file() {
+        return Ok(Vec::new()); // never booted / not used on this server
+    }
+    let raw = std::fs::read_to_string(path).map_err(|e| format!("read player file: {e}"))?;
+    if raw.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let values: Vec<serde_json::Value> =
+        serde_json::from_str(&raw).map_err(|e| format!("parse {}: {e}", path.display()))?;
+    Ok(values
+        .into_iter()
+        .filter_map(|v| {
+            let name = v.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string();
+            let uuid = v.get("uuid").and_then(|u| u.as_str()).unwrap_or("").to_string();
+            if name.is_empty() && uuid.is_empty() {
+                return None; // corrupt entry — skip it, keep the rest
+            }
+            Some(PlayerRecord {
+                name,
+                uuid,
+                reason: v.get("reason").and_then(|r| r.as_str()).map(String::from),
+                expires: v.get("expires").and_then(|r| r.as_str()).map(String::from),
+                level: v.get("level").and_then(|l| l.as_i64()),
+            })
+        })
+        .collect())
+}
+
+fn parse_banned_ips(path: &Path) -> Result<Vec<String>, String> {
+    if !path.is_file() {
+        return Ok(Vec::new());
+    }
+    let raw = std::fs::read_to_string(path).map_err(|e| format!("read banned-ips: {e}"))?;
+    if raw.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let values: Vec<serde_json::Value> =
+        serde_json::from_str(&raw).map_err(|e| format!("parse {}: {e}", path.display()))?;
+    Ok(values
+        .into_iter()
+        .filter_map(|v| v.get("ip").and_then(|i| i.as_str()).map(String::from))
+        .collect())
+}
+
+pub fn server_players_read_impl(base_path: String, slug: String) -> Result<PlayersFiles, String> {
+    validate_slug(&slug)?;
+    let dir = server_dir(Path::new(&base_path), &slug);
+    Ok(PlayersFiles {
+        usercache: parse_player_file(&dir.join("usercache.json"))?,
+        whitelist: parse_player_file(&dir.join("whitelist.json"))?,
+        banned_players: parse_player_file(&dir.join("banned-players.json"))?,
+        banned_ips: parse_banned_ips(&dir.join("banned-ips.json"))?,
+        ops: parse_player_file(&dir.join("ops.json"))?,
+    })
+}
+
+/// Reads the vanilla player files straight from the server directory.
+#[tauri::command]
+pub async fn server_players_read(base_path: String, slug: String) -> Result<PlayersFiles, String> {
+    tauri::async_runtime::spawn_blocking(move || server_players_read_impl(base_path, slug))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+pub fn server_log_tail_impl(
+    base_path: String,
+    slug: String,
+    max_lines: usize,
+) -> Result<Vec<String>, String> {
+    validate_slug(&slug)?;
+    let capped = max_lines.min(1000); // a tail, not a firehose
+    let log = server_dir(Path::new(&base_path), &slug)
+        .join("logs")
+        .join("latest.log");
+    if !log.is_file() {
+        return Ok(Vec::new()); // server never booted on this machine
+    }
+    let raw = std::fs::read_to_string(&log).map_err(|e| format!("read log: {e}"))?;
+    let lines: Vec<String> = raw.lines().map(String::from).collect();
+    let start = lines.len().saturating_sub(capped);
+    Ok(lines[start..].to_vec())
+}
+
+/// The last lines of logs/latest.log (the file the server rotates per boot).
+#[tauri::command]
+pub async fn server_log_tail(
+    base_path: String,
+    slug: String,
+    max_lines: u32,
+) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        server_log_tail_impl(base_path, slug, max_lines as usize)
+    })
+    .await
+    .map_err(|e| format!("worker failed: {e}"))?
+}
+
+// ---------------------------------------------------------------------------
 // Backups
 // ---------------------------------------------------------------------------
 
@@ -1340,6 +1470,104 @@ fn pack_format_for_server(base: &std::path::Path, server_slug: &str) -> u32 {
 #[cfg(test)]
 mod unit_tests {
     use super::*;
+
+    #[test]
+    fn server_players_read_parses_the_real_vanilla_files() {
+        let base = std::env::temp_dir().join(format!("voxel-srv-players-{}", std::process::id()));
+        let dir = base.join("servers").join("mod-server");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("usercache.json"),
+            r#"[{"name":"Steve","uuid":"u-steve","expiresOn":"2030-01-01 00:00:00 +0000"},
+                {"name":"Alex","uuid":"u-alex","expiresOn":"2030-01-01 00:00:00 +0000"},
+                {"uuid":"u-corrupt"}]"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("whitelist.json"),
+            r#"[{"name":"Alex","uuid":"u-alex"}]"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("banned-players.json"),
+            r#"[{"name":"Griefer","uuid":"u-grief","created":"2026-01-01 00:00:00 +0000","source":"Server","expires":"forever","reason":"Griefing spawn"}]"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("banned-ips.json"),
+            r#"[{"ip":"1.2.3.4","created":"2026-01-01 00:00:00 +0000","source":"Server","expires":"forever","reason":"botnet"}]"#,
+        )
+        .unwrap();
+        std::fs::write(dir.join("ops.json"), r#"[{"name":"Steve","uuid":"u-steve","level":4}]"#).unwrap();
+
+        let files = server_players_read_impl(base.to_string_lossy().to_string(), "mod-server".into())
+            .expect("parse files");
+        assert_eq!(files.usercache.len(), 3);
+        assert_eq!(files.usercache[0].name, "Steve");
+        assert_eq!(files.usercache[2].name, ""); // corrupt entry keeps the uuid, no name
+        assert_eq!(files.whitelist.len(), 1);
+        assert_eq!(files.banned_players.len(), 1);
+        assert_eq!(files.banned_players[0].reason.as_deref(), Some("Griefing spawn"));
+        assert_eq!(files.banned_players[0].expires.as_deref(), Some("forever"));
+        assert_eq!(files.banned_ips, vec!["1.2.3.4".to_string()]);
+        assert_eq!(files.ops.len(), 1);
+        assert_eq!(files.ops[0].level, Some(4));
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn server_players_read_missing_files_are_honest_empty_not_errors() {
+        let base = std::env::temp_dir().join(format!("voxel-srv-players-empty-{}", std::process::id()));
+        std::fs::create_dir_all(base.join("servers").join("fresh-server")).unwrap();
+        let files = server_players_read_impl(base.to_string_lossy().to_string(), "fresh-server".into())
+            .expect("empty is fine");
+        assert!(files.usercache.is_empty());
+        assert!(files.whitelist.is_empty());
+        assert!(files.banned_players.is_empty());
+        assert!(files.banned_ips.is_empty());
+        assert!(files.ops.is_empty());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn server_players_read_rejects_path_traversal() {
+        let err = server_players_read_impl("/tmp".into(), "../escape".into())
+            .expect_err("traversal must be rejected");
+        assert!(err.contains("Invalid server slug"), "got: {err}");
+    }
+
+    #[test]
+    fn server_log_tail_caps_the_last_lines_and_survives_missing_file() {
+        let base = std::env::temp_dir().join(format!("voxel-srv-tail-{}", std::process::id()));
+        let logs = base.join("servers").join("log-server").join("logs");
+        std::fs::create_dir_all(&logs).unwrap();
+        std::fs::write(logs.join("latest.log"), "l1
+l2
+l3
+l4
+l5
+").unwrap();
+
+        let tail = server_log_tail_impl(base.to_string_lossy().to_string(), "log-server".into(), 3)
+            .expect("tail");
+        assert_eq!(tail, vec!["l3".to_string(), "l4".into(), "l5".into()]);
+
+        let all = server_log_tail_impl(base.to_string_lossy().to_string(), "log-server".into(), 1000)
+            .expect("full");
+        assert_eq!(all.len(), 5);
+
+        // a hard cap protects the UI from a firehose request
+        let capped = server_log_tail_impl(base.to_string_lossy().to_string(), "log-server".into(), 5000)
+            .expect("capped");
+        assert_eq!(capped.len(), 5);
+
+        let none = server_log_tail_impl(base.to_string_lossy().to_string(), "never-booted".into(), 100)
+            .expect("missing log is empty, not an error");
+        assert!(none.is_empty());
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
 
     #[test]
     fn server_create_writes_a_truthful_readme() {

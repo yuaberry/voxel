@@ -32,6 +32,13 @@ pub fn run() {
             sql: include_str!("migrations/003_task_queue.sql"),
             kind: MigrationKind::Up,
         },
+        // v4 — Phase D: Player Management punishment history
+        Migration {
+            version: 4,
+            description: "player management punishment history",
+            sql: include_str!("migrations/004_player_management.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -114,6 +121,8 @@ pub fn run() {
             commands::servers::server_stop,
             commands::servers::server_status,
             commands::servers::server_send_command,
+            commands::servers::server_players_read,
+            commands::servers::server_log_tail,
             commands::servers::server_backup,
             commands::servers::server_list_backups,
             commands::servers::server_restore,

@@ -10,6 +10,7 @@ import {
   PackagePlus,
   Plus,
   Trash2,
+  Users,
 } from "lucide-react";
 import {
   Dialog,
@@ -64,6 +65,23 @@ import {
   securitySummary,
   type SecurityFinding,
 } from "@/services/servers/securityCenter";
+import {
+  MODERATION_SYSTEM_PROMPT,
+  analyzeLogTail,
+  applyPlayerAction,
+  createSqlPunishmentStore,
+  filterAiFindings,
+  mergePlayers,
+  type ManagedPlayer,
+  type ModerationFinding,
+  type PlayerAction,
+  type PlayersFiles,
+  type PunishmentRecord,
+  type PunishmentStore,
+} from "@/services/servers/playerManagement";
+import { streamChat } from "@/services/ai/streaming";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { secretsGet, AI_API_KEY_ID } from "@/services/secrets/secretsService";
 import { listProjectFiles } from "@/services/projects/projectsService";
 import { Coins, FileDown, ShieldAlert, Sparkles } from "lucide-react";
 import { IsoStructureCanvas } from "@/features/studio/IsoStructureCanvas";
@@ -76,7 +94,7 @@ import {
 import { updateServerRecord } from "@/services/db/repositories/serversRepository";
 import type { StructureGenResult } from "@/services/assets/structureService";
 
-type Tab = "briefing" | "world" | "structures" | "commands" | "plugins" | "currency" | "dossier" | "ai" | "security";
+type Tab = "briefing" | "world" | "structures" | "commands" | "plugins" | "currency" | "dossier" | "ai" | "security" | "players";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "briefing", label: "Briefing", icon: <FileText className="h-3.5 w-3.5" /> },
@@ -88,6 +106,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dossier", label: "Dossier", icon: <FileText className="h-3.5 w-3.5" /> },
   { id: "ai", label: "AI Studio", icon: <Sparkles className="h-3.5 w-3.5" /> },
   { id: "security", label: "Security", icon: <ShieldAlert className="h-3.5 w-3.5" /> },
+  { id: "players", label: "Players", icon: <Users className="h-3.5 w-3.5" /> },
 ];
 
 /**
@@ -97,6 +116,11 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
  * /convert flow) and install Paper plugins from Modrinth. Every action is
  * real: files land where the server reads them.
  */
+// the punishment history store — lazy singleton (plugin-sql on first use)
+let punishmentStoreSingleton: PunishmentStore | null = null;
+const punishmentStore = (): PunishmentStore =>
+  (punishmentStoreSingleton ??= createSqlPunishmentStore());
+
 export function ServerCustomizeDialog({
   server,
   open,
@@ -156,6 +180,120 @@ export function ServerCustomizeDialog({
 
   // ---- security state (checks run on open, from the real disk files)
   const [security, setSecurity] = useState<SecurityFinding[] | null>(null);
+
+  // ---- players tab state (§19/§20)
+  const [players, setPlayers] = useState<ManagedPlayer[] | null>(null);
+  const [playersRunning, setPlayersRunning] = useState(false);
+  const [playerQuery, setPlayerQuery] = useState("");
+  const [playerBusy, setPlayerBusy] = useState<string | null>(null);
+  const [punishmentHistory, setPunishmentHistory] = useState<PunishmentRecord[]>([]);
+  const [moderationFindings, setModerationFindings] = useState<ModerationFinding[] | null>(null);
+  const [moderationBusy, setModerationBusy] = useState(false);
+  const [banForm, setBanForm] = useState<{ player: ManagedPlayer; reason: string } | null>(null);
+
+  // §19 — load the REAL player files + running status when the tab opens
+  useEffect(() => {
+    if (!open || tab !== "players") return;
+    let cancelled = false;
+    setPlayers(null);
+    setModerationFindings(null);
+    invoke<boolean>("server_status", { slug })
+      .then((running) => {
+        if (!cancelled) setPlayersRunning(running);
+      })
+      .catch(() => setPlayersRunning(false));
+    invoke<PlayersFiles>("server_players_read", { basePath, slug })
+      .then((files) => {
+        if (!cancelled) setPlayers(mergePlayers(files));
+      })
+      .catch(() => {
+        if (!cancelled) setPlayers([]);
+      });
+    punishmentStore()
+      .list(slug, 20)
+      .then((rows) => {
+        if (!cancelled) setPunishmentHistory(rows);
+      })
+      .catch(() => setPunishmentHistory([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tab, basePath, slug]);
+
+  const refreshPlayers = async () => {
+    const files = await invoke<PlayersFiles>("server_players_read", { basePath, slug }).catch(
+      () => null,
+    );
+    if (files) setPlayers(mergePlayers(files));
+    setPunishmentHistory(await punishmentStore().list(slug, 20).catch(() => []));
+  };
+
+  const runPlayerAction = async (action: PlayerAction, player: ManagedPlayer, reason?: string) => {
+    setPlayerBusy(player.name);
+    try {
+      await applyPlayerAction({
+        slug,
+        action,
+        player,
+        reason,
+        running: playersRunning,
+        sendCommand: (serverSlug, command) =>
+          invoke("server_send_command", { slug: serverSlug, commandLine: command }),
+        store: punishmentStore(),
+      });
+      toast.success(t("Action applied") + `: ${action} ${player.name}`);
+      setBanForm(null);
+      await refreshPlayers();
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setPlayerBusy(null);
+    }
+  };
+
+  // §20 — the moderation assistant: local heuristics + the AI layer whose
+  // suggestions only survive when their evidence literally exists in the log
+  const analyzeModerationLog = async () => {
+    setModerationBusy(true);
+    setModerationFindings(null);
+    try {
+      const lines = await invoke<string[]>("server_log_tail", { basePath, slug, maxLines: 400 });
+      if (lines.length === 0) {
+        setModerationFindings([]);
+        return;
+      }
+      const local = analyzeLogTail(lines);
+      let ai: ModerationFinding[] = [];
+      const settings = useSettingsStore.getState().settings.ai;
+      const apiKey = await secretsGet(AI_API_KEY_ID).catch(() => null);
+      if (settings.model.trim()) {
+        let text = "";
+        let failed = false;
+        for await (const event of streamChat(settings, apiKey, [
+          { role: "system", content: MODERATION_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content:
+              "Server log tail (oldest first, the most recent lines at the end):\n" +
+              lines.slice(-120).join("\n"),
+          },
+        ])) {
+          if (event.type === "delta") text += event.text;
+          if (event.type === "error") {
+            failed = true;
+            break;
+          }
+        }
+        if (!failed) ai = filterAiFindings(text, lines);
+      }
+      const merged = [...local, ...ai];
+      setModerationFindings(merged);
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setModerationBusy(false);
+    }
+  };
 
   // ---- simulator state (Currency tab)
   const [simBlocks, setSimBlocks] = useState(30);
@@ -1191,6 +1329,274 @@ export function ServerCustomizeDialog({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {tab === "players" && (
+          <div className="space-y-3">
+            {!playersRunning && (
+              <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-400">
+                {t(
+                  "The server is stopped — player actions go through the running console. Start the server to apply them.",
+                )}
+              </p>
+            )}
+            <Input
+              placeholder={t("Search players…")}
+              value={playerQuery}
+              onChange={(e) => setPlayerQuery(e.target.value)}
+              className="h-8 text-xs"
+            />
+            {players === null ? (
+              <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t("Reading the player files…")}
+              </div>
+            ) : players.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {t("No players yet — the server writes usercache.json on first boot.")}
+              </p>
+            ) : (
+              <div className="max-h-56 overflow-y-auto rounded-lg border">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-card">
+                    <tr className="border-b text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                      <th className="px-2 py-1.5 font-medium">{t("Player")}</th>
+                      <th className="px-2 py-1.5 font-medium">{t("Status")}</th>
+                      <th className="px-2 py-1.5 text-right font-medium">{t("Actions")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {players
+                      .filter((player) =>
+                        player.name.toLowerCase().includes(playerQuery.trim().toLowerCase()),
+                      )
+                      .map((player) => (
+                        <tr
+                          key={player.uuid || player.name}
+                          className="border-b border-border/30 last:border-0"
+                        >
+                          <td className="px-2 py-1.5 font-medium">
+                            {player.name || (
+                              <span className="italic text-muted-foreground">{player.uuid}</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <div className="flex flex-wrap gap-1">
+                              {player.banned && (
+                                <Badge variant="destructive" className="text-[9px]">BAN</Badge>
+                              )}
+                              {player.whitelisted && (
+                                <Badge className="bg-emerald-500/15 text-[9px] text-emerald-400">W</Badge>
+                              )}
+                              {player.opped && (
+                                <Badge className="bg-primary/15 text-[9px] text-primary">OP</Badge>
+                              )}
+                              {player.neverJoined && (
+                                <Badge variant="outline" className="text-[9px]">
+                                  {t("never joined")}
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <div className="flex flex-wrap justify-end gap-1">
+                              {playerBusy === player.name ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                              ) : (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-[10px]"
+                                    disabled={!playersRunning}
+                                    title={player.whitelisted ? t("Remove from whitelist") : t("Add to whitelist")}
+                                    onClick={() => void runPlayerAction(player.whitelisted ? "unwhitelist" : "whitelist", player)}
+                                  >
+                                    {player.whitelisted ? "−W" : "+W"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-[10px]"
+                                    disabled={!playersRunning}
+                                    title={player.opped ? t("Remove operator") : t("Make operator")}
+                                    onClick={() => void runPlayerAction(player.opped ? "deop" : "op", player)}
+                                  >
+                                    {player.opped ? "−OP" : "+OP"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-[10px]"
+                                    disabled={!playersRunning || player.banned}
+                                    title={t("Kick")}
+                                    onClick={() => void runPlayerAction("kick", player, "Kicked from the panel")}
+                                  >
+                                    {t("Kick")}
+                                  </Button>
+                                  {player.banned ? (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 px-2 text-[10px] text-emerald-400"
+                                      disabled={!playersRunning}
+                                      title={t("Pardon")}
+                                      onClick={() => void runPlayerAction("pardon", player)}
+                                    >
+                                      {t("Pardon")}
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 px-2 text-[10px] text-destructive"
+                                      disabled={!playersRunning}
+                                      title={t("Ban")}
+                                      onClick={() => setBanForm({ player, reason: "" })}
+                                    >
+                                      {t("Ban")}
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {banForm && (
+              <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2">
+                <p className="text-xs font-semibold">
+                  {t("Ban")} {banForm.player.name}
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    value={banForm.reason}
+                    onChange={(e) => setBanForm({ ...banForm, reason: e.target.value })}
+                    placeholder={t("Reason (required — the audit trail)")}
+                    className="h-8 text-xs"
+                  />
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-8"
+                    disabled={!banForm.reason.trim() || playerBusy === banForm.player.name}
+                    onClick={() => void runPlayerAction("ban", banForm.player, banForm.reason.trim())}
+                  >
+                    {t("Ban")}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8" onClick={() => setBanForm(null)}>
+                    {t("Cancel")}
+                  </Button>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2 rounded-lg border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold">{t("Moderation assistant")}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7"
+                  disabled={moderationBusy}
+                  onClick={() => void analyzeModerationLog()}
+                >
+                  {moderationBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                  {t("Analyze last log")}
+                </Button>
+              </div>
+              <p className="text-[10px] leading-relaxed text-muted-foreground">
+                {t(
+                  "Reads the server's own log for join-leave floods and chat spam. The AI layer adds suggestions — every one must quote evidence that exists in the log, and nothing is ever applied without your click.",
+                )}
+              </p>
+              {moderationFindings === null ? null : moderationFindings.length === 0 ? (
+                <p className="text-[11px] text-emerald-400">
+                  {t("No suspicious patterns in the recent log.")}
+                </p>
+              ) : (
+                moderationFindings.map((finding, i) => (
+                  <div
+                    key={`${finding.player}-${i}`}
+                    className="space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/5 p-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold">
+                        {finding.player} — {finding.kind}
+                      </p>
+                      <Badge variant="outline" className="text-[9px]">
+                        {finding.suggestedAction}
+                        {finding.requiresOwnerDecision ? ` · ${t("owner decides")}` : ""}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-foreground/75">{finding.reason}</p>
+                    <code className="block rounded bg-muted/50 px-1.5 py-1 text-[9px] leading-relaxed">
+                      {finding.evidence.slice(0, 3).join("\n")}
+                    </code>
+                    {finding.suggestedAction === "kick" && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="h-6 px-2 text-[10px]"
+                        disabled={!playersRunning || playerBusy === finding.player}
+                        onClick={() => {
+                          const target =
+                            players?.find((p) => p.name === finding.player) ??
+                            ({
+                              name: finding.player,
+                              uuid: "",
+                              whitelisted: false,
+                              banned: false,
+                              banReason: null,
+                              opped: false,
+                              neverJoined: true,
+                            } satisfies ManagedPlayer);
+                          void runPlayerAction("kick", target, finding.reason);
+                        }}
+                      >
+                        {t("Kick now")}
+                      </Button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold">{t("Punishment history")}</p>
+              {punishmentHistory.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {t("No punishments recorded on this server yet.")}
+                </p>
+              ) : (
+                punishmentHistory.map((record) => (
+                  <div
+                    key={record.id}
+                    className="flex flex-wrap items-center justify-between gap-1 rounded-lg border px-2 py-1 text-[11px]"
+                  >
+                    <span>
+                      <Badge
+                        variant={record.action === "pardon" ? "secondary" : "destructive"}
+                        className="mr-2 text-[9px]"
+                      >
+                        {record.action}
+                      </Badge>
+                      {record.playerName}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {record.reason ?? ""} ·{" "}
+                      {record.source === "moderation-assistant"
+                        ? t("from moderation suggestion")
+                        : record.source}{" "}
+                      · {new Date(record.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
 
