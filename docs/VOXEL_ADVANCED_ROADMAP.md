@@ -20,8 +20,8 @@
 ## FASE C — IA (COMPLETA: Command Center ✓ Workflow v1 ✓ Model Router v2 ✓ Knowledge Center ✓ QA Lab ✓)
 
 ## FASE D — Servidores
-- Economy Simulator (simulações de progressão Prison — valores rotulados como simulação)
-- Security Center (checklist + relatórios de risco; nada invasivo)
+- [x] Economy Simulator (Customize → Currency: tabela de ranks, prestígio composto ×5, exploits e gargalo — disclaimer SIMULATION; 6 testes)
+- [x] Security Center (Customize → Security: RCON plain-text/sem senha, online-mode do DISCO, whitelist, EULA, idade de backups, origem de plugins — nunca "totalmente seguro"; 7 testes)
 - Player Management + Moderation Assistant (logs reais do servidor; IA nunca bane sem regra configurada)
 - Backup Pro por servidor (retenção, integridade, teste de restauração)
 - Server Automation (gatilho/condição/ação com limites; nada destrutivo silencioso)
