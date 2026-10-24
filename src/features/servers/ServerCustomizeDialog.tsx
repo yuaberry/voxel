@@ -53,7 +53,19 @@ import {
   type CurrencyConfig,
   type CurrencyValuation,
 } from "@/services/servers/currencyService";
-import { Coins, FileDown, Sparkles } from "lucide-react";
+import {
+  simulateProgression,
+  suggestParams,
+  type SimulationReport,
+} from "@/services/servers/economySimulator";
+import {
+  evaluateSecurity,
+  parseProperties,
+  securitySummary,
+  type SecurityFinding,
+} from "@/services/servers/securityCenter";
+import { listProjectFiles } from "@/services/projects/projectsService";
+import { Coins, FileDown, ShieldAlert, Sparkles } from "lucide-react";
 import { IsoStructureCanvas } from "@/features/studio/IsoStructureCanvas";
 import {
   designServerPlan,
@@ -64,7 +76,7 @@ import {
 import { updateServerRecord } from "@/services/db/repositories/serversRepository";
 import type { StructureGenResult } from "@/services/assets/structureService";
 
-type Tab = "briefing" | "world" | "structures" | "commands" | "plugins" | "currency" | "dossier" | "ai";
+type Tab = "briefing" | "world" | "structures" | "commands" | "plugins" | "currency" | "dossier" | "ai" | "security";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "briefing", label: "Briefing", icon: <FileText className="h-3.5 w-3.5" /> },
@@ -75,6 +87,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "currency", label: "Currency", icon: <Coins className="h-3.5 w-3.5" /> },
   { id: "dossier", label: "Dossier", icon: <FileText className="h-3.5 w-3.5" /> },
   { id: "ai", label: "AI Studio", icon: <Sparkles className="h-3.5 w-3.5" /> },
+  { id: "security", label: "Security", icon: <ShieldAlert className="h-3.5 w-3.5" /> },
 ];
 
 /**
@@ -141,6 +154,14 @@ export function ServerCustomizeDialog({
   // ---- rename state (the World tab edits the server identity too)
   const [serverName, setServerName] = useState(server.name);
 
+  // ---- security state (checks run on open, from the real disk files)
+  const [security, setSecurity] = useState<SecurityFinding[] | null>(null);
+
+  // ---- simulator state (Currency tab)
+  const [simBlocks, setSimBlocks] = useState(30);
+  const [simMultiplier, setSimMultiplier] = useState(2);
+  const [simCoins, setSimCoins] = useState(1);
+
   const serverRel = `servers/${slug}`;
 
   useEffect(() => {
@@ -170,6 +191,39 @@ export function ServerCustomizeDialog({
     setPlan(null);
     setPlanPreviews({});
     setServerName(server.name);
+    setSecurity(null);
+    void (async () => {
+      try {
+        const properties = await readProjectFile(basePath, `${serverRel}/server.properties`)
+          .catch(() => "");
+        const eula = await readProjectFile(basePath, `${serverRel}/eula.txt`).catch(() => "");
+        const plugins = await listProjectFiles(basePath, `${serverRel}/plugins`).catch(() => []);
+        const backups = await invoke<{ created_at: string }[]>("server_list_backups", {
+          basePath,
+          slug,
+        }).catch(() => [] as { created_at: string }[]);
+        const agesHours = backups.map((b) => {
+          // compact_timestamp: YYYYMMDD-SSSSS (seconds of the day)
+          const m = /^(\d{4})(\d{2})(\d{2})-(\d{5})$/.exec(b.created_at);
+          if (!m) return null;
+          const stamp = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) + Number(m[4]) * 1000;
+          return (Date.now() - stamp) / 3_600_000;
+        });
+        const newest = agesHours.filter((a): a is number => a !== null).sort((a, b) => a - b)[0] ?? null;
+        setSecurity(
+          evaluateSecurity({
+            properties: parseProperties(properties),
+            eulaAccepted: eula.includes("eula=true"),
+            backupCount: backups.length,
+            newestBackupAgeHours: newest,
+            pluginJars: plugins.filter((f) => !f.is_dir && f.path.endsWith(".jar")).map((f) => f.path.split("/").pop() ?? f.path),
+          }),
+        );
+      } catch {
+        setSecurity([]);
+      }
+    })();
+
     getCurrency(basePath, slug).then((cfg) => {
       setCurrency(cfg);
       if (cfg) {
@@ -883,6 +937,78 @@ export function ServerCustomizeDialog({
                     {t("Save currency")}
                   </Button>
                 </div>
+                {(() => {
+                  const report: SimulationReport = simulateProgression({
+                    blocksPerMinute: simBlocks,
+                    prestigeMultiplier: simMultiplier,
+                    coinsPerBlock: simCoins,
+                    dilution: valuation?.config.dilution ?? suggestParams(null).dilution,
+                  });
+                  return (
+                    <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                      <p className="text-xs font-semibold">{t("Progression simulator (Prison rules)")}</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <label className="space-y-1">
+                          <span className="text-[10px] text-muted-foreground">{t("blocks / minute")}</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={simBlocks}
+                            onChange={(e) => setSimBlocks(Number(e.target.value) || 0)}
+                            className="h-8 text-xs"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[10px] text-muted-foreground">{t("prestige multiplier")}</span>
+                          <Input
+                            type="number"
+                            step={0.5}
+                            min={0}
+                            value={simMultiplier}
+                            onChange={(e) => setSimMultiplier(Number(e.target.value) || 0)}
+                            className="h-8 text-xs"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[10px] text-muted-foreground">{t("coins / block")}</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={simCoins}
+                            onChange={(e) => setSimCoins(Number(e.target.value) || 0)}
+                            className="h-8 text-xs"
+                          />
+                        </label>
+                      </div>
+                      <table className="w-full text-[10px]">
+                        <thead>
+                          <tr className="border-b border-border/60 text-muted-foreground">
+                            <th className="py-1 text-left">{t("rank band")}</th>
+                            <th className="text-right">{t("blocks")}</th>
+                            <th className="text-right">{t("minutes")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {report.ranks.slice(0, 6).map((r) => (
+                            <tr key={r.rank} className="border-b border-border/30">
+                              <td className="py-1">{r.rank}</td>
+                              <td className="text-right font-mono">{r.blocksNeeded}</td>
+                              <td className="text-right font-mono">{r.minutesNeeded}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <p className="text-[10px] leading-relaxed">
+                        {t("First prestige")}: <span className="font-mono text-primary">{report.minutesToPrestige} min</span> · {t("coins at prestige")}: <span className="font-mono text-primary">{report.coinsAtPrestige}</span>
+                      </p>
+                      <p className="text-[10px] leading-relaxed text-muted-foreground">⚠ {report.bottleneck}</p>
+                      {report.exploitFindings.map((finding, i) => (
+                        <p key={i} className="text-[10px] leading-relaxed text-amber-400">● {finding}</p>
+                      ))}
+                      <p className="text-[9px] italic text-muted-foreground">{report.disclaimer}</p>
+                    </div>
+                  );
+                })()}
                 {valuation && (
                   <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
                     <p className="text-xs font-semibold">
@@ -1064,6 +1190,64 @@ export function ServerCustomizeDialog({
                   </Button>
                 </div>
               </div>
+            )}
+          </div>
+        )}
+
+        {tab === "security" && (
+          <div className="space-y-3">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t(
+                "Real checks on this server's own files: the account gate, RCON credentials sitting in server.properties, whitelist, EULA and backup recency. Passing these checks is not a guarantee — stay updated.",
+              )}
+            </p>
+            {security === null ? (
+              <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t("Reading the server files…")}
+              </div>
+            ) : security.length === 0 ? (
+              <p className="text-xs text-muted-foreground">{t("No server found to check.")}</p>
+            ) : (
+              <>
+                <p className={cn(
+                  "rounded-lg border px-3 py-2 text-xs font-semibold",
+                  securitySummary(security).critical > 0
+                    ? "border-destructive/40 bg-destructive/10 text-destructive"
+                    : securitySummary(security).warnings > 0
+                      ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
+                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+                )}
+                >
+                  {securitySummary(security).verdict}
+                </p>
+                {security.map((finding) => (
+                  <div
+                    key={finding.id}
+                    className={cn(
+                      "rounded-lg border px-3 py-2",
+                      finding.severity === "critical" && "border-destructive/40 bg-destructive/5",
+                      finding.severity === "warning" && "border-amber-500/40 bg-amber-500/5",
+                      finding.severity === "info" && "border-border/60 bg-card/50",
+                      finding.severity === "pass" && "border-emerald-500/25 bg-emerald-500/5",
+                    )}
+                  >
+                    <p className={cn(
+                      "text-xs font-semibold",
+                      finding.severity === "critical" && "text-destructive",
+                      finding.severity === "warning" && "text-amber-400",
+                      finding.severity === "pass" && "text-emerald-400",
+                    )}
+                    >
+                      {finding.title}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-foreground/75">{finding.evidence}</p>
+                    {finding.severity !== "pass" && (
+                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{finding.recommendation}</p>
+                    )}
+                  </div>
+                ))}
+              </>
             )}
           </div>
         )}
