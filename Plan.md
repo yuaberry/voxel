@@ -185,7 +185,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (63 sessões)
+## 5. Histórico de sessões (64 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -211,6 +211,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 64 | Fase G: Analytics local | **/insights** (builds com mediana REAL de duração + barras 14d, IA com fallback runs, moderação/automação dos históricos, disco MEDIDO pelo Rust; 0 telemetria) + elapsed no audit do build + roadmap E/F com dependências externas escritas + Remote Build marcado ENTREGUE + 8 TS + 2 Rust + v0.21.0 | NaN guard; contrato select T; destructuring desalinhado; fixture/assert da mediana |
 | 63 | Fase G: lint ZERO | **Extinção dos 47 set-state-in-effect + 5 primos** (31 arquivos, receitas do Compiler: derive-no-render, ajuste-durante-render, microtask, cancelamento) + **2 bugs reais achados** (multiAgent stale no runner do agente; modTarget default nunca aplicado) + id digitado à mão nunca sobrescrito + v0.20.0 | HomePage derive antes do provider; replace pegou a própria linha do slug; effect do handoff sem fechar then |
 | 62 | Fase D COMPLETA: Automation | **Server Automation** (allowlist no perímetro: 2 triggers/3 ações; motor de transições com baseline; cooldown 5min; run log migration 005 — nada silencioso) + 2 Rust + 10 TS + v0.19.0 | lastFired=0 bloqueava 1ª execução; teste sem rules; ramMb→ram_mb |
 | 61 | Fase D: Backup Pro | **Retenção** (cap-N + idade, no manifest; auto-prune pós-create; mais novo nunca deletado) + **Verify real** (lê todo zip validando CRC; confere level.dat) + **Agendamento honesto** (app aberto + servidor parado; falha alerta, skip não) + 7 Rust + 10 TS + v0.18.0 | fixtures na pasta errada; count=1 nos replaces; stamps de janeiro não são recentes; tuple abortou write |
@@ -299,7 +300,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 63, v0.20.0)
+## 8. Estado atual (verificado — Sessão 64, v0.21.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -319,7 +320,8 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.20.0 (latest)** | Desktop: **Fase G abre — lint ZERO (0 errors 0 warnings)** + 2 bugs reais corrigidos + APK mobile 0.3.1 |
+| **v0.21.0 (latest)** | Desktop: **/insights — analytics local 0 telemetria** (builds mediana real, IA fallbacks, moderação/automação, disco medido) + APK mobile 0.3.1 |
+| v0.20.0 | Desktop: **Fase G abre — lint ZERO (0 errors 0 warnings)** + 2 bugs reais corrigidos + APK mobile 0.3.1 |
 | v0.19.0 | Desktop: **Fase D COMPLETA — Server Automation** (transições com limites, run log, nada silencioso) + APK mobile 0.3.1 |
 | v0.18.0 | Desktop: **Fase D — Backup Pro** (retenção, verify com CRC, agendamento) + APK mobile 0.3.1 |
 | v0.17.0 | Desktop: **Fase D — Player Management + Moderation Assistant** (Players tab, histórico de punições, IA grounded) + APK mobile 0.3.1 |
@@ -394,10 +396,10 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 | **C — IA** | ✅ COMPLETA | AI Command Center (/command: fila DB-backed, cancel/retry, limites 1/20) · Workflow Fix Build (6 etapas checkpointadas) · Model Router v2 (fallbackModel pré-delta + métricas reais) · Knowledge Center (8 artigos VERIFICADOS ligados aos erros) · QA Lab (matriz 4 níveis, runtime nunca fingido) |
 | **D — Servidores** | ✅ **COMPLETA (S62)** | ✅ Economy Simulator · ✅ Security Center · ✅ Player Management · ✅ Moderation Assistant (IA nunca bane sozinha) · ✅ Backup Pro (retenção+verify CRC) · ✅ Server Automation (allowlist, transições, run log — nada silencioso) |
 | **E — Colaboração** | ⬜ não iniciada | (bloqueada por backend: documentado como dependência) |
-| **F — Mobile** | ⬜ não iniciada | (Bridge já existe; Remote Build é a fatia principal) |
+| **F — Mobile** | ✅ local máximo ENTREGUE | Remote Build via Bridge (POST build token-gated + build-watch do mobile) ✓ desde S18-20 — dependências externas documentadas: push backend, keystore release, TestFlight |
 | **G — Polimento** | 🟡 EM ANDAMENTO | ✅ item A: lint ZERO — os 47 set-state-in-effect extintos com receitas do Compiler + 2 bugs stale-callback corrigidos (S63) |
 
-**NEXT MOVE — Fase G item A ✓ (S63: lint ZERO)**. Próximas sessões: **Fase E (Colaboração)** e **Fase F (Mobile Remote Build)** dependem de infra externa — a sessão que as atacar começa DOCUMENTANDO as dependências (backend p/ colaboração; keystore de release p/ Play Store) e implementando as fatias locais possíveis. Sem infra: continuar Fase G (polimento a pedido do dono).
+**NEXT MOVE — Fase G: lint zero ✓ (S63) + analytics ✓ (S64); Fase F local máximo ✓ (Remote Build já entregue)**. O que resta de E/F exige infra EXTERNA (documentada no roadmap): backend de identidade (team), backend de push, keystore de release, TestFlight — decisão do dono, não de código. Caminhos locais que ainda existem a pedido: **Accessibility G** (escala de UI/teclado), **Performance Lab G**, resource packs completos (§9.6), módulos 2.0 combinados (§9.7), Docker/Deployment via SSH do próprio dono (§9.8), auto-refresh de sessão MSA/GitHub (§9.10).
 1. ~~Player Management (§19) + Moderation Assistant (§20)~~ → **ENTREGUES (S60)**. ~~Backup Pro (§21)~~ → **ENTREGUE (S61)**. ~~Server Automation (§22)~~ → **ENTREGUE (S62)** — **FASE D 5/5 COMPLETA**.
 2. ~~Backup Pro (§21)~~ → **ENTREGUE (S61)**.
 3. **Server Automation (§22)**: gatilho→condição→ação com limites (alerta offline via polling existente, backup pré-update, restart por política); nada destrutivo silencioso.
@@ -566,7 +568,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 63 — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 189 · cargo 102 (+11 E2E) · render-smoke 5 dialogs · **lint 0/0**. Migrations 004 (server_punishments) + 005 (automation_runs). Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
+*Última atualização: Sessão 64 — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 197 · cargo 104 (+11 E2E) · render-smoke 5 dialogs · **lint 0/0**. Migrations 004 (server_punishments) + 005 (automation_runs). Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
 
 ---
 
@@ -642,3 +644,27 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: **lint 0 errors 0 warnings (PRIMEIRA VEZ na história do projeto)** ✓ · typecheck 0 ✓ · vitest **189/189** (render-smoke incluído — os dialogs continuam abrindo/carregando/resetando igual) ✓ · vite build 8m23s ✓ · boot vivo 0 panics ✓. Release **v0.20.0**.
 
 **Fase G status**: item A ✓ (lint zero). Próximo: Fase E/F conforme infra externa (documentar dependências + fatias locais possíveis) ou polimento contínuo a pedido do dono.
+
+---
+
+## 64. Sessão 64 — Fase G: Analytics local (/insights) + E/F documentadas
+
+**Pedido do dono**: "continue" (NEXT MOVE §8.9: E/F dependem de infra — documentar dependências + fatias locais; senão G contínuo).
+
+**Descoberta**: Remote Build (F) **já estava entregue** (Bridge POST /api/projects/{slug}/build + tab Projects do mobile com build-watch ao vivo + notificação) — o Plan estava desatualizado. Com E/F travadas por infra externa, a fatia escolhida foi o item G restante de maior valor: **Analytics local**.
+
+**Insights (§G)** (`/insights`, sidebar + Ctrl+K): o dashboard honesto — **cada número MEDIDO** do SQLite e do disco da própria máquina, badge "0 telemetria", workspace vazio mostra zeros ("no data yet"), nunca barra inventada:
+- **Builds**: volume, taxa de sucesso, **mediana real de duração** (o buildService agora grava os segundos no message de auditoria — builds novos alimentam a mediana), 14 barras diárias zero-filled com falhas em vermelho, top projetos.
+- **IA**: runs, ok rate, latência média, **execuções com fallback** (attempts>1 do Model Router), tabela por modelo — do ai_metrics real.
+- **Moderação/Automação**: agregados dos históricos 004/005 com outcomes (applied/failed/skipped) — nem nas métricas algo roda em silêncio.
+- **Workspace + DISCO**: contagens + `workspace_disk_facts` (Rust async, walk REAL das 4 pastas grandes somando bytes, +2 testes com fixtures).
+
+**Roadmap honesto E/F**: Remote Build marcado ENTREGUE; dependências externas escritas (backend de identidade p/ team, backend de push, keystore de release, TestFlight) — "código local nenhum conjura isso; recusar inventar é o ponto".
+
+**10 testes novos** (8 TS + 2 Rust): parser de elapsed lendo só o que o buildService escreve, rate guardado contra zero builds, buckets zero-filled, top projects, mediana real, rates de IA com fallback, overview completo com DB injetável, bytes medidos de fixtures, base inexistente recusada.
+
+**Bugs caçados (4)**: `byAction.get()!` NaN no total de punições; contrato do select (T é o tipo COMPLETO, não T[]); SELECT de punishments removido do array mas nome no destructuring (CountRow com .detail); minha fixture do median com mensagem irreal + assert de mediana errado ([100,200,300] → 200, não 150).
+
+**Verificação**: typecheck 0 ✓ · **lint 0/0** ✓ · vitest **197/197** (+8) ✓ · cargo **104/104** (+2) ✓ · vite build 2m14s ✓ · boot vivo 0 panics ✓. Release **v0.21.0**.
+
+**Fases**: A/B/C/D ✓ COMPLETAS · F local máximo ✓ (Remote Build entregue desde o mobile) · G: lint zero ✓ + analytics ✓ (restam accessibility/performance-lab a pedido) · E/F restante = infra externa documentada.
