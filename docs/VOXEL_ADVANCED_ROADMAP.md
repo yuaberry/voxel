@@ -38,7 +38,7 @@
 
 ## FASE G — Polimento
 - [x] Analytics local (S64: página /insights — builds com sucesso/mediana/barras de 14 dias, IA com runs/latência/fallbacks por modelo, moderação e automação dos históricos reais, contagens e DISCO MEDIDO de verdade pelo Rust; 0 telemetria; 8 TS + 2 Rust)
-- Accessibility (teclado/contraste/escala) · Localization structure (pt-BR ✓/en ✓)
+- [x] Accessibility (S65: interface scale 85%–125% com clamp puro testado; reduce-motion ✓ desde a v0.21; teclado completo = fatia futura) · Localization structure (pt-BR ✓/en ✓)
 - Performance Lab (só métricas medidas) · Regression testing (render-smoke ✓, E2E cargo ✓)
 
 ## Regras permanentes (herdadas + Super Prompt)

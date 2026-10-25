@@ -185,7 +185,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (64 sessões)
+## 5. Histórico de sessões (65 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -211,6 +211,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 65 | ENCERRAMENTO: UI Scale + sumário | **Interface scale 85%–125%** (clamp puro testado; garbage → 100%) + bateria final completa + Plan de encerramento com dependências externas documentadas + v0.22.0 | float trap no assert; ∞ é garbage |
 | 64 | Fase G: Analytics local | **/insights** (builds com mediana REAL de duração + barras 14d, IA com fallback runs, moderação/automação dos históricos, disco MEDIDO pelo Rust; 0 telemetria) + elapsed no audit do build + roadmap E/F com dependências externas escritas + Remote Build marcado ENTREGUE + 8 TS + 2 Rust + v0.21.0 | NaN guard; contrato select T; destructuring desalinhado; fixture/assert da mediana |
 | 63 | Fase G: lint ZERO | **Extinção dos 47 set-state-in-effect + 5 primos** (31 arquivos, receitas do Compiler: derive-no-render, ajuste-durante-render, microtask, cancelamento) + **2 bugs reais achados** (multiAgent stale no runner do agente; modTarget default nunca aplicado) + id digitado à mão nunca sobrescrito + v0.20.0 | HomePage derive antes do provider; replace pegou a própria linha do slug; effect do handoff sem fechar then |
 | 62 | Fase D COMPLETA: Automation | **Server Automation** (allowlist no perímetro: 2 triggers/3 ações; motor de transições com baseline; cooldown 5min; run log migration 005 — nada silencioso) + 2 Rust + 10 TS + v0.19.0 | lastFired=0 bloqueava 1ª execução; teste sem rules; ramMb→ram_mb |
@@ -300,7 +301,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 64, v0.21.0)
+## 8. Estado atual (verificado — Sessão 65, v0.22.0 — ENCERRAMENTO)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -320,7 +321,8 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.21.0 (latest)** | Desktop: **/insights — analytics local 0 telemetria** (builds mediana real, IA fallbacks, moderação/automação, disco medido) + APK mobile 0.3.1 |
+| **v0.22.0 (latest)** | Desktop: **encerramento — UI scale (accessibility) completa a Fase G local** + APK mobile 0.3.1 |
+| v0.21.0 | Desktop: **/insights — analytics local 0 telemetria** (builds mediana real, IA fallbacks, moderação/automação, disco medido) + APK mobile 0.3.1 |
 | v0.20.0 | Desktop: **Fase G abre — lint ZERO (0 errors 0 warnings)** + 2 bugs reais corrigidos + APK mobile 0.3.1 |
 | v0.19.0 | Desktop: **Fase D COMPLETA — Server Automation** (transições com limites, run log, nada silencioso) + APK mobile 0.3.1 |
 | v0.18.0 | Desktop: **Fase D — Backup Pro** (retenção, verify com CRC, agendamento) + APK mobile 0.3.1 |
@@ -397,7 +399,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 | **D — Servidores** | ✅ **COMPLETA (S62)** | ✅ Economy Simulator · ✅ Security Center · ✅ Player Management · ✅ Moderation Assistant (IA nunca bane sozinha) · ✅ Backup Pro (retenção+verify CRC) · ✅ Server Automation (allowlist, transições, run log — nada silencioso) |
 | **E — Colaboração** | ⬜ não iniciada | (bloqueada por backend: documentado como dependência) |
 | **F — Mobile** | ✅ local máximo ENTREGUE | Remote Build via Bridge (POST build token-gated + build-watch do mobile) ✓ desde S18-20 — dependências externas documentadas: push backend, keystore release, TestFlight |
-| **G — Polimento** | 🟡 EM ANDAMENTO | ✅ item A: lint ZERO — os 47 set-state-in-effect extintos com receitas do Compiler + 2 bugs stale-callback corrigidos (S63) |
+| **G — Polimento** | ✅ local COMPLETA | ✅ lint ZERO (S63) · ✅ analytics local /insights 0 telemetria (S64) · ✅ accessibility: reduce-motion + UI scale 85%–125% (S65) — teclado completo = fatia futura |
 
 **NEXT MOVE — Fase G: lint zero ✓ (S63) + analytics ✓ (S64); Fase F local máximo ✓ (Remote Build já entregue)**. O que resta de E/F exige infra EXTERNA (documentada no roadmap): backend de identidade (team), backend de push, keystore de release, TestFlight — decisão do dono, não de código. Caminhos locais que ainda existem a pedido: **Accessibility G** (escala de UI/teclado), **Performance Lab G**, resource packs completos (§9.6), módulos 2.0 combinados (§9.7), Docker/Deployment via SSH do próprio dono (§9.8), auto-refresh de sessão MSA/GitHub (§9.10).
 1. ~~Player Management (§19) + Moderation Assistant (§20)~~ → **ENTREGUES (S60)**. ~~Backup Pro (§21)~~ → **ENTREGUE (S61)**. ~~Server Automation (§22)~~ → **ENTREGUE (S62)** — **FASE D 5/5 COMPLETA**.
@@ -568,7 +570,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 64 — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 197 · cargo 104 (+11 E2E) · render-smoke 5 dialogs · **lint 0/0**. Migrations 004 (server_punishments) + 005 (automation_runs). Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
+*Última atualização: Sessão 65 (ENCERRAMENTO) — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 200 · cargo 104 (+11 E2E) · render-smoke 5 dialogs · **lint 0/0**. Migrations 001-005. Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
 
 ---
 
@@ -668,3 +670,40 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 **Verificação**: typecheck 0 ✓ · **lint 0/0** ✓ · vitest **197/197** (+8) ✓ · cargo **104/104** (+2) ✓ · vite build 2m14s ✓ · boot vivo 0 panics ✓. Release **v0.21.0**.
 
 **Fases**: A/B/C/D ✓ COMPLETAS · F local máximo ✓ (Remote Build entregue desde o mobile) · G: lint zero ✓ + analytics ✓ (restam accessibility/performance-lab a pedido) · E/F restante = infra externa documentada.
+
+---
+
+## 65. Sessão 65 — ENCERRAMENTO: Fase G local completa (UI Scale) + sumário final
+
+**Pedido do dono**: "continue e termine".
+
+**UI Scale (§G accessibility)** (Settings → Appearance): slider 85%–125% aplicado como CSS zoom var no documento, com % ao vivo, botão Reset e o valor cru no rótulo — sem mágica. O clamp é função pura testada (garbage/NaN/∞ → 100% antes de chegar ao documento); a faixa é estreita de propósito: os layouts são crafted a 100%, o ajuste é conforto, não passivo pra quebra.
+
+**Bugs meus caçados (2)**: asserts do teste com float trap (0.855 binário) e ∞ (é garbage → default, não clamp).
+
+**Verificação final (bateria de encerramento)**: typecheck 0 ✓ · **lint 0/0** ✓ · vitest **200/200** ✓ · cargo **104/104** (+11 E2E) ✓ · vite build 2m47s ✓ · boot vivo 0 panics ✓ · mobile typecheck ✓. Release **v0.22.0**.
+
+---
+
+# ENCERRAMENTO — o estado do VOXEL (Sessão 65, v0.22.0)
+
+## O que existe e está provado
+- **Criação**: 6 templates Java (Vanilla FP → Fabric → Forge → NeoForge MDK → NeoGradle 7 → era 26.x MDG 2.0.148/Java 25) que **compilam jar real** (E2E) · Asset Studio (items/blocks/sprites animados) · Structure Studio (.nbt vanilla) · World Studio (dimensões custom) · Shader Studio (32 presets, GLSL real, preview WebGL) · Visual Logic (grafo→mcfunctions) · Gameplay Designer (scanner 3 estilos, receitas) · Asset Lab (consistency checker) · Compatibility Lab · Style Memory (bibles + contradições com quote obrigatória).
+- **Servidores**: ciclo completo E2E (jar baixado de fonte oficial, start/stop world-safe, console stdin, backups zip-slip-guarded + restore) · Economy (ledger SHA-256, moeda própria com FX BCE, diluição) · Prison/Token Chain (/convert) · Economy Simulator · Security Center · Player Management (arquivos vanilla reais) · Moderation Assistant (IA grounded: sugestão só sobrevive citando evidência LITERAL; nunca bane sozinha) · Backup Pro (retenção, verify CRC real, agendamento honesto) · Server Automation (allowlist no perímetro, transições, run log, nada silencioso).
+- **IA**: Nexus Agent (12 tools, política 3 camadas) + Task Force multi-agente · Task Engine DB-backed (cancel/retry/limites) · Model Router v2 (fallback pré-delta + métricas reais) · AI Command Center · Workflow Fix Build · Knowledge Center (8 artigos VERIFICADOS ligados aos erros) · QA Lab (matriz 4 níveis; runtime nunca fingido).
+- **Mobile**: Bridge token-gated (PWA + API: status/projects/Remote Build/servers/console/ping/AI chat) · APK 0.3.1 (secure-store, biometria, build notifications) · PWA iOS instalável.
+- **Painel**: Insights (analytics local 0 telemetria; disco medido) · diagnostics self-heal (disco↔DB) · Search unificado Ctrl+K · Timeline · Dossiê 6 formatos · briefing docs 4 formatos · PT-BR completo.
+- **Qualidade**: **lint 0/0** · typecheck 0 · vitest 200 · cargo 104 (+11 E2E ignored) · render-smoke 5 dialogs · 5 migrations append-only · 22 releases 7/7 (206).
+
+## O que falta e POR QUE (depende do dono, não de código)
+| Item | Dependência externa |
+|---|---|
+| Team Collaboration (E) | backend de identidade (Supabase/cloud §85) |
+| Push notifications mobile | backend Expo + servidor |
+| Play Store / TestFlight | keystore de release / conta Apple Developer |
+| Módulos 2.0, resource packs completos, Performance Lab, teclado completo, Docker/SSH deploy | prioridade do dono — fatias locais viáveis a qualquer momento |
+
+## Protocolo de retomada pós-encerramento
+1. Protocolo §12 (bateria verde antes de tudo).
+2. As regras §8.9 atravessam: async+spawn_blocking para TODO I/O · sem fake data · vereditos com evidência · limitações registradas · releases 7/7 com tree limpa · PT-BR com o dono.
+3. Pedidos novos: incremental dentro das regras (§6), verificado, commitado, relatado.
