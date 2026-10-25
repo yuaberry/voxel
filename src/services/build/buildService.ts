@@ -188,10 +188,12 @@ export async function persistBuildLogEntry(
       .slice(-8)
       .map((l) => l.line.slice(0, 200))
       .join(" | ");
+    const elapsedMs = run.endedAt != null ? run.endedAt - run.startedAt : 0;
+    const elapsedNote = elapsedMs > 0 ? ` in ${Math.round(elapsedMs / 1000)}s` : "";
     const message =
       run.status === "success"
-        ? `Build success (${run.task}) — ${run.logs.length} lines`
-        : `Build failed (exit ${run.exitCode ?? "?"}) — ${run.logs.length} lines${errorLines ? ` — tail: ${errorLines}` : ""}`;
+        ? `Build success (${run.task}) — ${run.logs.length} lines${elapsedNote}`
+        : `Build failed (exit ${run.exitCode ?? "?"}) — ${run.logs.length} lines${elapsedNote}${errorLines ? ` — tail: ${errorLines}` : ""}`;
     await db.execute(
       `INSERT INTO logs (level, source, message) VALUES ($1, $2, $3)`,
       [run.status === "success" ? "info" : "error", `build:${project.slug}`, message],

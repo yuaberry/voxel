@@ -11,7 +11,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import {
-  Boxes,
+  Activity, Boxes,
   Brush,
   FolderOpen,
   Home,
@@ -100,6 +100,7 @@ const NAV_TARGETS = [
   { to: "/compat", label: "Go to Compatibility Lab", icon: Boxes, group: "Navigate" },
   { to: "/command", label: "Go to AI Command Center", icon: Boxes, group: "Navigate" },
   { to: "/knowledge", label: "Go to Knowledge Center", icon: Boxes, group: "Navigate" },
+  { to: "/insights", label: "Go to Insights", icon: Activity, group: "Navigate" },
   { to: "/qa", label: "Go to QA Lab", icon: Boxes, group: "Navigate" },
   { to: "/settings/general", label: "Settings · General", icon: Settings, group: "Settings" },
   { to: "/settings/appearance", label: "Settings · Appearance", icon: Palette, group: "Settings" },

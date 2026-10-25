@@ -27,6 +27,7 @@ import { CompatibilityPage } from "@/features/compat/CompatibilityPage";
 import { CommandCenterPage } from "@/features/command/CommandCenterPage";
 import { KnowledgePage } from "@/features/knowledge/KnowledgePage";
 import { QaPage } from "@/features/qa/QaPage";
+import { InsightsPage } from "@/features/insights/InsightsPage";
 import { bootTaskEngine } from "@/services/ai/taskEngineBoot";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 
@@ -228,6 +229,7 @@ export default function App() {
               <Route path="command" element={<CommandCenterPage />} />
               <Route path="knowledge" element={<KnowledgePage />} />
               <Route path="qa" element={<QaPage />} />
+              <Route path="insights" element={<InsightsPage />} />
               <Route path="projects/:projectId" element={<ProjectWorkspacePage />} />
               <Route path="ai-creator" element={<AiCreatorPage />} />
               <Route path="servers" element={<ServersPage />} />

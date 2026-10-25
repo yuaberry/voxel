@@ -849,3 +849,94 @@ mod search_tests {
         let _ = fs::remove_dir_all(&base);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Workspace disk facts (Super Prompt — Analytics local, Phase G)
+// ---------------------------------------------------------------------------
+
+/// Measured bytes for the big workspace folders — a real walk of the disk,
+/// not an estimate. This is local data only: the panel aggregates what
+/// already lives on this machine, no telemetry ever leaves it.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceDiskFacts {
+    pub projects_bytes: u64,
+    pub servers_bytes: u64,
+    pub backups_bytes: u64,
+    pub instances_bytes: u64,
+}
+
+fn dir_size(dir: &Path) -> u64 {
+    let mut stack = vec![dir.to_path_buf()];
+    let mut total: u64 = 0;
+    while let Some(current) = stack.pop() {
+        if let Ok(entries) = std::fs::read_dir(&current) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if let Ok(meta) = entry.metadata() {
+                    total += meta.len();
+                }
+            }
+        }
+    }
+    total
+}
+
+pub fn workspace_disk_facts_impl(base_path: String) -> Result<WorkspaceDiskFacts, String> {
+    let base = Path::new(&base_path);
+    if !base.is_dir() {
+        return Err("Storage base not accessible".to_string());
+    }
+    Ok(WorkspaceDiskFacts {
+        projects_bytes: dir_size(&base.join("projects")),
+        servers_bytes: dir_size(&base.join("servers")),
+        backups_bytes: dir_size(&base.join("backups")),
+        instances_bytes: dir_size(&base.join("instances")),
+    })
+}
+
+#[tauri::command]
+pub async fn workspace_disk_facts(base_path: String) -> Result<WorkspaceDiskFacts, String> {
+    tauri::async_runtime::spawn_blocking(move || workspace_disk_facts_impl(base_path))
+        .await
+        .map_err(|e| format!("worker failed: {e}"))?
+}
+
+#[cfg(test)]
+mod disk_facts_tests {
+    use super::*;
+
+    #[test]
+    fn workspace_disk_facts_measures_real_bytes() {
+        let base =
+            std::env::temp_dir().join(format!("voxel-facts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("projects/demo/src")).unwrap();
+        std::fs::create_dir_all(base.join("servers/arena")).unwrap();
+        std::fs::create_dir_all(base.join("backups/servers/arena")).unwrap();
+        std::fs::write(base.join("projects/demo/build.gradle"), vec![42u8; 1000]).unwrap();
+        std::fs::write(base.join("projects/demo/src/Main.java"), vec![1u8; 500]).unwrap();
+        std::fs::write(base.join("servers/arena/server.jar"), vec![7u8; 5000]).unwrap();
+        std::fs::write(
+            base.join("backups/servers/arena/backup-20260101-00000.zip"),
+            vec![3u8; 2000],
+        )
+        .unwrap();
+
+        let facts = workspace_disk_facts_impl(base.to_string_lossy().to_string())
+            .expect("facts");
+        assert_eq!(facts.projects_bytes, 1500);
+        assert_eq!(facts.servers_bytes, 5000);
+        assert_eq!(facts.backups_bytes, 2000);
+        assert_eq!(facts.instances_bytes, 0); // folder does not exist — honest zero
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn workspace_disk_facts_rejects_a_missing_base() {
+        assert!(workspace_disk_facts_impl("/nonexistent-voxel-base".into()).is_err());
+    }
+}

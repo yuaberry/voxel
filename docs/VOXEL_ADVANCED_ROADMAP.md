@@ -26,19 +26,20 @@
 - Backup Pro por servidor (retenção, integridade, teste de restauração)
 - [x] Server Automation (Customize → Automation: allowlist NO perímetro (2 triggers, 3 ações revisadas), motor de TRANSIÇÕES com baseline sem disparo, cooldown 5min anti-thrash, run log migration 005 — nada silencioso; 2 Rust + 10 TS)
 
-## FASE E — Colaboração (bloqueada por infra)
-- Workspace Sync (Git/config já existe para projetos; conflitos explícitos)
-- Team Collaboration (exige backend de identidade — documentado como dependência)
-- Plugin SDK · Template Market local · Release Center
+## FASE E — Colaboração (DEPENDÊNCIAS DOCUMENTADAS — o que falta é infra externa, não código local)
+- Workspace Sync (Git/config já existe para projetos; conflitos explícitos) — FATIA LOCAL POSSÍVEL no futuro: export/import de workspace
+- Team Collaboration — **dependência: backend de identidade** (o roadmap original §85 menciona Supabase/cloud opcional; nenhuma infra própria existe). Sem isso, NÃO há team features locais honestas — recusado inventar.
+- Plugin SDK · Template Market local · Release Center — aguardam prioridade do dono; Template Market local é a fatia naturalmente local (o marketplace de modpacks/shaders já existe como padrão)
 
-## FASE F — Mobile
-- Remote Build (Bridge → fila autorizada no desktop conectado)
-- Notifications push (exige backend) · Server Control já parcial via Bridge
+## FASE F — Mobile (o local máximo está ENTREGUE)
+- [x] Remote Build (POST /api/projects/{slug}/build pelo Bridge token-gated, o mesmo command do botão desktop; a tab Projects do mobile dispara, assiste o status ao vivo e notifica no fim)
+- Notifications push — **dependência: backend de push (Expo notifications + servidor)** · Server Control via Bridge ✓
+- Publicação em lojas — **dependências: keystore de release (Play Store) e conta Apple Developer (TestFlight)** — nenhuma das duas pode ser gerada por código
 
 ## FASE G — Polimento
-- Analytics local (builds/servidores — sem telemetria pessoal)
+- [x] Analytics local (S64: página /insights — builds com sucesso/mediana/barras de 14 dias, IA com runs/latência/fallbacks por modelo, moderação e automação dos históricos reais, contagens e DISCO MEDIDO de verdade pelo Rust; 0 telemetria; 8 TS + 2 Rust)
 - Accessibility (teclado/contraste/escala) · Localization structure (pt-BR ✓/en ✓)
-- Performance Lab (só métricas medidas) · Regression testing
+- Performance Lab (só métricas medidas) · Regression testing (render-smoke ✓, E2E cargo ✓)
 
 ## Regras permanentes (herdadas + Super Prompt)
 1. Sempre async+spawn_blocking para commands com I/O (S44-50 — classe congelamento extinta).
