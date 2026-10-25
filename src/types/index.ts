@@ -17,6 +17,8 @@ export interface GeneralSettings {
 export interface AppearanceSettings {
   accent: AccentColor;
   reduceMotion: boolean;
+  /** 0.85–1.25 — the interface zoom (accessibility) */
+  uiScale: number;
 }
 
 export interface AiSettings {

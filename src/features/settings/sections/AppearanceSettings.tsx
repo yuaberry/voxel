@@ -1,8 +1,15 @@
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { Field, SectionHeader } from "../SettingsBits";
 import { cn } from "@/lib/utils";
+import {
+  UI_SCALE_MAX,
+  UI_SCALE_MIN,
+  clampUiScale,
+  uiScaleCss,
+} from "@/services/settings/uiScale";
 import type { AccentColor } from "@/types";
 
 const ACCENTS: Array<{ id: AccentColor; label: string; dot: string }> = [
@@ -18,6 +25,7 @@ const ACCENTS: Array<{ id: AccentColor; label: string; dot: string }> = [
 export function AppearanceSettings() {
   const accent = useSettingsStore((s) => s.settings.appearance.accent);
   const reduceMotion = useSettingsStore((s) => s.settings.appearance.reduceMotion);
+  const uiScale = useSettingsStore((s) => s.settings.appearance.uiScale);
   const update = useSettingsStore((s) => s.update);
 
   return (
@@ -69,6 +77,47 @@ export function AppearanceSettings() {
             )
           }
         />
+      </Field>
+
+      <Field
+        label="Interface scale"
+        hint="85%–125% — the whole UI, for comfort. The layouts are crafted at 100%."
+      >
+        <div className="flex items-center gap-3">
+          <input
+            type="range"
+            min={UI_SCALE_MIN}
+            max={UI_SCALE_MAX}
+            step={0.05}
+            value={clampUiScale(uiScale)}
+            onChange={(e) =>
+              update("appearance", { uiScale: clampUiScale(Number(e.target.value)) }).catch(() =>
+                toast.error("Could not save scale preference"),
+              )
+            }
+            className="w-40 accent-[var(--accent)]"
+          />
+          <span className="w-10 font-mono text-xs text-muted-foreground">
+            {Math.round(clampUiScale(uiScale) * 100)}%
+          </span>
+          {clampUiScale(uiScale) !== 1 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              onClick={() =>
+                update("appearance", { uiScale: 1 }).catch(() =>
+                  toast.error("Could not save scale preference"),
+                )
+              }
+            >
+              Reset
+            </Button>
+          )}
+          <span className="font-mono text-[10px] text-muted-foreground">
+            var: {uiScaleCss(uiScale)}
+          </span>
+        </div>
       </Field>
     </section>
   );

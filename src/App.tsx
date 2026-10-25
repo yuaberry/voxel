@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { uiScaleCss } from "@/services/settings/uiScale";
 import { Toaster } from "@/components/ui/toaster";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -38,6 +39,7 @@ export default function App() {
   const basePath = useSettingsStore((s) => s.settings.storage.basePath);
   const accent = useSettingsStore((s) => s.settings.appearance.accent);
   const reduceMotion = useSettingsStore((s) => s.settings.appearance.reduceMotion);
+  const uiScale = useSettingsStore((s) => s.settings.appearance.uiScale);
 
   const hydrateProjects = useProjectsStore((s) => s.hydrate);
 
@@ -182,6 +184,10 @@ export default function App() {
     document.documentElement.dataset.accent = accent;
     document.documentElement.dataset.reduceMotion = String(reduceMotion);
   }, [accent, reduceMotion]);
+  useEffect(() => {
+    // §G accessibility — the crafted layouts survive 85%–125%
+    document.documentElement.style.setProperty("--ui-scale", uiScaleCss(uiScale));
+  }, [uiScale]);
 
   return (
     <ErrorBoundary>

@@ -1,3 +1,7 @@
+body {
+  zoom: var(--ui-scale, 1);
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

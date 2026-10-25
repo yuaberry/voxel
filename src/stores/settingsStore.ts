@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   appearance: {
     accent: "purple",
     reduceMotion: false,
+    uiScale: 1,
   },
   ai: {
     provider: "openrouter",
