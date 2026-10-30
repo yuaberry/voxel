@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { t } from "@/i18n";
 import { useNavigate } from "react-router-dom";
-import { Download, Globe, Loader2, Wand2 } from "lucide-react";
+import { Download, Globe, Loader2, Package, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { invoke } from "@tauri-apps/api/core";
 import { BriefingPicker } from "@/components/BriefingPicker";
 import { writeBriefingDocuments } from "@/services/documents/documentsService";
+import { createFullPack } from "@/services/servers/fullPackService";
 
 const RAM_OPTIONS = [1024, 2048, 4096, 8192];
 
@@ -85,6 +86,7 @@ export function CreateServerDialog({
   const [modules, setModules] = useState<Set<ServerModuleId>>(new Set());
   const [monumentSeed, setMonumentSeed] = useState<number>(1337);
   const [busy, setBusy] = useState(false);
+  const [fullPackBusy, setFullPackBusy] = useState(false);
   // World setup — real server.properties keys, curated by the user
   const [worldSeed, setWorldSeed] = useState("");
   const [worldType, setWorldType] = useState<"normal" | "flat" | "amplified" | "large_biomes">("normal");
@@ -376,6 +378,102 @@ export function CreateServerDialog({
       });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleCreateFullPack = async () => {
+    if (fullPackBusy) return;
+    const missing = missingRequirement();
+    if (missing) {
+      if (missing === "storage") {
+        toast.error("Configure your storage location first", {
+          description: "Settings → Storage",
+        });
+        navigate("/settings/storage");
+      } else if (missing === "eula") {
+        toast.warning("Accept the Minecraft EULA to enable creation", {
+          description:
+            "The checkbox is right below the version picker — the server refuses to boot without it (Mojang's rule, not ours).",
+          duration: 8000,
+        });
+      } else if (missing === "port") {
+        toast.warning("Pick a valid port (4-5 digits)", {
+          description: `Port "${port}" is not a valid port number (1024-65535).`,
+        });
+      } else if (missing === "slug") {
+        toast.warning("Name your server first", {
+          description: "Type a name — the id (slug) is generated from it.",
+        });
+      } else {
+        toast.warning("Pick the Minecraft version first");
+      }
+      return;
+    }
+    setFullPackBusy(true);
+    try {
+      const worldProperties: Record<string, string> = {
+        "level-type": `minecraft:${worldType}`,
+        difficulty,
+        "generate-structures": String(generateStructures),
+        "enable-command-block": "true",
+        "spawn-protection": "0",
+      };
+      if (worldSeed.trim()) {
+        worldProperties["level-seed"] = worldSeed.trim();
+      }
+      const properties = { ...activePreset?.properties, ...styleProperties, ...worldProperties };
+
+      const result = await createFullPack({
+        basePath,
+        slug,
+        name: name.trim(),
+        software,
+        mcVersion,
+        port: Number(port),
+        ramMb: ram,
+        acceptEula,
+        moduleKind: "prison",
+        currencyName: "VoxelCoin",
+        currencySymbol: "₦",
+        prisonPrestigeMultiplier: 2,
+        seed: monumentSeed,
+        generateStructures,
+        generateAssets: true,
+        createServerPack: true,
+        properties,
+      });
+
+      const now = new Date().toISOString();
+      const record: ServerRecord = {
+        id: crypto.randomUUID(),
+        name: name.trim(),
+        slug,
+        software,
+        minecraft_version: mcVersion,
+        path: result.server.serverDir,
+        port: Number(port),
+        ram_mb: ram,
+        status: "stopped",
+        created_at: now,
+        updated_at: now,
+      };
+      await insertServer(record);
+
+      toast.success(`Server "${name.trim()}" built — Prison pack ready`, {
+        description: result.summary,
+        duration: 10000,
+      });
+      setName("");
+      setAcceptEula(false);
+      setPresetId(null);
+      setStyleProperties({});
+      onOpenChange(false);
+    } catch (error) {
+      toast.error("Could not build full pack", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setFullPackBusy(false);
     }
   };
 
@@ -697,6 +795,22 @@ export function CreateServerDialog({
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {busy ? "Creating…" : "Create server"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => void handleCreateFullPack()}
+            disabled={fullPackBusy || !canCreate}
+            title={
+              fullPackBusy
+                ? "Building the full prison pack…"
+                : canCreate
+                  ? ""
+                  : "Click to see what's missing"
+            }
+          >
+            {fullPackBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            <Package className="mr-2 h-3.5 w-3.5" />
+            {fullPackBusy ? "Building all…" : "Build everything (Prison)"}
           </Button>
         </DialogFooter>
       </DialogContent>

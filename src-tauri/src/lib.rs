@@ -140,6 +140,7 @@ pub fn run() {
             commands::servers::server_backup_delete,
             commands::servers::server_backup_verify,
             commands::servers::server_backup_prune,
+            commands::servers::server_pack_export,
             commands::servers::server_restore,
             commands::servers::server_delete,
             commands::github::git_commit_all,
