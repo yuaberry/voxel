@@ -169,6 +169,25 @@ export function ServerCustomizeDialog({
   // ---- Accessibility: Escape key closes the dialog
   useEscapeKey(() => onOpenChange(false), open);
 
+  // ---- server status polling (auto-refresh)
+  const [serverRunning, setServerRunning] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const check = async () => {
+      if (cancelled) return;
+      const running = await invoke<boolean>("server_status", { slug }).catch(() => false);
+      setServerRunning(running);
+    };
+    check();
+    const interval = setInterval(check, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [open, slug]);
+
   // ---- world state (server.properties facts, edited in place)
   const [motd, setMotd] = useState("A VOXEL server");
   const [levelSeed, setLevelSeed] = useState("");
@@ -931,6 +950,12 @@ export function ServerCustomizeDialog({
             {t("Customize server")}
             <Badge variant="outline" className="text-[10px]">
               {server.software} {server.minecraft_version}
+            </Badge>
+            <Badge
+              variant={serverRunning === true ? "success" : serverRunning === false ? "destructive" : "secondary"}
+              className="text-[10px] px-2"
+            >
+              {serverRunning === true ? t("online") : serverRunning === false ? t("offline") : t("checking…")}
             </Badge>
           </DialogTitle>
           <DialogDescription>

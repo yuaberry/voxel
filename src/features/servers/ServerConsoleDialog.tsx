@@ -73,6 +73,20 @@ export function ServerConsoleDialog({ server, basePath, onClose }: Props) {
   const slug = server?.slug ?? "";
   const open = server !== null;
 
+  // ---- Accessibility: Escape key closes the dialog
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    const doc: Document = document;
+    doc.addEventListener("keydown", handleKeyDown);
+    return () => doc.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
   const refreshBackups = useCallback(async () => {
     if (!basePath || !slug) return;
     setBackups(await listServerBackups(basePath, slug).catch(() => []));
