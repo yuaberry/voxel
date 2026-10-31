@@ -212,6 +212,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
 | 70 | Deployment SSH + Performance Lab + Accessibility | **Deployment SSH** (§9.8): deploy remoto via ssh/scp, testar conexão, transferir arquivos · **Performance Lab** (/performance): boot time, build time, FPS ao vivo, memória, server start — tudo medido de verdade · **Acessibilidade**: skip link, ARIA, focus trap, teclado, foco visível, reduced motion · v0.27.0 | |
+| 70 | Session Auto-Refresh (§9.10) | **Monitora sessão MSA** e alerta quando expira (≤10 min) ou já expirou. Nunca faz auto-login — sempre requer ação do dono · 6 TS testes + v0.27.0 | |
 | 69 | Accessibility + Performance Lab | **Acessibilidade**: skip link, ARIA labels, focus trap, teclado (setas/Enter/Space), foco visível, reduced motion · **Performance Lab** (/performance): boot time, build time, FPS ao vivo, memória, server start time — tudo medido de verdade, 0 telemetria · 13 TS testes + v0.26.0 | |
 | 68 | Prison Extensions | **Lojas, NPCs, minas customizadas, rank visual** para o Prison module · /trigger nexus_shop buy/sell, NPCs summon com nome/itens/armadura, minas com rank mínimo, prefixos de chat e tablist por rank · 11 TS testes + v0.25.0 | |
 | 67 | Resource Packs + Java Mods | **Resource packs** (pack.mcmeta, lang PT-BR/EN, modelos, blockstates, texturas reais via Rust) + **Java mods** (build.gradle, fabric.mod.json/mods.toml, classe principal, registro de itens/blocos, lang, texturas) + 19 TS testes + v0.24.0 | |
@@ -580,7 +581,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 70 — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 254 · cargo 104 (+11 E2E) · render-smoke 5 dialogs · **lint 0/0**. Migrations 001-005. Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
+*Última atualização: Sessão 70 — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 260 · cargo 104 (+11 E2E) · render-smoke 5 dialogs · **lint 0/0**. Migrations 001-005. Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
 
 ---
 
@@ -851,3 +852,24 @@ build 1m22s · boot 0 panics · release v0.27.0.
 analytics ✓ · accessibility ✓ (S68) · Performance Lab ✓ (S69) ·
 Deployment SSH ✓ (S70) · Full Pack Generator + resource packs +
 Java mods + Prison Extensions ✓ (S66-68).
+
+---
+
+## 70. Sessão 70 — Session Auto-Refresh (§9.10)
+
+**Pedido do dono**: continuar melhorando o gerador de tudo e a qualidade do app.
+
+**Session Auto-Refresh (§9.10)**: monitora a sessão do MSA (Microsoft
+Account) e alerta o dono quando a sessão está prestes a expirar
+(≤10 min) ou já expirou. Nunca faz auto-login — sempre requer ação do
+dono. Lê timestamps de expiração do keyring do OS, nunca armazena ou
+transmite credenciais.
+
+**6 novos testes TS**. Verificação: typecheck 0 · lint 0/0 · vitest
+260 · cargo 104 · build 1m43s · boot 0 panics · release v0.27.0.
+
+**Fases**: A/B/C/D ✓ completas · F local máximo ✓ · G: lint zero ✓ ·
+analytics ✓ · accessibility UI scale + skip link + ARIA + focus trap +
+teclado (S68) · Performance Lab /performance com métricas reais (S69) ·
+Deployment SSH deploy remoto via ssh/scp (S70) · Session Auto-Refresh
+§9.10 (S70) — teclado completo = fatia futura.
