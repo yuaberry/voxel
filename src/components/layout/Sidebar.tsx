@@ -55,6 +55,7 @@ const workspaceItems: NavItem[] = [
   { to: "/knowledge", label: "Knowledge", icon: BookMarked, enabled: true },
   { to: "/insights", label: "Insights", icon: Activity, enabled: true },
   { to: "/qa", label: "QA Lab", icon: FlaskConical, enabled: true },
+  { to: "/performance", label: "Performance Lab", icon: Cpu, enabled: true },
 ];
 
 export function Sidebar() {

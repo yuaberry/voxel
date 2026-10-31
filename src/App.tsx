@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AccessibilityProvider } from "@/components/accessibility/AccessibilityProvider";
 import { DiagnosticsDialog } from "@/components/DiagnosticsDialog";
 import { Button } from "@/components/ui/button";
 import { Stethoscope } from "lucide-react";
@@ -29,6 +30,7 @@ import { CommandCenterPage } from "@/features/command/CommandCenterPage";
 import { KnowledgePage } from "@/features/knowledge/KnowledgePage";
 import { QaPage } from "@/features/qa/QaPage";
 import { InsightsPage } from "@/features/insights/InsightsPage";
+import { PerformanceLabPage } from "@/features/performance/PerformanceLabPage";
 import { bootTaskEngine } from "@/services/ai/taskEngineBoot";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 
@@ -191,6 +193,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+    <AccessibilityProvider>
     <TooltipProvider delayDuration={200}>
       <HashRouter>
         {loaded ? (
@@ -236,6 +239,7 @@ export default function App() {
               <Route path="knowledge" element={<KnowledgePage />} />
               <Route path="qa" element={<QaPage />} />
               <Route path="insights" element={<InsightsPage />} />
+              <Route path="performance" element={<PerformanceLabPage />} />
               <Route path="projects/:projectId" element={<ProjectWorkspacePage />} />
               <Route path="ai-creator" element={<AiCreatorPage />} />
               <Route path="servers" element={<ServersPage />} />
@@ -244,7 +248,7 @@ export default function App() {
               <Route path="settings/:section" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
-          </Routes>
+            </Routes>
           </>
         ) : (
           <SplashScreen />
@@ -252,6 +256,7 @@ export default function App() {
       </HashRouter>
       <Toaster />
     </TooltipProvider>
+    </AccessibilityProvider>
     </ErrorBoundary>
   );
 }

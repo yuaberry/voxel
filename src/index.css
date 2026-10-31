@@ -271,3 +271,96 @@ body {
   animation: voxel-sprite-frames steps(4) infinite;
   image-rendering: pixelated;
 }
+
+/* ==========================================================================
+   Accessibility — Focus Visible & Skip Link
+   ========================================================================== */
+
+/* Skip link — hidden by default, visible on focus */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* Focus visible — ensure keyboard users can see where they are */
+*:focus-visible {
+  outline: 2px solid #9155ff;
+  outline-offset: 2px;
+}
+
+/* Buttons and interactive elements — stronger focus indicator */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[role="checkbox"]:focus-visible,
+[role="switch"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="menuitem"]:focus-visible,
+[role="option"]:focus-visible {
+  outline: 2px solid #9155ff;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (forced-colors: active) {
+  *:focus-visible {
+    outline: 2px solid ButtonText;
+    outline-offset: 2px;
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast text for critical information */
+.text-high-contrast {
+  color: CanvasText;
+  background-color: Canvas;
+}
+
+/* Ensure sufficient contrast for placeholder text */
+input::placeholder {
+  opacity: 0.6;
+}
+
+/* Screen reader only text — visible to screen readers, hidden visually */
+.sr-only-focusable:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0.5rem 1rem;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  border: 0;
+}
+
+/* Table row focus for keyboard navigation */
+tr:focus-within {
+  outline: 2px solid #9155ff;
+  outline-offset: -1px;
+}
+
+/* Badge focus for interactive badges */
+.badge:focus-visible {
+  outline: 2px solid #9155ff;
+  outline-offset: 2px;
+}
