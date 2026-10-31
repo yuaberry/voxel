@@ -185,7 +185,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (69 sessões)
+## 5. Histórico de sessões (70 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -211,6 +211,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 70 | Deployment SSH + Performance Lab + Accessibility | **Deployment SSH** (§9.8): deploy remoto via ssh/scp, testar conexão, transferir arquivos · **Performance Lab** (/performance): boot time, build time, FPS ao vivo, memória, server start — tudo medido de verdade · **Acessibilidade**: skip link, ARIA, focus trap, teclado, foco visível, reduced motion · v0.27.0 | |
 | 69 | Accessibility + Performance Lab | **Acessibilidade**: skip link, ARIA labels, focus trap, teclado (setas/Enter/Space), foco visível, reduced motion · **Performance Lab** (/performance): boot time, build time, FPS ao vivo, memória, server start time — tudo medido de verdade, 0 telemetria · 13 TS testes + v0.26.0 | |
 | 68 | Prison Extensions | **Lojas, NPCs, minas customizadas, rank visual** para o Prison module · /trigger nexus_shop buy/sell, NPCs summon com nome/itens/armadura, minas com rank mínimo, prefixos de chat e tablist por rank · 11 TS testes + v0.25.0 | |
 | 67 | Resource Packs + Java Mods | **Resource packs** (pack.mcmeta, lang PT-BR/EN, modelos, blockstates, texturas reais via Rust) + **Java mods** (build.gradle, fabric.mod.json/mods.toml, classe principal, registro de itens/blocos, lang, texturas) + 19 TS testes + v0.24.0 | |
@@ -305,7 +306,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 69, v0.26.0)
+## 8. Estado atual (verificado — Sessão 70, v0.27.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -325,7 +326,8 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.26.0 (latest)** | Desktop: **Accessibility + Performance Lab** (skip link, ARIA, foco visível, /performance com métricas reais) + APK mobile 0.3.1 |
+| **v0.27.0 (latest)** | Desktop: **Performance Lab + Deployment SSH + Accessibility** (métricas reais, deploy remoto via SSH, a11y) + APK mobile 0.3.1 |
+| v0.26.0 | Desktop: **Accessibility + Performance Lab** (skip link, ARIA, foco visível, /performance com métricas reais) + APK mobile 0.3.1 |
 | v0.25.0 | Desktop: **Prison Extensions** (lojas, NPCs, minas, rank visual) + APK mobile 0.3.1 |
 | v0.24.0 | Desktop: **Full Pack — resource packs + Java mods** + APK mobile 0.3.1 |
 | v0.23.0 | Desktop: **Full Pack Generator** (um comando gera servidor Prison completo) + APK mobile 0.3.1 |
@@ -578,7 +580,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 69 — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 254 · cargo 104 (+11 E2E) · render-smoke 5 dialogs · **lint 0/0**. Migrations 001-005. Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
+*Última atualização: Sessão 70 — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 254 · cargo 104 (+11 E2E) · render-smoke 5 dialogs · **lint 0/0**. Migrations 001-005. Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
 
 ---
 
@@ -822,3 +824,30 @@ resource packs ✓ · Java mods ✓.
 **Fases**: A/B/C/D ✓ completas · F local máximo ✓ · G: lint zero ✓ · analytics ✓ · accessibility ✓ · Full Pack Generator + resource packs + Java mods + Prison Extensions ✓ · Performance Lab ✓.
 
 O que resta depende de infra externa do dono (identidade, push, keystore, TestFlight) — documentado no roadmap.
+
+---
+
+## 70. Sessão 70 — Deployment SSH + Performance Lab + Accessibility
+
+**Pedido do dono**: continuar melhorando o gerador de tudo e a qualidade do app.
+
+**Deployment SSH (§9.8)**: deploy de servidor para máquina remota via
+SSH/scp. Configurar host, porta, usuário e chave SSH (armazenada no
+keyring do OS). Testar conexão, fazer deploy dos arquivos do servidor
+remotamente.
+
+**Performance Lab (/performance)**: métricas reais medidos desta
+máquina — boot time, build time, FPS ao vivo, memória RSS, server
+start time. Zero fake data.
+
+**Acessibilidade**: skip to content link, ARIA labels em botões de
+ícone, focus trap para dialogs, teclado (setas, Enter/Space, Home/End),
+estilos de foco visível, suporte a reduced motion.
+
+**Verificação**: typecheck 0 · lint 0/0 · vitest 254 · cargo 104 ·
+build 1m22s · boot 0 panics · release v0.27.0.
+
+**Fases**: A/B/C/D ✓ completas · F local máximo ✓ · G: lint zero ✓ ·
+analytics ✓ · accessibility ✓ (S68) · Performance Lab ✓ (S69) ·
+Deployment SSH ✓ (S70) · Full Pack Generator + resource packs +
+Java mods + Prison Extensions ✓ (S66-68).
