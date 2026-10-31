@@ -33,6 +33,7 @@ import { createServerCommand } from "@/services/servers/serverService";
 import type { ServerSetupResult } from "@/services/servers/serverService";
 import { createResourcePack } from "@/services/resourcepack/resourcePackService";
 import { createModJava } from "@/services/mods/modGeneratorService";
+import { prisonExtensionsFiles } from "@/services/servers/prisonExtensions";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,6 +72,57 @@ export interface FullPackOptions {
   createServerPack: boolean;
   /** Extra server.properties overrides (merged on top of the pack's own). */
   properties?: Record<string, string>;
+  /** Prison extensions: shops, NPCs, custom mines, rank visuals. */
+  prisonExtensions?: {
+    shops?: Array<{
+      id: string;
+      name: string;
+      triggerId: string;
+      items: Array<{
+        id: string;
+        displayName: string;
+        buyPrice: number;
+        sellPrice: number;
+        slot: number;
+        amount: number;
+      }>;
+    }>;
+    npcs?: Array<{
+      id: string;
+      name: string;
+      x: number;
+      y: number;
+      z: number;
+      rotationYaw: number;
+      rotationPitch: number;
+      mobType: string;
+      heldItem?: string;
+      helmet?: string;
+      chestplate?: string;
+      leggings?: string;
+      boots?: string;
+      customNameVisible: boolean;
+      aiDisabled: boolean;
+      silent: boolean;
+    }>;
+    mines?: Array<{
+      id: string;
+      name: string;
+      x: number;
+      y: number;
+      z: number;
+      blockType: string;
+      minRank: number;
+    }>;
+    ranks?: Array<{
+      rank: number;
+      name: string;
+      prefix: string;
+      suffix: string;
+      tablistColor: string;
+      nametagColor: string;
+    }>;
+  };
 }
 
 export interface PackStructure {
@@ -95,6 +147,13 @@ export interface FullPackResult {
   assets: PackAsset[];
   resourcePack?: { packPath: string; fileCount: number; totalBytes: number };
   modJava?: { modPath: string; fileCount: number; totalBytes: number };
+  prisonExt?: {
+    shops: number;
+    npcs: number;
+    mines: number;
+    ranks: number;
+    total: number;
+  };
   serverPack?: { zipPath: string; modCount: number };
   summary: string;
 }
@@ -489,7 +548,31 @@ export async function createFullPack(
     };
   }
 
-  // ---- 8. Server pack ZIP — the whole server, deployable anywhere
+  // ---- 8. Prison extensions (shops, NPCs, custom mines, rank visual)
+  let prisonExt;
+  if (moduleKind === "prison" && options.prisonExtensions) {
+    const peResult = prisonExtensionsFiles({
+      currencySymbol,
+      currencyName,
+      prisonPrestigeMultiplier,
+      shops: options.prisonExtensions.shops ?? [],
+      npcs: options.prisonExtensions.npcs ?? [],
+      mines: options.prisonExtensions.mines ?? [],
+      ranks: options.prisonExtensions.ranks ?? [],
+    });
+    for (const file of peResult) {
+      await cmds.writeProjectFile(basePath, `${serverRel}/${file.path}`, file.content);
+    }
+    prisonExt = {
+      shops: peResult.filter((f) => f.path.includes("/shops/")).length,
+      npcs: peResult.filter((f) => f.path.includes("/npcs/")).length,
+      mines: peResult.filter((f) => f.path.includes("/mines/")).length,
+      ranks: peResult.filter((f) => f.path.includes("/ranks/")).length,
+      total: peResult.length,
+    };
+  }
+
+  // ---- 9. Server pack ZIP — the whole server, deployable anywhere
   let serverPack;
   if (createServerPack) {
     serverPack = await cmds.exportServerPack({ basePath, slug, packName: name });
@@ -503,6 +586,7 @@ export async function createFullPack(
     generateAssets ? `Assets: ${assets.length} pixel-art files.` : "",
     options.generateResourcePack ? `Resource pack: ${resourcePack?.fileCount ?? 0} files.` : "",
     options.generateMod ? `Java mod: ${modJava?.fileCount ?? 0} files.` : "",
+    prisonExt ? `Prison extensions: ${prisonExt.total} files (${prisonExt.shops} shops, ${prisonExt.npcs} NPCs, ${prisonExt.mines} mines, ${prisonExt.ranks} ranks).` : "",
     createServerPack ? `Server pack: ${serverPack?.zipPath ?? ""}` : "",
   ]
     .filter(Boolean)
@@ -519,6 +603,7 @@ export async function createFullPack(
     assets,
     resourcePack,
     modJava,
+    prisonExt,
     serverPack,
     summary,
   };
