@@ -31,6 +31,8 @@ import type { StructureKindId } from "@/services/assets/structureService";
 import { writeProjectFile } from "@/services/projects/projectsService";
 import { createServerCommand } from "@/services/servers/serverService";
 import type { ServerSetupResult } from "@/services/servers/serverService";
+import { createResourcePack } from "@/services/resourcepack/resourcePackService";
+import { createModJava } from "@/services/mods/modGeneratorService";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,6 +62,11 @@ export interface FullPackOptions {
   generateStructures: boolean;
   /** Generate real pixel-art assets (coin, sprites). */
   generateAssets: boolean;
+  /** Generate a resource pack for the server (textures, models, lang, sounds). */
+  generateResourcePack: boolean;
+  /** Generate a Fabric/NeoForge Java mod for the server. */
+  generateMod: boolean;
+  modLoader: "fabric" | "neoforge";
   /** Zip the whole server folder into a deployable server pack. */
   createServerPack: boolean;
   /** Extra server.properties overrides (merged on top of the pack's own). */
@@ -86,6 +93,8 @@ export interface FullPackResult {
   commands: { id: string; actions: number }[];
   structures: PackStructure[];
   assets: PackAsset[];
+  resourcePack?: { packPath: string; fileCount: number; totalBytes: number };
+  modJava?: { modPath: string; fileCount: number; totalBytes: number };
   serverPack?: { zipPath: string; modCount: number };
   summary: string;
 }
@@ -135,6 +144,30 @@ export interface FullPackCmds {
     slug: string;
     packName: string;
   }) => Promise<{ zipPath: string; modCount: number }>;
+  createResourcePack: (options: {
+    storageBase: string;
+    projectRel: string;
+    packName: string;
+    packDescription?: string;
+    modId: string;
+    language: "pt_br" | "en_us";
+    items: Array<{ id: string; textureStyle: string; primary: string; secondary: string; frames?: number; displayName: string }>;
+    blocks: Array<{ id: string; textureStyle: string; primary: string; secondary: string; displayName: string }>;
+    generateSounds: boolean;
+  }) => Promise<{ packPath: string; fileCount: number; totalBytes: number; summary: string }>;
+  createModJava: (options: {
+    storageBase: string;
+    projectRel: string;
+    modId: string;
+    modName: string;
+    version: string;
+    minecraftVersion: string;
+    loader: "fabric" | "neoforge";
+    items: Array<{ id: string; displayName: string; creativeTab?: boolean }>;
+    blocks: Array<{ id: string; displayName: string; material: string; hardness: number; resistance: number }>;
+    group: string;
+    archiveBaseName: string;
+  }) => Promise<{ modPath: string; fileCount: number; totalBytes: number; summary: string }>;
 }
 
 export const realCmds: FullPackCmds = {
@@ -165,6 +198,8 @@ export const realCmds: FullPackCmds = {
       slug: payload.slug,
       packName: payload.packName,
     }),
+  createResourcePack: (options: any) => createResourcePack(options as any),
+  createModJava: (options: any) => createModJava(options as any),
 };
 
 // ---------------------------------------------------------------------------
@@ -393,7 +428,68 @@ export async function createFullPack(
     }
   }
 
-  // ---- 6. Server pack ZIP — the whole server, deployable anywhere
+  // ---- 6. Resource pack (textures, models, lang, sounds)
+  let resourcePack;
+  if (options.generateResourcePack) {
+    const rpResult = await cmds.createResourcePack({
+      storageBase: basePath,
+      projectRel: `projects/${slug}-resourcepack`,
+      packName: name,
+      packDescription: `Resource pack for ${name} server`,
+      modId: PRI,
+      language: "pt_br",
+      items: prisonAssets().map((a) => ({
+        id: a.id,
+        textureStyle: a.style === "panel" ? "panel" : a.style,
+        primary: a.primary,
+        secondary: a.secondary,
+        frames: a.frames,
+        displayName: a.id.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+      })),
+      blocks: [],
+      generateSounds: true,
+    });
+    resourcePack = {
+      packPath: rpResult.packPath,
+      fileCount: rpResult.fileCount,
+      totalBytes: rpResult.totalBytes,
+    };
+  }
+
+  // ---- 7. Java mod (Fabric or NeoForge)
+  let modJava;
+  if (options.generateMod) {
+    const mjResult = await cmds.createModJava({
+      storageBase: basePath,
+      projectRel: `projects/${slug}-mod`,
+      modId: PRI,
+      modName: `${name} Mod`,
+      version: "1.0.0",
+      minecraftVersion: mcVersion,
+      loader: options.modLoader,
+      items: prisonAssets().filter((a) => a.assetKind === "item").map((a) => ({
+        id: a.id,
+        displayName: a.id.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+        creativeTab: true,
+      })),
+      blocks: prisonAssets().filter((a) => a.assetKind === "block").map((a) => ({
+        id: a.id,
+        displayName: a.id.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+        material: "stone",
+        hardness: 2.0,
+        resistance: 6.0,
+      })),
+      group: "com.voxel",
+      archiveBaseName: `${slug}-mod`,
+    });
+    modJava = {
+      modPath: mjResult.modPath,
+      fileCount: mjResult.fileCount,
+      totalBytes: mjResult.totalBytes,
+    };
+  }
+
+  // ---- 8. Server pack ZIP — the whole server, deployable anywhere
   let serverPack;
   if (createServerPack) {
     serverPack = await cmds.exportServerPack({ basePath, slug, packName: name });
@@ -405,6 +501,8 @@ export async function createFullPack(
     `Commands: ${commands.length} custom /trigger commands.`,
     generateStructures ? `Structures: ${structures.length} (prison block + mines A/B/C).` : "",
     generateAssets ? `Assets: ${assets.length} pixel-art files.` : "",
+    options.generateResourcePack ? `Resource pack: ${resourcePack?.fileCount ?? 0} files.` : "",
+    options.generateMod ? `Java mod: ${modJava?.fileCount ?? 0} files.` : "",
     createServerPack ? `Server pack: ${serverPack?.zipPath ?? ""}` : "",
   ]
     .filter(Boolean)
@@ -419,6 +517,8 @@ export async function createFullPack(
     commands: commands.map((c) => ({ id: c.id, actions: c.actions.length })),
     structures,
     assets,
+    resourcePack,
+    modJava,
     serverPack,
     summary,
   };

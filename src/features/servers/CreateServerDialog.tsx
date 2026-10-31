@@ -439,6 +439,9 @@ export function CreateServerDialog({
         seed: monumentSeed,
         generateStructures,
         generateAssets: true,
+        generateResourcePack: true,
+        generateMod: true,
+        modLoader: "fabric",
         createServerPack: true,
         properties,
       });

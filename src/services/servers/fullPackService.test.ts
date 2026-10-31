@@ -32,6 +32,9 @@ const baseOptions: FullPackOptions = {
   seed: 777,
   generateStructures: true,
   generateAssets: true,
+  generateResourcePack: true,
+  generateMod: true,
+  modLoader: "fabric",
   createServerPack: true,
 };
 
@@ -42,6 +45,8 @@ function makeCmds(overrides: Partial<FullPackCmds> = {}): FullPackCmds & {
   structureMock: ReturnType<typeof vi.fn>;
   textureMock: ReturnType<typeof vi.fn>;
   packMock: ReturnType<typeof vi.fn>;
+  resourcePackMock: ReturnType<typeof vi.fn>;
+  modJavaMock: ReturnType<typeof vi.fn>;
 } {
   const writes: Array<{ relPath: string; content: string }> = [];
   const calls = { createServer: 0, write: 0, structure: 0, texture: 0, pack: 0 };
@@ -65,6 +70,18 @@ function makeCmds(overrides: Partial<FullPackCmds> = {}): FullPackCmds & {
     zipPath: "/workspace/server_packs/my-prison-server.zip",
     modCount: 42,
   });
+  const resourcePackMock = vi.fn().mockResolvedValue({
+    packPath: "/workspace/projects/prison-server-resourcepack",
+    fileCount: 10,
+    totalBytes: 50000,
+    summary: "Resource pack created",
+  });
+  const modJavaMock = vi.fn().mockResolvedValue({
+    modPath: "/workspace/projects/prison-server-mod",
+    fileCount: 15,
+    totalBytes: 100000,
+    summary: "Mod created",
+  });
 
   const cmds: FullPackCmds = {
     createServer: createServerMock,
@@ -72,9 +89,11 @@ function makeCmds(overrides: Partial<FullPackCmds> = {}): FullPackCmds & {
     generateStructure: structureMock,
     generateItemTexture: textureMock,
     exportServerPack: packMock,
+    createResourcePack: resourcePackMock,
+    createModJava: modJavaMock,
     ...overrides,
   };
-  return { ...cmds, calls, writes, createServerMock, structureMock, textureMock, packMock };
+  return { ...cmds, calls, writes, createServerMock, structureMock, textureMock, packMock, resourcePackMock, modJavaMock };
 }
 
 describe("Full Pack Generator — one command, everything real", () => {
@@ -198,6 +217,37 @@ describe("Full Pack Generator — one command, everything real", () => {
     expect(cmds.exportServerPack).toHaveBeenCalledTimes(0);
   });
 
+  it("generateResourcePack=false skips resource pack", async () => {
+    const cmds = makeCmds();
+    await createFullPack({ ...baseOptions, generateResourcePack: false }, cmds);
+    expect(cmds.createResourcePack).toHaveBeenCalledTimes(0);
+  });
+
+  it("generateMod=false skips Java mod generation", async () => {
+    const cmds = makeCmds();
+    await createFullPack({ ...baseOptions, generateMod: false }, cmds);
+    expect(cmds.createModJava).toHaveBeenCalledTimes(0);
+  });
+
+  it("resource pack is generated when enabled", async () => {
+    const cmds = makeCmds();
+    await createFullPack(baseOptions, cmds);
+    expect(cmds.createResourcePack).toHaveBeenCalledTimes(1);
+    const [rpOpts] = cmds.resourcePackMock.mock.calls[0];
+    expect(rpOpts.modId).toBe("nexus_prison");
+    expect(rpOpts.packName).toBe("My Prison");
+  });
+
+  it("Java mod is generated when enabled", async () => {
+    const cmds = makeCmds();
+    await createFullPack(baseOptions, cmds);
+    expect(cmds.createModJava).toHaveBeenCalledTimes(1);
+    const [mjOpts] = cmds.modJavaMock.mock.calls[0];
+    expect(mjOpts.modId).toBe("nexus_prison");
+    expect(mjOpts.modName).toBe("My Prison Mod");
+    expect(mjOpts.loader).toBe("fabric");
+  });
+
   it("returns an honest summary with every section counted", async () => {
     const cmds = makeCmds();
     const result = await createFullPack(baseOptions, cmds);
@@ -207,6 +257,8 @@ describe("Full Pack Generator — one command, everything real", () => {
     expect(result.commands.length).toBeGreaterThan(0);
     expect(result.structures.length).toBe(4);
     expect(result.assets.length).toBe(3);
+    expect(result.resourcePack?.fileCount).toBe(10);
+    expect(result.modJava?.fileCount).toBe(15);
     expect(result.serverPack?.zipPath).toContain("server_packs");
     expect(result.summary).toContain("My Prison");
     expect(result.summary).toContain("ready to boot");
