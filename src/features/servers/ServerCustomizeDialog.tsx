@@ -28,6 +28,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
+import { useEscapeKey } from "@/components/accessibility/useEscapeKey";
+import { FocusVisible } from "@/components/accessibility/FocusVisible";
 import { invoke } from "@tauri-apps/api/core";
 import type { ServerRecord } from "@/types";
 import { BriefingPicker } from "@/components/BriefingPicker";
@@ -163,6 +165,9 @@ export function ServerCustomizeDialog({
   const [busy, setBusy] = useState(false);
   const slug = server.slug;
   const isPaper = server.software === "paper";
+
+  // ---- Accessibility: Escape key closes the dialog
+  useEscapeKey(() => onOpenChange(false), open);
 
   // ---- world state (server.properties facts, edited in place)
   const [motd, setMotd] = useState("A VOXEL server");
@@ -920,6 +925,7 @@ export function ServerCustomizeDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[86vh] max-w-3xl overflow-y-auto">
+        <FocusVisible>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {t("Customize server")}
@@ -2280,6 +2286,7 @@ export function ServerCustomizeDialog({
             )}
           </div>
         )}
+        </FocusVisible>
       </DialogContent>
     </Dialog>
   );
