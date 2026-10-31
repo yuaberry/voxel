@@ -14,7 +14,7 @@
  */
 
 // Browser/Node global performance API — works in both environments
-const globalPerf = typeof globalThis.performance !== "undefined" ? globalThis.performance : null;
+const globalPerf = globalThis.performance as Performance;
 
 // ---------------------------------------------------------------------------
 // Performance Lab (Phase G — Polishing).

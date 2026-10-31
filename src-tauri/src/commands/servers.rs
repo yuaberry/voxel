@@ -9,9 +9,10 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
+use walkdir::WalkDir;
 
 use super::launcher::http_get_bytes;
 use super::process;
@@ -2042,6 +2043,192 @@ pub async fn server_pack_export(
     tauri::async_runtime::spawn_blocking(move || server_pack_export_impl(base_path, slug, pack_name))
         .await
         .map_err(|e| format!("worker failed: {e}"))?
+}
+
+// ---------------------------------------------------------------------------
+// Deployment SSH — VPS/remote server deployment (Super Prompt §9.8)
+// ---------------------------------------------------------------------------
+
+/// SSH connection configuration for a remote deployment target.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DeploymentSshConfig {
+    pub id: String,
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub key_id: String, // references a key stored in the OS keyring
+    pub remote_base_path: String, // e.g. "/home/voxel/servers"
+}
+
+/// Result of deploying a server via SSH.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DeploymentSshResult {
+    pub deployed: bool,
+    pub remote_path: String,
+    pub files_transferred: u64,
+    pub total_bytes: u64,
+    pub message: String,
+}
+
+/// Test an SSH connection to a deployment target using the system `ssh` client.
+#[tauri::command]
+pub async fn deployment_ssh_test(
+    host: String,
+    port: u16,
+    username: String,
+    key_path: String,
+) -> Result<DeploymentSshResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        deployment_ssh_test_impl(host, port, username, key_path)
+    })
+    .await
+    .map_err(|e| format!("worker failed: {e}"))?
+}
+
+fn deployment_ssh_test_impl(
+    host: String,
+    port: u16,
+    username: String,
+    key_path: String,
+) -> Result<DeploymentSshResult, String> {
+    let key_path = Path::new(&key_path);
+    if !key_path.is_file() {
+        return Err(format!("SSH key file not found: {}", key_path.display()));
+    }
+
+    let output = std::process::Command::new("ssh")
+        .args([
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "BatchMode=yes",
+            "-i", key_path.to_str().ok_or("invalid key path")?,
+            "-p", port.to_string().as_str(),
+            "-l", &username,
+            &host,
+            "echo 'ssh-connection-ok'",
+        ])
+        .output()
+        .map_err(|e| format!("failed to run ssh: {e}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let ok = stdout.trim() == "ssh-connection-ok";
+
+    Ok(DeploymentSshResult {
+        deployed: ok,
+        remote_path: String::new(),
+        files_transferred: 0,
+        total_bytes: 0,
+        message: if ok {
+            "SSH connection successful".to_string()
+        } else {
+            format!("SSH connection failed: {}", String::from_utf8_lossy(&output.stderr).trim())
+        },
+    })
+}
+
+/// Deploy a server to a remote host via SSH (scp).
+#[tauri::command]
+pub async fn deployment_ssh_deploy(
+    host: String,
+    port: u16,
+    username: String,
+    key_path: String,
+    remote_base_path: String,
+    local_server_slug: String,
+    local_base_path: String,
+) -> Result<DeploymentSshResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        deployment_ssh_deploy_impl(host, port, username, key_path, remote_base_path, local_server_slug, local_base_path)
+    })
+    .await
+    .map_err(|e| format!("worker failed: {e}"))?
+}
+
+fn deployment_ssh_deploy_impl(
+    host: String,
+    port: u16,
+    username: String,
+    key_path: String,
+    remote_base_path: String,
+    local_server_slug: String,
+    local_base_path: String,
+) -> Result<DeploymentSshResult, String> {
+    let key_path = Path::new(&key_path);
+    if !key_path.is_file() {
+        return Err(format!("SSH key file not found: {}", key_path.display()));
+    }
+
+    let local_dir = Path::new(&local_base_path).join("servers").join(&local_server_slug);
+    if !local_dir.is_dir() {
+        return Err(format!("server directory not found: {}", local_dir.display()));
+    }
+
+    let remote_dir = format!("{}/{}", remote_base_path, local_server_slug);
+
+    // Create remote directory
+    let mkdir_output = std::process::Command::new("ssh")
+        .args([
+            "-o", "StrictHostKeyChecking=no",
+            "-i", key_path.to_str().ok_or("invalid key path")?,
+            "-p", port.to_string().as_str(),
+            "-l", &username,
+            &host,
+            &format!("mkdir -p '{}'", remote_dir),
+        ])
+        .output()
+        .map_err(|e| format!("failed to run ssh: {e}"))?;
+
+    if !mkdir_output.status.success() {
+        return Err(format!("failed to create remote directory: {}", String::from_utf8_lossy(&mkdir_output.stderr).trim()));
+    }
+
+    // Transfer all files via scp
+    let remote_target = format!("{}@{}:{}", username, host, remote_dir);
+    let scp_output = std::process::Command::new("scp")
+        .args([
+            "-o", "StrictHostKeyChecking=no",
+            "-i", key_path.to_str().ok_or("invalid key path")?,
+            "-P", port.to_string().as_str(),
+            "-r",
+            local_dir.to_str().ok_or("invalid local path")?,
+            &remote_target,
+        ])
+        .output()
+        .map_err(|e| format!("failed to run scp: {e}"))?;
+
+    if !scp_output.status.success() {
+        return Err(format!("scp failed: {}", String::from_utf8_lossy(&scp_output.stderr).trim()));
+    }
+
+    // Count files transferred
+    let mut files_transferred = 0u64;
+    let mut total_bytes = 0u64;
+    for entry in walkdir::WalkDir::new(&local_dir) {
+        let entry = entry.map_err(|e| format!("failed to read local directory: {e}"))?;
+        let path = entry.path();
+        if path.is_file() {
+            files_transferred += 1;
+            total_bytes += path.metadata()
+                .map_err(|e| format!("failed to read file metadata: {e}"))?
+                .len();
+        }
+    }
+
+    Ok(DeploymentSshResult {
+        deployed: true,
+        remote_path: remote_dir,
+        files_transferred,
+        total_bytes,
+        message: format!("deployed {} files ({} bytes) to {}:{}", files_transferred, total_bytes, host, port),
+    })
+}
+
+/// List configured deployment targets (stored in settings).
+#[tauri::command]
+pub async fn deployment_ssh_list() -> Result<Vec<DeploymentSshConfig>, String> {
+    // Read from settings - for now return empty, the UI manages the list
+    Ok(vec![])
 }
 
 #[cfg(test)]
