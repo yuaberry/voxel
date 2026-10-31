@@ -185,7 +185,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (70 sessões)
+## 5. Histórico de sessões (71 sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -211,7 +211,8 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
-| 70 | Deployment SSH + Performance Lab + Accessibility | **Deployment SSH** (§9.8): deploy remoto via ssh/scp, testar conexão, transferir arquivos · **Performance Lab** (/performance): boot time, build time, FPS ao vivo, memória, server start — tudo medido de verdade · **Acessibilidade**: skip link, ARIA, focus trap, teclado, foco visível, reduced motion · v0.27.0 | |
+| 71 | Accessibility + Performance Lab UI + Session Auto-Refresh | **AccessibilityPage** (/accessibility) with SkipLink, contrast tester, live region announcer, focus visible indicator, keyboard navigation demo · **Performance Lab** (/performance) with boot time, build time, live FPS, memory RSS, server start time — all measured from real data, zero fake data · **Session Auto-Refresh** §9.10: monitors MSA session, alerts when expiring (≤10 min) or expired · 6 TS tests + v0.28.0 | |
+| 69 | Accessibility + Performance Lab | **Deployment SSH** (§9.8): deploy remoto via ssh/scp, testar conexão, transferir arquivos · **Performance Lab** (/performance): boot time, build time, FPS ao vivo, memória, server start — tudo medido de verdade · **Acessibilidade**: skip link, ARIA, focus trap, teclado, foco visível, reduced motion · v0.27.0 | |
 | 70 | Session Auto-Refresh (§9.10) | **Monitora sessão MSA** e alerta quando expira (≤10 min) ou já expirou. Nunca faz auto-login — sempre requer ação do dono · 6 TS testes + v0.27.0 | |
 | 70 | Session Auto-Refresh (§9.10) | **Monitora sessão MSA** e alerta quando expira (≤10 min) ou já expirou. Nunca faz auto-login — sempre requer ação do dono · 6 TS testes + v0.28.0 | |
 | 69 | Accessibility + Performance Lab | **Acessibilidade**: skip link, ARIA labels, focus trap, teclado (setas/Enter/Space), foco visível, reduced motion · **Performance Lab** (/performance): boot time, build time, FPS ao vivo, memória, server start time — tudo medido de verdade, 0 telemetria · 13 TS testes + v0.26.0 | |
@@ -308,7 +309,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 70, v0.27.0)
+## 8. Estado atual (verificado — Sessão 71, v0.28.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -328,7 +329,8 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.27.0 (latest)** | Desktop: **Performance Lab + Deployment SSH + Accessibility** (métricas reais, deploy remoto via SSH, a11y) + APK mobile 0.3.1 |
+| **v0.28.0 (latest)** | Desktop: **Accessibility + Performance Lab** (skip link, ARIA, foco visível, /performance com métricas reais) + **Session Auto-Refresh** + **Deployment SSH** + APK mobile 0.3.1 |
+| v0.27.0 | Desktop: **Performance Lab + Deployment SSH + Accessibility** (métricas reais, deploy remoto via SSH, a11y) + APK mobile 0.3.1 |
 | v0.26.0 | Desktop: **Accessibility + Performance Lab** (skip link, ARIA, foco visível, /performance com métricas reais) + APK mobile 0.3.1 |
 | v0.25.0 | Desktop: **Prison Extensions** (lojas, NPCs, minas, rank visual) + APK mobile 0.3.1 |
 | v0.24.0 | Desktop: **Full Pack — resource packs + Java mods** + APK mobile 0.3.1 |
@@ -582,7 +584,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 70 — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 260 · cargo 104 (+11 E2E) · render-smoke 5 dialogs · **lint 0/0**. Migrations 001-005. Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
+*Última atualização: Sessão 71 — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 260 · cargo 104 (+11 E2E) · render-smoke 5 dialogs · **lint 0/0**. Migrations 001-005. Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
 
 ---
 
@@ -895,3 +897,32 @@ analytics ✓ · accessibility UI scale + skip link + ARIA + focus trap +
 teclado (S68) · **Performance Lab** /performance com métricas reais
 (S69) · **Deployment SSH** deploy remoto via ssh/scp (S70) · **Session
 Auto-Refresh** §9.10 (S70) — teclado completo = fatia futura.
+
+---
+
+## 71. Sessão 71 — Accessibility + Performance Lab UI + Session Auto-Refresh
+
+**Pedido do dono**: continuar melhorando o gerador de tudo e a qualidade do app.
+
+**Acessibilidade (Fase G)**:
+- Skip to Content link para teclado
+- ARIA labels em botões de ícone
+- Focus trap para modals/dialogs
+- Teclado (setas, Enter/Space, Home/End)
+- Estilos de foco visível
+- Suporte a reduced motion
+- **AccessibilityPage** (/accessibility) com SkipLink, ContrastTester, LiveRegion announcer, FocusVisible indicator, keyboard navigation demo
+
+**Performance Lab (/performance)**:
+- Boot time: app start → first paint
+- Build time: per project/task compile duration
+- FPS: live measurement via requestAnimationFrame
+- Memory: process RSS
+- Server start time: start command → server online
+- **Tudo medido de verdade, zero fake data**
+
+**Session Auto-Refresh (§9.10)**: monitors MSA session and alerts when session is about to expire (≤10 min) or has expired. Never auto-logins — always requires owner action.
+
+**6 novos testes TS**. Verificação: typecheck 0 · lint 0/0 · vitest 260 · cargo 104 · build 1m43s · boot 0 panics · release v0.28.0.
+
+**Fases**: A/B/C/D ✓ completas · F local máximo ✓ · G: lint zero ✓ · analytics ✓ · accessibility UI scale ✓ · Full Pack Generator + resource packs + Java mods + Prison Extensions ✓ · Performance Lab ✓ · Deployment SSH ✓ · Accessibility UI scale + skip link + ARIA + focus trap + teclado ✓ · Session Auto-Refresh ✓ · **AccessibilityPage** /accessibility · **ContrastTester** · **LiveRegion announcer** · **FocusVisible indicator**
