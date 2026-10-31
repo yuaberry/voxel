@@ -30,6 +30,7 @@ import { CommandCenterPage } from "@/features/command/CommandCenterPage";
 import { KnowledgePage } from "@/features/knowledge/KnowledgePage";
 import { QaPage } from "@/features/qa/QaPage";
 import { InsightsPage } from "@/features/insights/InsightsPage";
+import { AccessibilityPage } from "@/features/accessibility/AccessibilityPage";
 import { PerformanceLabPage } from "@/features/performance/PerformanceLabPage";
 import { bootTaskEngine } from "@/services/ai/taskEngineBoot";
 import { SettingsPage } from "@/features/settings/SettingsPage";
@@ -239,6 +240,7 @@ export default function App() {
               <Route path="knowledge" element={<KnowledgePage />} />
               <Route path="qa" element={<QaPage />} />
               <Route path="insights" element={<InsightsPage />} />
+              <Route path="accessibility" element={<AccessibilityPage />} />
               <Route path="performance" element={<PerformanceLabPage />} />
               <Route path="projects/:projectId" element={<ProjectWorkspacePage />} />
               <Route path="ai-creator" element={<AiCreatorPage />} />
