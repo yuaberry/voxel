@@ -46,3 +46,6 @@ pdf-extract = "0.12.1"
 ssh2 = "0.9"
 
 walkdir = "2.4"
+
+[patch.crates-io]
+openssl-sys = { version = "0.9", features = ["vendored"] }
