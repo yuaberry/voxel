@@ -25,7 +25,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useUiStore } from "@/stores/uiStore";
-import { APP_VERSION } from "@/components/AboutDialog";
+import { APP_VERSION } from "@/lib/appVersion";
 import { cn } from "@/lib/utils";
 import { useEffect } from "react";
 
