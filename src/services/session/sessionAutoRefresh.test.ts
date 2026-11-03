@@ -67,7 +67,11 @@ describe("Session Auto-Refresh", () => {
   });
 
   it("returns valid session when token is fresh", async () => {
-    const future = Date.now() + 60 * 60000; // 1 hour from now
+    // Freeze the clock: the old test used two Date.now() calls 60min apart,
+    // so a few milliseconds of execution made floor() return 59 on CI.
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const future = now + 60 * 60000; // exactly 1 hour from the frozen now
     await mockSecretsGet("some_token", String(future));
     const status = await checkMsnaSession();
     expect(status).not.toBeNull();
