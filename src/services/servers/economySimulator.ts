@@ -78,7 +78,7 @@ export function simulateProgression(params: SimulatorParams): SimulationReport {
   }
   if (prestigeMultiplier > 10) {
     exploitFindings.push(
-      `Prestige multiplier ${prestigeMultiplier} is extreme — one prestige run snowballs the whole progression. Watch for coin inflation (the dilution curve exists for this).`,
+      `Prestige multiplier ${prestigeMultiplier} is extreme — one prestige run snowballs the progression. Watch for coin inflation (the dilution curve exists for this).`,
     );
   }
   if (coinsPerBlock > 1000) {
