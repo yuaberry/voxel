@@ -11,30 +11,28 @@
 
 import { useState } from "react";
 import { t } from "@/i18n";
-import { SkipLink } from "@/components/accessibility/SkipLink";
-import { LiveRegion, useLiveRegion } from "@/components/accessibility/LiveRegion";
+import { LiveRegion } from "@/components/accessibility/LiveRegion";
 import { FocusVisible } from "@/components/accessibility/FocusVisible";
 import { ContrastTester } from "@/components/accessibility/ContrastTester";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export function AccessibilityPage() {
   const [announceMessage, setAnnounceMessage] = useState("");
+  const [announcedMessage, setAnnouncedMessage] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { announce } = useLiveRegion();
 
   const announceTest = () => {
-    announce(announceMessage);
+    const message = announceMessage.trim();
+    if (!message) return;
+    setAnnouncedMessage(message);
   };
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
-      {/* Skip link */}
-      <SkipLink href="#main-content" label="Pular para o conteúdo principal" />
-
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="bg-gradient-to-r from-brand-purple to-brand-cyan bg-clip-text text-2xl font-extrabold tracking-tight text-transparent">
@@ -49,13 +47,14 @@ export function AccessibilityPage() {
         </Badge>
       </div>
 
-      {/* Skip Link Demo */}
+      {/* Skip Link Demo — the real link is global (AccessibilityProvider).
+          Rendering another fixed link here duplicated the focus target and
+          pointed both at the same landmark. */}
       <Card title={t("Skip to Content")}>
         <div className="space-y-3">
           <p className="text-[11px] text-muted-foreground">
             {t("Pressione Tab para navegar até o link 'Pular para o conteúdo' no topo da página")}
           </p>
-          <SkipLink href="#main-content" label="Pular para o conteúdo principal" />
         </div>
       </Card>
 
@@ -84,7 +83,7 @@ export function AccessibilityPage() {
               {t("Announce")}
             </Button>
           </div>
-          <LiveRegion>{announceMessage}</LiveRegion>
+          <LiveRegion>{announcedMessage}</LiveRegion>
           <p className="text-[11px] text-muted-foreground">
             {t("O texto acima será anunciado para leitores de tela")}
           </p>
@@ -125,8 +124,10 @@ export function AccessibilityPage() {
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
-          <DialogTitle>{t("Test Dialog")}</DialogTitle>
-          <DialogHeader>{t("Press Escape to close this dialog")}</DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{t("Test Dialog")}</DialogTitle>
+            <DialogDescription>{t("Press Escape to close this dialog")}</DialogDescription>
+          </DialogHeader>
         </DialogContent>
       </Dialog>
 

@@ -15,7 +15,11 @@ export function AppLayout() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <main className="min-h-0 flex-1 overflow-y-auto">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="min-h-0 flex-1 overflow-y-auto outline-none"
+        >
           {/* Keyed by pathname so page transitions replay the fade-in */}
           <div key={pathname} className="animate-fade-in">
             <Outlet />

@@ -34,9 +34,13 @@ export const ptBR: Record<string, string> = {
   "AI-Powered Creation Platform": "Plataforma de Criação com IA",
   "Create project": "Criar projeto",
   "projects": "projetos",
+  "project": "projeto",
   "shaderpacks": "shaderpacks",
+  "shaderpack": "shaderpack",
   "servers": "servidores",
+  "server": "servidor",
   "instances": "instâncias",
+  "instance": "instância",
 
   // ------- Projects -------
   "New project": "Novo projeto",
@@ -439,7 +443,7 @@ export const ptBR: Record<string, string> = {
   "No builds recorded yet.": "Nenhum build registrado ainda.",
   "all green": "todos verdes",
   "Moderation": "Moderação",
-  "punishments": "punuições",
+  "punishments": "punições",
   "From the punishment history — every entry was applied by you.": "Do histórico de punições — cada entrada foi aplicada por você.",
   "applied": "aplicadas",
   "skipped": "puladas",
@@ -470,4 +474,5 @@ export const ptBR: Record<string, string> = {
 "Search Paper plugins (Modrinth)…": "Buscar plugins Paper (Modrinth)…",
 "This server has no Economy module — costs and the /convert flow will be inactive. Install Economy when creating a server (or rebuild the datapack) to unlock them.": "Este servidor não tem o módulo Economy — custos e o fluxo /convert ficam inativos. Instale o Economy ao criar um servidor (ou reconstrua o datapack) para desbloqueá-los.",
   "All green on this machine — if something still misbehaves, tell us the exact action and we hunt it.": "Tudo verde nesta máquina — se algo ainda falhar, diga a ação exata que a gente caça.",
+  "Skip to main content": "Pular para o conteúdo principal",
 };

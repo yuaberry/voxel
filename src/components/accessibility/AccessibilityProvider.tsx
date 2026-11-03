@@ -20,13 +20,12 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
 
   return (
     <div className="relative min-h-full">
-      {/* Skip to content — first focusable element */}
+      {/* Skip to content — first focusable element. The target is the single
+          <main id="main-content"> in AppLayout; wrapping the whole app in a
+          second <main> created a nested landmark that skipped nothing. */}
       <SkipLink />
 
-      {/* Main content area — landmark for screen readers */}
-      <main id="main-content" tabIndex={-1} role="main" className="min-h-full outline-none">
-        {children}
-      </main>
+      {children}
 
       {/* Live region for screen reader announcements */}
       <LiveRegion children="" />

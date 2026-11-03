@@ -15,7 +15,14 @@ const DICTS: Record<Language, Record<string, string>> = {
   "pt-BR": ptBR,
 };
 
+function applyDocumentLanguage(language: Language): void {
+  if (typeof document !== "undefined") {
+    document.documentElement.lang = language;
+  }
+}
+
 let active: Language = resolveInitial();
+applyDocumentLanguage(active);
 
 function resolveInitial(): Language {
   if (typeof navigator !== "undefined") {
@@ -34,6 +41,7 @@ export function resolveLanguage(setting: LanguageSetting): Language {
 
 export function setLanguage(setting: LanguageSetting): void {
   active = resolveLanguage(setting);
+  applyDocumentLanguage(active);
 }
 
 export function currentLanguage(): Language {
