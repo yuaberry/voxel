@@ -148,25 +148,25 @@ export function HomePage() {
               <StatTile
                 icon={<Boxes className="h-3.5 w-3.5" />}
                 value={projects.length}
-                label="projects"
+                label={projects.length === 1 ? t("project") : t("projects")}
                 onClick={() => navigate("/projects")}
               />
               <StatTile
                 icon={<Palette className="h-3.5 w-3.5" />}
                 value={stats?.shaderPacks ?? 0}
-                label="shaderpacks"
+                label={stats?.shaderPacks === 1 ? t("shaderpack") : t("shaderpacks")}
                 onClick={() => navigate("/shaders")}
               />
               <StatTile
                 icon={<ServerIcon className="h-3.5 w-3.5" />}
                 value={stats?.servers ?? 0}
-                label="servers"
+                label={stats?.servers === 1 ? t("server") : t("servers")}
                 onClick={() => navigate("/servers")}
               />
               <StatTile
                 icon={<Play className="h-3.5 w-3.5" />}
                 value={stats?.instances ?? 0}
-                label="instances"
+                label={stats?.instances === 1 ? t("instance") : t("instances")}
                 onClick={() => navigate("/projects")}
               />
             </div>
