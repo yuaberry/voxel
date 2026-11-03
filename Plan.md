@@ -309,13 +309,14 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 
-## 8. Estado atual (verificado — Sessão 71, v0.28.0)
+## 8. Estado atual (verificado — Sessão 72, v0.29.0)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
 | Rust unit (89) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
 | Vitest (105) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
+| Vitest (260) | ✅ todos os testes incluindo Player Management, Moderation Assistant, dialogs render-smoke, Performance Lab, Accessibility, Deployment SSH, Session Auto-Refresh |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -329,7 +330,8 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.28.0 (latest)** | Desktop: **Accessibility + Performance Lab** (skip link, ARIA, foco visível, /performance com métricas reais) + **Session Auto-Refresh** + **Deployment SSH** + APK mobile 0.3.1 |
+| **v0.29.0 (latest)** | Desktop: **Player Management + Moderation Assistant** (arquivos vanilla reais, ações via stdin, ban requer motivo, histórico migration 004; IA nunca bane sozinha, sugestões groundadas em evidência literal) + **typecheck/lint fixes** (10 TS errors, 2 lint errors) + release multi-OS 8 assets HTTP 200 |
+| v0.28.0 | Desktop: **Accessibility + Performance Lab** (skip link, ARIA, foco visível, /performance com métricas reais) + **Session Auto-Refresh** + **Deployment SSH** + APK mobile 0.3.1 |
 | v0.27.0 | Desktop: **Performance Lab + Deployment SSH + Accessibility** (métricas reais, deploy remoto via SSH, a11y) + APK mobile 0.3.1 |
 | v0.26.0 | Desktop: **Accessibility + Performance Lab** (skip link, ARIA, foco visível, /performance com métricas reais) + APK mobile 0.3.1 |
 | v0.25.0 | Desktop: **Prison Extensions** (lojas, NPCs, minas, rank visual) + APK mobile 0.3.1 |
@@ -926,3 +928,27 @@ Auto-Refresh** §9.10 (S70) — teclado completo = fatia futura.
 **6 novos testes TS**. Verificação: typecheck 0 · lint 0/0 · vitest 260 · cargo 104 · build 1m43s · boot 0 panics · release v0.28.0.
 
 **Fases**: A/B/C/D ✓ completas · F local máximo ✓ · G: lint zero ✓ · analytics ✓ · accessibility UI scale ✓ · Full Pack Generator + resource packs + Java mods + Prison Extensions ✓ · Performance Lab ✓ · Deployment SSH ✓ · Accessibility UI scale + skip link + ARIA + focus trap + teclado ✓ · Session Auto-Refresh ✓ · **AccessibilityPage** /accessibility · **ContrastTester** · **LiveRegion announcer** · **FocusVisible indicator**
+
+---
+
+## 72. Sessão 72 — Finalização release v0.29.0
+
+**Pedido do dono**: "leia o Plan.md e continue"
+
+**Correções de typecheck** (10 erros TS corrigidos):
+- `serverStudioManager.ts`: `invoke` import não usado removido; `enableAnalytics`, `worldType`, `enableModerationAI`, `moderationSensitivity` removidos do destructuring (não utilizados); `worldSeed` adicionado ao destructuring; `automation` const removido (não usado); `server.status` → `"stopped"` (ServerSetupResult não tem `status`); `ServerModuleId` importado e cast aplicado; command `status: "installed" as const`
+- `assetGenerator.ts`: `asset.textureStyle` → `asset.style` (2x); `writtenAssets` tipado como `AssetGenerationResult[]`; `id` → `assetId` nos pushes (2x)
+- `modpackBuilder.ts`: `getDb` import removido (não usado); `localDir` → `modpackDir`; `shader` → `_` (variável não usada); `action: true` → `compatible: true` (ModCompatibility não tem `action`)
+- `moderationAssistant.ts`: parâmetro `e` tipado como `string` e `unknown` (2x)
+
+**Correções de lint** (2 erros):
+- `economySimulator.extra.ts`: `require('crypto')` → `import { createHash } from 'crypto'` + `const configHash`
+- `serverExport.ts`: `let totalBytes` → `const totalBytes`
+
+**Verificação completa**: typecheck 0 ✓ · lint 0 errors ✓ · vitest **260/260** ✓ · cargo **104 passed, 11 ignored** ✓ · vite build ✓ · boot vivo 0 panics ✓
+
+**Release v0.29.0**: tag criada no commit `554f112`, force-push para alinhar `tauri.conf.json` versão 0.29.0 (estava 0.30.0 causando nomes de assets incorretos). Release workflow multi-OS (macOS arm64/x64, Ubuntu, Windows) concluído com sucesso. **8 assets publicados e validados por HTTP 200**: `VOXEL_0.29.0_aarch64.dmg`, `VOXEL_0.29.0_amd64.AppImage`, `VOXEL_0.29.0_amd64.deb`, `VOXEL_0.29.0_x64-setup.exe`, `VOXEL_0.29.0_x64.dmg`, `VOXEL_0.29.0_x64_en-US.msi`, `VOXEL_aarch64.app.tar.gz`, `VOXEL_x64.app.tar.gz`. Assets antigos (VOXEL_0.30.0) removidos do release.
+
+**Commit**: `554f112` (fix: align tauri.conf version) + `71bf50c` (feat: complete Phase D server management features and fix typecheck errors)
+
+**Fases**: A/B/C/D ✓ completas · F local máximo ✓ · G completa · Release v0.29.0 ✓ 7/7 assets (8/8 com app.tar.gz)
