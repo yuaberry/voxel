@@ -586,7 +586,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 71 — Fases A/B/C COMPLETAS e Fase D em andamento (5/5 COMPLETA: Simulator, Security, Players+Moderation, Backup Pro, Automation — Fase D encerrada; próximo: Fase G item A — warns set-state-in-effect). 60 releases até a v0.16.0. Testes: vitest 260 · cargo 104 (+11 E2E) · render-smoke 5 dialogs · **lint 0/0**. Migrations 001-005. Superfícies novas: /logic /designer /assets /compat /command /knowledge /qa + Customize com AI Studio/Currency/Security/Dossier. NEXT MOVE detalhado no §8.9.*
+*Última atualização: Sessão 73 — correções de UI reportadas pelo dono (SkipLink, versão, a11y, testes). Estado: vitest 265 · cargo 104 (+11 E2E) · lint 0/0 · release v0.29.0 (latest).*
 
 ---
 
@@ -952,3 +952,21 @@ Auto-Refresh** §9.10 (S70) — teclado completo = fatia futura.
 **Commit**: `554f112` (fix: align tauri.conf version) + `71bf50c` (feat: complete Phase D server management features and fix typecheck errors)
 
 **Fases**: A/B/C/D ✓ completas · F local máximo ✓ · G completa · Release v0.29.0 ✓ 7/7 assets (8/8 com app.tar.gz)
+
+---
+
+## 73. Sessão 73 — Correções de UI reportadas pelo dono
+
+**Pedido do dono**: "notei alguns bugs no app, como aquele card azul flutuante em cima, resolva para mim e corrija quaisquer erros existentes, quero tudo funcionando e bonitinho."
+
+**Card azul flutuante (causa raiz)**: era o `SkipLink`. `top-4` + `-translate-y-full` deixava 16px do pill permanentemente visíveis no topo. Fix: `top-0` + `-translate-y-full` (some por inteiro) e `focus:translate-y-4` (aparece inteiro no foco). O clique passou a ser tratado em JS: com HashRouter, um `href="#main-content"` puro era lido como rota e derrubava a navegação. Agora foca `#main-content` e preserva o hash.
+
+**Landmarks**: `AccessibilityProvider` envolvia o app inteiro em `<main>` e `AppLayout` tinha outro `<main>` aninhado — o skip link "pulava" para um wrapper que ainda continha a sidebar. Agora só existe o `<main id="main-content">` do conteúdo, em `AppLayout`.
+
+**Acessibilidade**: `LiveRegion` usava `hidden` (display:none), então leitores de tela ignoravam os anúncios; agora `sr-only`. `useLiveRegion` delega para `useLiveAnnouncer`, cujo cleanup devolve o nó corretamente no StrictMode. A demo não anuncia mais a cada tecla e o Dialog de teste ganhou descrição. `<html lang>` acompanha o idioma ativo. SkipLinks duplicados da página foram removidos.
+
+**Versão**: `APP_VERSION` estava hardcoded `"0.30.0"` (sidebar) enquanto `package.json`/`tauri.conf.json` eram `0.29.0`. Agora deriva de `package.json`; teste garante o alinhamento com `tauri.conf.json` (os nomes dos assets de release dependem dele).
+
+**Outros**: pluralização e tradução dos stats da Home ("1 server", "1 instance"); `testTimeout` dos render-smoke de 5s → 30s (a suite leva ~4s idle; o timeout em cascata vazava um dialog para o teste seguinte e produzia "duplicate Server name").
+
+**Verificação**: typecheck 0 · lint 0/0 · vitest **265/265** (+5) · cargo **104 passed, 11 ignored** · vite build 1m32s · prova visual no bundle de produção (link hidden top=-40; Tab mostra top=16; Enter foca main e mantém `#/`).
