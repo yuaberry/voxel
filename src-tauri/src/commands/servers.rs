@@ -9,10 +9,9 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
-use walkdir::WalkDir;
 
 use super::launcher::http_get_bytes;
 use super::process;
@@ -1593,7 +1592,6 @@ fn server_import_world_impl(base_path: String, slug: String, zip_path: String) -
     std::fs::create_dir_all(&staging).map_err(|e| format!("{e}"))?;
 
     let mut saw_level_dat = false;
-    let mut saw_world_root = false;
     let mut entries = 0usize;
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i).map_err(|e| format!("{e}"))?;
@@ -1605,13 +1603,12 @@ fn server_import_world_impl(base_path: String, slug: String, zip_path: String) -
         if segments.iter().any(|s| *s == ".." || s.is_empty()) {
             continue; // zip-slip guarded
         }
-        let (prefix, rest): (usize, Vec<&str>) = if segments.first() == Some(&"world") {
-            saw_world_root = true;
-            (1, segments[1..].to_vec())
+        let rest: Vec<&str> = if segments.first() == Some(&"world") {
+            // a zip with a "world/" root is unwrapped one level
+            segments[1..].to_vec()
         } else {
-            (0, segments.clone())
+            segments.clone()
         };
-        let _ = prefix;
         if rest.last().map(|s| *s == "level.dat").unwrap_or(false) && rest.len() == 1 {
             saw_level_dat = true;
         }
@@ -1963,8 +1960,8 @@ pub fn server_pack_export_impl(
     let options: zip::write::SimpleFileOptions =
         zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
-    let mut file_count = 0usize;
-    let mut total_bytes = 0u64;
+    let mut file_count;
+    let mut total_bytes;
 
     fn add_dir(
         zip: &mut zip::ZipWriter<std::fs::File>,
@@ -3086,7 +3083,7 @@ mod backups_pro_tests {
     fn verify_passes_a_healthy_backup_and_reports_its_facts() {
         let base = std::env::temp_dir().join(format!("voxel-bkp-verify-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
-        let dir = setup_server(&base, "verify-server");
+        let _dir = setup_server(&base, "verify-server");
         write_backup_zip(&base, "verify-server", "20260101-00000", false, true);
 
         let report = server_backup_verify_impl(
@@ -3107,7 +3104,7 @@ mod backups_pro_tests {
     fn verify_catches_corruption_and_missing_level_dat() {
         let base = std::env::temp_dir().join(format!("voxel-bkp-corrupt-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
-        let dir = setup_server(&base, "corrupt-server");
+        let _dir = setup_server(&base, "corrupt-server");
         write_backup_zip(&base, "corrupt-server", "20260101-00001", true, true);
         write_backup_zip(&base, "corrupt-server", "20260101-00002", false, false);
 
@@ -3138,7 +3135,7 @@ mod backups_pro_tests {
     fn prune_respects_the_count_cap_and_always_keeps_the_newest() {
         let base = std::env::temp_dir().join(format!("voxel-bkp-prune-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
-        let dir = setup_server(&base, "prune-server");
+        let _dir = setup_server(&base, "prune-server");
         for day in 1..=12 {
             write_backup_zip(&base, "prune-server", &format!("202601{day:02}-00000"), false, true);
         }

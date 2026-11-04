@@ -512,7 +512,7 @@ enum ChatPartIn {
 }
 
 #[derive(Deserialize, Clone)]
-struct ChatMessageIn {
+pub struct ChatMessageIn {
     role: String,
     content: ChatContentIn,
 }

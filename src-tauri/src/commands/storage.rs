@@ -544,7 +544,7 @@ mod restore_tests {
         );
 
         // same workspace again: everything is skipped, NOTHING overwritten
-        let mut king = fresh.join("projects/kingdom/src/Main.java");
+        let king = fresh.join("projects/kingdom/src/Main.java");
         std::fs::write(&king, b"NEWER LOCAL WORK").unwrap();
         let result = workspace_import_snapshot_impl(fresh.to_string_lossy().to_string(), snap.zip_path.clone()).unwrap();
         assert!(result.restored.is_empty());

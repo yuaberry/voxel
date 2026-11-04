@@ -40,21 +40,6 @@ pub enum ItemStyleKind {
 }
 
 impl ItemStyleKind {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ItemStyleKind::Sword => "sword",
-            ItemStyleKind::Gem => "gem",
-            ItemStyleKind::Ingot => "ingot",
-            ItemStyleKind::Orb => "orb",
-            ItemStyleKind::Apple => "apple",
-            ItemStyleKind::Book => "book",
-            ItemStyleKind::Wand => "wand",
-            ItemStyleKind::Bricks => "bricks",
-            ItemStyleKind::Planks => "planks",
-            ItemStyleKind::Ore => "ore",
-            ItemStyleKind::Panel => "panel",
-        }
-    }
     pub fn from_str(s: &str) -> Option<Self> {
         Some(match s {
             "sword" => ItemStyleKind::Sword,
@@ -168,6 +153,7 @@ impl Canvas {
             (0, 0, 0, 0)
         }
     }
+    #[cfg(test)]
     pub fn opaque_count(&self) -> usize {
         self.px.iter().filter(|p| p.3 > 0).count()
     }
@@ -987,7 +973,7 @@ mod tests {
             .decode(&result.png_base64)
             .unwrap();
         let decoder = png::Decoder::new(std::io::Cursor::new(&bytes));
-        let mut reader = decoder.read_info().unwrap();
+        let reader = decoder.read_info().unwrap();
         assert_eq!(reader.info().width, 16);
         assert_eq!(reader.info().height, 64);
 

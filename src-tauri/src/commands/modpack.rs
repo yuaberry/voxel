@@ -578,7 +578,6 @@ fn parse_range(range: &str) -> ((Vec<u32>, bool), (Vec<u32>, bool)) {
     }
     if let Some(rest) = r.strip_prefix('[').or_else(|| r.strip_prefix('(')) {
         let inclusive = r.starts_with('[');
-        let close_inf = rest.ends_with(')');
         let body = rest.trim_end_matches([')', ']']);
         let mut parts = body.splitn(2, ',');
         let lo = parts.next().unwrap_or("*").trim();
@@ -1184,7 +1183,7 @@ versionRange="[1.21,1.22)"
     #[test]
     fn compatibility_passes_a_clean_fabric_pair() {
         let base = fake_workspace("clean");
-        let libs = base.join("projects/dark-kingdom/build/libs");
+        let _libs = base.join("projects/dark-kingdom/build/libs");
         fs::create_dir_all(base.join("projects/ally/build/libs")).unwrap();
         fake_jar(
             &base.join("projects/ally/build/libs/ally-1.0.jar"),
@@ -1237,7 +1236,7 @@ versionRange="[1.21,1.22)"
     #[test]
     fn library_lists_exported_packs_and_deletes_by_name() {
         let base = fake_workspace("library");
-        let result = modpack_export_impl(payload(&base)).unwrap();
+        let _result = modpack_export_impl(payload(&base)).unwrap();
 
         let list = modpack_list_impl(base.to_string_lossy().to_string()).unwrap();
         assert_eq!(list.len(), 1);

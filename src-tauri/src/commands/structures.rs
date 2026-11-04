@@ -17,7 +17,6 @@ use std::io::Write;
 // NBT (the minimal subset the structure format needs)
 // ---------------------------------------------------------------------------
 
-const TAG_BYTE: u8 = 1;
 const TAG_INT: u8 = 3;
 const TAG_STRING: u8 = 8;
 const TAG_LIST: u8 = 9;
@@ -53,16 +52,6 @@ fn nbt_int_list(values: &[i32]) -> Vec<u8> {
     out.extend_from_slice(&(values.len() as i32).to_be_bytes());
     for v in values {
         out.extend_from_slice(&v.to_be_bytes());
-    }
-    out
-}
-
-fn nbt_string_list(values: &[String]) -> Vec<u8> {
-    let mut out = Vec::new();
-    out.push(TAG_STRING);
-    out.extend_from_slice(&(values.len() as i32).to_be_bytes());
-    for v in values {
-        out.extend_from_slice(&nbt_string(v));
     }
     out
 }
@@ -577,7 +566,7 @@ fn generate_mine(seed: u64) -> GeneratedStructure {
 
 /// A PRISON BLOCK — walled yard with corner towers, iron-bar gates, and
 /// four cells with bunks: the prison the owner's rank system deserves.
-fn generate_prison(seed: u64) -> GeneratedStructure {
+fn generate_prison(_seed: u64) -> GeneratedStructure {
     let w = 21; // 21x21 yard
     let wall_h = 5;
     let tower_h = 8;

@@ -18,7 +18,7 @@ use super::servers::module_docs;
 // Facts, gathered from the disk
 // ---------------------------------------------------------------------------
 
-struct CustomCmdDoc {
+pub struct CustomCmdDoc {
     id: String,
     description: String,
     cost: Option<u32>,
@@ -26,14 +26,13 @@ struct CustomCmdDoc {
     action_lines: Vec<String>,
 }
 
-struct LedgerStats {
+pub struct LedgerStats {
     tx_count: u64,
     circulating: i64,
-    verified: bool,
 }
 
 #[derive(serde::Deserialize, Clone)]
-struct CurrencyCfg {
+pub struct CurrencyCfg {
     #[serde(default)]
     name: String,
     #[serde(default)]
@@ -193,7 +192,6 @@ fn ledger_stats(path: &Path) -> Option<LedgerStats> {
     Some(LedgerStats {
         tx_count: count,
         circulating,
-        verified: true, // the file exists and parsed — the panel's verify re-proves it
     })
 }
 
@@ -756,7 +754,6 @@ pub fn markdown_to_html(md: &str, title: &str) -> String {
             let cells: Vec<String> = t
                 .split('|')
                 .skip(1)
-                .take_while(|c| true)
                 .filter(|c| !c.trim().is_empty() && !c.trim().chars().all(|c| c == '-'))
                 .map(|c| html_escape(c.trim().replace("**", "").as_str()))
                 .collect();
@@ -1163,7 +1160,6 @@ struct Doc {
     toc: Vec<TocEntry>,
     chapter: u32,
     section: u32,
-    in_code: bool,
 }
 
 impl Doc {
@@ -1175,7 +1171,6 @@ impl Doc {
             toc: Vec::new(),
             chapter: 0,
             section: 0,
-            in_code: false,
         }
     }
 
@@ -1670,11 +1665,6 @@ pub fn dossier_generate_impl(base_path: String, slug: String) -> Result<DossierR
     push("odt", odt_bytes(&md, &title))?;
 
     Ok(DossierResult { files, pages })
-}
-
-fn count_pdf_pages(pdf: &[u8]) -> u32 {
-    let text = String::from_utf8_lossy(pdf);
-    text.matches("/Type /Page ").count().max(1) as u32
 }
 
 #[tauri::command]

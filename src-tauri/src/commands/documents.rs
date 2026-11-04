@@ -73,8 +73,7 @@ fn unescape_xml(s: &str) -> String {
 fn extract_docx(bytes: &[u8]) -> Result<String, String> {
     let cursor = std::io::Cursor::new(bytes.to_vec());
     let mut zip = zip::ZipArchive::new(cursor).map_err(|e| format!("not a valid .docx (zip): {e}"))?;
-    let mut xml = String::new();
-    {
+    let xml = {
         let mut entry = zip
             .by_name("word/document.xml")
             .map_err(|e| format!("docx is missing word/document.xml: {e}"))?;
@@ -82,8 +81,8 @@ fn extract_docx(bytes: &[u8]) -> Result<String, String> {
         entry
             .read_to_string(&mut buf)
             .map_err(|e| format!("docx read: {e}"))?;
-        xml = buf;
-    }
+        buf
+    };
     let mut out = String::new();
     let mut rest = xml.as_str();
     while let Some(start) = rest.find('<') {
@@ -276,7 +275,7 @@ mod tests {
         let mut pdf = String::new();
         pdf.push_str("%PDF-1.4\n");
         let mut offsets: Vec<usize> = Vec::new();
-        let mut push_obj = |pdf: &mut String, offsets: &mut Vec<usize>, id: usize, body: &str| {
+        let push_obj = |pdf: &mut String, offsets: &mut Vec<usize>, id: usize, body: &str| {
             offsets.push(pdf.len());
             pdf.push_str(&format!("{id} 0 obj\n{body}\nendobj\n"));
         };
