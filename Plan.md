@@ -970,3 +970,22 @@ Auto-Refresh** §9.10 (S70) — teclado completo = fatia futura.
 **Outros**: pluralização e tradução dos stats da Home ("1 server", "1 instance"); `testTimeout` dos render-smoke de 5s → 30s (a suite leva ~4s idle; o timeout em cascata vazava um dialog para o teste seguinte e produzia "duplicate Server name").
 
 **Verificação**: typecheck 0 · lint 0/0 · vitest **265/265** (+5) · cargo **104 passed, 11 ignored** · vite build 1m32s · prova visual no bundle de produção (link hidden top=-40; Tab mostra top=16; Enter foca main e mantém `#/`).
+
+---
+
+## 74. Sessão 74 — Skip link REMOVIDO (pedido do dono)
+
+**Pedido do dono**: "preciso que remova ele e se certifique de que tudo está funcionando corretamente, sem nenhum bug." — o "ele" é o card azul (o SkipLink).
+
+**Removido de vez** (não é mais escondido — não existe):
+- `src/components/accessibility/SkipLink.tsx` e o teste correspondente (deletados)
+- `<SkipLink />` no `AccessibilityProvider` (que agora só cuida da live region)
+- card "Skip to Content" da página `/accessibility`
+- tradução `"Skip to main content"` do dicionário pt-BR
+- comentário obsoleto de "Skip Link" no `index.css`
+
+Mantido: o `<main id="main-content">` único do `AppLayout` (landmark semântica, sem tab stop artificial).
+
+**Nota honesta**: sem skip link, quem navega só por teclado perde o atalho "pular para o conteúdo" — o landmark continua correto e a ordem de foco segue natural (sidebar → conteúdo).
+
+**Verificação**: typecheck 0 · lint 0/0 · vitest 262/262 (os 3 testes do skip link foram removidos junto com o componente) · cargo **104 passed, 11 ignored** e **ZERO warnings** (os 21 avisos antigos do compilador foram eliminados: imports mortos, código morto, valor inicial nunca lido e tipos privados em API pública) · vite build ✓ · prova visual no bundle de produção (nenhum elemento fixo no topo; `/accessibility` renderiza sem o card) · CI verde.

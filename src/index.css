@@ -273,10 +273,10 @@ body {
 }
 
 /* ==========================================================================
-   Accessibility — Focus Visible & Skip Link
+   Accessibility — Focus Visible & Screen-reader-only text
    ========================================================================== */
 
-/* Skip link — hidden by default, visible on focus */
+/* Visually hidden, still announced by screen readers (live regions) */
 .sr-only {
   position: absolute;
   width: 1px;

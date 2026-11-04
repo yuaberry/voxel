@@ -474,5 +474,4 @@ export const ptBR: Record<string, string> = {
 "Search Paper plugins (Modrinth)…": "Buscar plugins Paper (Modrinth)…",
 "This server has no Economy module — costs and the /convert flow will be inactive. Install Economy when creating a server (or rebuild the datapack) to unlock them.": "Este servidor não tem o módulo Economy — custos e o fluxo /convert ficam inativos. Instale o Economy ao criar um servidor (ou reconstrua o datapack) para desbloqueá-los.",
   "All green on this machine — if something still misbehaves, tell us the exact action and we hunt it.": "Tudo verde nesta máquina — se algo ainda falhar, diga a ação exata que a gente caça.",
-  "Skip to main content": "Pular para o conteúdo principal",
 };

@@ -47,17 +47,6 @@ export function AccessibilityPage() {
         </Badge>
       </div>
 
-      {/* Skip Link Demo — the real link is global (AccessibilityProvider).
-          Rendering another fixed link here duplicated the focus target and
-          pointed both at the same landmark. */}
-      <Card title={t("Skip to Content")}>
-        <div className="space-y-3">
-          <p className="text-[11px] text-muted-foreground">
-            {t("Pressione Tab para navegar até o link 'Pular para o conteúdo' no topo da página")}
-          </p>
-        </div>
-      </Card>
-
       {/* Contrast Tester */}
       <Card title={t("Color Contrast")}>
         <div className="space-y-4">
