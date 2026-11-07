@@ -199,6 +199,7 @@ export function LauncherSettings() {
           signing={signingProvider === "microsoft"}
           disabled={signingProvider !== null}
           canSignIn={clientIdDraft.trim().length > 10}
+          signInDisabledReason="Add the Microsoft (Azure) client id below to enable this sign-in."
           onSignIn={() => void handleSignIn("microsoft")}
           onSignOut={() => void handleSignOut("microsoft")}
           onActivate={() => void handleActivate("microsoft")}
@@ -216,6 +217,7 @@ export function LauncherSettings() {
           signing={signingProvider === "elyby"}
           disabled={signingProvider !== null}
           canSignIn={elyClientIdDraft.trim().length > 0}
+          signInDisabledReason="Add the Ely.by client id below to enable this sign-in. Create a public desktop application at account.ely.by/dev/applications/new."
           onSignIn={() => void handleSignIn("elyby")}
           onSignOut={() => void handleSignOut("elyby")}
           onActivate={() => void handleActivate("elyby")}
@@ -352,6 +354,7 @@ function AccountCard({
   signing,
   disabled,
   canSignIn,
+  signInDisabledReason,
   onSignIn,
   onSignOut,
   onActivate,
@@ -362,6 +365,8 @@ function AccountCard({
   signing: boolean;
   disabled: boolean;
   canSignIn: boolean;
+  /** Why the sign-in button is disabled — never a silent grey button. */
+  signInDisabledReason?: string;
   onSignIn: () => void;
   onSignOut: () => void;
   onActivate: () => void;
@@ -401,17 +406,24 @@ function AccountCard({
           </div>
         </>
       ) : (
-        <Button
-          variant="gradient"
-          size="sm"
-          disabled={disabled || !canSignIn || signing}
-          onClick={onSignIn}
-        >
-          {signing ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        <>
+          <Button
+            variant="gradient"
+            size="sm"
+            disabled={disabled || !canSignIn || signing}
+            onClick={onSignIn}
+          >
+            {signing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : null}
+            {signing ? "Waiting for sign-in…" : `Sign in with ${providerName}`}
+          </Button>
+          {!canSignIn && signInDisabledReason ? (
+            <p className="text-[10px] leading-relaxed text-muted-foreground/70">
+              {signInDisabledReason}
+            </p>
           ) : null}
-          {signing ? "Waiting for sign-in…" : `Sign in with ${providerName}`}
-        </Button>
+        </>
       )}
     </div>
   );
