@@ -1050,4 +1050,4 @@ Mantido: o `<main id="main-content">` único do `AppLayout` (landmark semântica
 
 **Re-tag deliberado**: a primeira build da tag (commit `cba826d`) já publicava os 8 assets, mas faltava o ajuste de UX que explica o botão desabilitado. Release + tag foram apagados e a tag foi recriada no commit final — a release publicada vem de **um único commit** (mesma prática da S14).
 
-**Pendente (ação do dono)**: instalar o `.deb` sobre o `voxel 0.29.0` local exige `sudo` com senha — não tenho credencial de root nesta sessão. Comando pronto: `sudo apt install /tmp/opencode/v032/VOXEL_0.32.0_amd64.deb` (o pacote está baixado e validado).
+**Instalação local — FEITA**: o `voxel 0.29.0` foi atualizado para **0.32.0** (`A descompactar voxel (0.32.0) sobre (0.29.0)`), via `pkexec apt-get install` (diálogo polkit na sessão Cinnamon). O binário instalado em `/usr/bin/nexuscraft-studio` tem **sha256 idêntico ao asset publicado** (`b2f2b621…effe`), reporta a versão `0.32.0`, **zero** vestígio de skip link e carrega o código Ely.by (`account.ely.by`, `ely_client_id`, `ely_refresh_token`, `authlib-injector`).
