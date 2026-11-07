@@ -330,7 +330,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **Sign-out Ely.by não voltava para a Microsoft** — o sign-out interno limpa `mc_active_provider` antes do fallback, então o fallback lia "não estava ativo" e não selecionava a Microsoft | teste do service com o sign-out mockado igual ao real (limpa o provider) | `signOutProvider` lê a seleção **antes** do sign-out e decide o fallback a partir dela |
 | **Cancelamento durante os writes finais do login Ely.by deixava credenciais no keyring** — o `throwIfAborted` posterior ao commit lançava fora do bloco de rollback | teste que aborta no `secretsSet` do access token | rollback completo: credenciais apagadas + provider anterior restaurado (o cancelamento ganha do commit) |
 
-## 8. Estado atual (verificado — Sessão 75, v0.32.0 em preparação)
+## 8. Estado atual (verificado — Sessão 75, v0.32.0 publicada)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
@@ -351,7 +351,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.32.0 (em preparação)** | Desktop: **Ely.by como provider de autenticação** (device flow oficial, sem senha, authlib-injector v1.2.8 com SHA-256, provider efetivo com sessões Microsoft/Ely.by isoladas, UI Microsoft/Ely.by) + **SkipLink removido** (o card azul sumiu de vez) + hardening de OAuth (timeout total, abort, redirects bloqueados, ACL HTTP de 4 endpoints, allowlist de `open_auth_url`) |
+| **v0.32.0 (latest)** | Desktop: **Ely.by como provider de autenticação** (device flow oficial, sem senha, authlib-injector v1.2.8 com SHA-256, provider efetivo com sessões Microsoft/Ely.by isoladas, UI Microsoft/Ely.by) + **SkipLink removido** (o card azul sumiu de vez) + hardening de OAuth (timeout total, abort, redirects bloqueados, ACL HTTP de 4 endpoints, allowlist de `open_auth_url`) — tag `fceef35`, 8 assets HTTP 206 |
 | v0.29.0 (latest publicada) | Desktop: **Player Management + Moderation Assistant** (arquivos vanilla reais, ações via stdin, ban requer motivo, histórico migration 004; IA nunca bane sozinha, sugestões groundadas em evidência literal) + **typecheck/lint fixes** (10 TS errors, 2 lint errors) + release multi-OS 8 assets HTTP 200 |
 | v0.28.0 | Desktop: **Accessibility + Performance Lab** (skip link, ARIA, foco visível, /performance com métricas reais) + **Session Auto-Refresh** + **Deployment SSH** + APK mobile 0.3.1 |
 | v0.27.0 | Desktop: **Performance Lab + Deployment SSH + Accessibility** (métricas reais, deploy remoto via SSH, a11y) + APK mobile 0.3.1 |
@@ -1044,4 +1044,10 @@ Mantido: o `<main id="main-content">` único do `AppLayout` (landmark semântica
 
 **Pendência honesta (depende do dono)**: o `client_id` do Desktop Application público do VOXEL ainda não foi fornecido/aprovado em `https://account.ely.by/dev/applications/new`. Sem ele o **device flow real** não pode ser exercitado ao vivo — o campo fica configurável em Settings→Launcher e o resto (perímetro, UI, rollback, revoke, refresh, lançamento com injector) está pronto e testado.
 
-**Próximo passo**: commit lógico → push `main` → tag `v0.32.0` → release multi-OS → validar os 8 assets → instalar o `.deb` sobre o `voxel 0.29.0` local e confirmar a versão e o bundle sem o card azul.
+**Release v0.32.0 — PUBLICADA**: tag `v0.32.0` → commit `fceef35` ("fix(settings): explain why a provider sign-in button is disabled"), que já carrega a feature (`9922abc`), o bump (`0429a34`) e a documentação (`cba826d`). **8 assets publicados e validados por HTTP 206 + assinatura de formato** (PE no `.exe`, OLE no `.msi`, ELF no `.AppImage`, gzip nos `.app.tar.gz`, trailer `koly` nos `.dmg`): `VOXEL_0.32.0_amd64.deb` (19,7 MB) · `VOXEL_0.32.0_amd64.AppImage` (96,5 MB) · `VOXEL_0.32.0_x64-setup.exe` (12,4 MB) · `VOXEL_0.32.0_x64_en-US.msi` (16,3 MB) · `VOXEL_0.32.0_x64.dmg` (17,9 MB) · `VOXEL_0.32.0_aarch64.dmg` (17,3 MB) · `VOXEL_x64.app.tar.gz` + `VOXEL_aarch64.app.tar.gz`.
+
+**Prova de que o bundle publicado é o bundle verificado**: o rebuild local no commit da tag gerou `dist/assets/index-u0Xf3w9S.js` — **exatamente o nome de arquivo embutido no binário publicado** (hash igual). Nesse bundle: **zero** ocorrências de `Skip to main content` / `Skip to Content` / `SkipLink` / `skip-link` / `Pular para o conteúdo`, e presença de `account.ely.by`, `Ely.by client id`, `minecraft_server_session`, `authlib-injector`, `mc_active_provider`. O `.deb` traz `Package: voxel`, `Version: 0.32.0`, binário em `usr/bin/nexuscraft-studio` e **nenhum maintainer script** (upgrade seguro).
+
+**Re-tag deliberado**: a primeira build da tag (commit `cba826d`) já publicava os 8 assets, mas faltava o ajuste de UX que explica o botão desabilitado. Release + tag foram apagados e a tag foi recriada no commit final — a release publicada vem de **um único commit** (mesma prática da S14).
+
+**Pendente (ação do dono)**: instalar o `.deb` sobre o `voxel 0.29.0` local exige `sudo` com senha — não tenho credencial de root nesta sessão. Comando pronto: `sudo apt install /tmp/opencode/v032/VOXEL_0.32.0_amd64.deb` (o pacote está baixado e validado).
