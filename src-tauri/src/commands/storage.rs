@@ -9,6 +9,7 @@
 use serde::Serialize;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
+use url::Url;
 
 const WORKSPACE_SUBDIRS: [&str; 7] = [
     "projects",
@@ -212,17 +213,37 @@ pub fn open_in_file_manager(path: String) -> Result<(), String> {
     }
 }
 
-/// Opens a Microsoft or GitHub authentication page in the system browser.
-/// Hard-restricted to sign-in hosts — never arbitrary URLs.
+fn is_allowed_auth_url(raw: &str) -> bool {
+    let Ok(url) = Url::parse(raw.trim()) else {
+        return false;
+    };
+    if url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port_or_known_default() != Some(443)
+    {
+        return false;
+    }
+    match url.host_str() {
+        Some("www.microsoft.com")
+        | Some("microsoft.com")
+        | Some("login.microsoftonline.com")
+        | Some("login.live.com") => true,
+        Some("github.com") => matches!(url.path(), "/login/device" | "/login/device/code"),
+        Some("account.ely.by") => {
+            matches!(url.path(), "/code" | "/dev/applications/new")
+        }
+        _ => false,
+    }
+}
+
+/// Opens a Microsoft, Ely.by or GitHub authentication page in the system
+/// browser. Hard-restricted to sign-in hosts — never arbitrary URLs.
 #[tauri::command]
 pub fn open_auth_url(url: String) -> Result<(), String> {
     let trimmed = url.trim();
-    let allowed = trimmed.starts_with("https://www.microsoft.com/")
-        || trimmed.starts_with("https://login.microsoftonline.com/")
-        || trimmed.starts_with("https://login.live.com/")
-        || trimmed.starts_with("https://github.com/login");
-    if !allowed {
-        return Err("Only Microsoft sign-in pages can be opened".to_string());
+    if !is_allowed_auth_url(trimmed) {
+        return Err("Only supported sign-in pages can be opened".to_string());
     }
 
     let program = if cfg!(target_os = "linux") {
@@ -245,6 +266,32 @@ pub fn open_auth_url(url: String) -> Result<(), String> {
     }
 }
 
+
+#[cfg(test)]
+mod auth_url_tests {
+    use super::*;
+
+    #[test]
+    fn allows_only_supported_https_sign_in_hosts() {
+        assert!(is_allowed_auth_url(
+            "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode"
+        ));
+        assert!(is_allowed_auth_url("https://microsoft.com/devicelogin"));
+        assert!(is_allowed_auth_url("https://account.ely.by/dev/applications/new"));
+        assert!(is_allowed_auth_url("https://account.ely.by/code?user_code=ABCD-EFGH"));
+        assert!(is_allowed_auth_url("https://github.com/login/device"));
+
+        assert!(!is_allowed_auth_url("https://account.ely.by.evil.example/code"));
+        assert!(!is_allowed_auth_url("https://account.ely.by/settings"));
+        assert!(!is_allowed_auth_url("https://account.ely.by/code/redirect"));
+        assert!(!is_allowed_auth_url("https://user@account.ely.by/code"));
+        assert!(!is_allowed_auth_url("https://account.ely.by:444/code"));
+        assert!(!is_allowed_auth_url("https://github.com/login-evil"));
+        assert!(!is_allowed_auth_url("http://account.ely.by/code"));
+        assert!(!is_allowed_auth_url("https://example.com/login"));
+        assert!(!is_allowed_auth_url("file:///etc/passwd"));
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Workspace snapshot — the authorship assets (projects, shaderpacks,

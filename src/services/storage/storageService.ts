@@ -17,7 +17,7 @@ export async function openInFileManager(path: string): Promise<void> {
   await invoke("open_in_file_manager", { path });
 }
 
-/** Opens a Microsoft sign-in page in the system browser (Rust-guarded). */
+/** Opens a supported sign-in page in the system browser (Rust-guarded). */
 export async function workspaceLegacyStatus(): Promise<{
   exists: boolean;
   path: string;

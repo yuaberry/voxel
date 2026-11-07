@@ -22,11 +22,25 @@ import {
 
 const mockInvoke = invoke as any;
 
-async function mockSecretsGet(tokenVal: string | null, expiryVal: string | null) {
+async function mockSecretsGet(
+  tokenVal: string | null,
+  expiryVal: string | null,
+  provider: "microsoft" | "elyby" = "microsoft",
+) {
   mockInvoke.mockImplementation((cmd: string, args: any) => {
     if (cmd === "secrets_get") {
-      if (args.key === "mc_access_token") return Promise.resolve(tokenVal);
-      if (args.key === "mc_token_expiry") return Promise.resolve(expiryVal);
+      if (args.key === "mc_active_provider") return Promise.resolve(provider);
+      if (provider === "elyby") {
+        if (args.key === "ely_username") return Promise.resolve("ElyPlayer");
+        if (args.key === "ely_uuid") return Promise.resolve("22222222-2222-2222-2222-222222222222");
+        if (args.key === "ely_access_token") return Promise.resolve(tokenVal);
+        if (args.key === "ely_token_expiry") return Promise.resolve(expiryVal);
+      } else {
+        if (args.key === "mc_username") return Promise.resolve("MicrosoftPlayer");
+        if (args.key === "mc_uuid") return Promise.resolve("11111111-1111-1111-1111-111111111111");
+        if (args.key === "mc_access_token") return Promise.resolve(tokenVal);
+        if (args.key === "mc_token_expiry") return Promise.resolve(expiryVal);
+      }
     }
     return Promise.resolve(null);
   });
@@ -79,6 +93,18 @@ describe("Session Auto-Refresh", () => {
     expect(status!.isExpiring).toBe(false);
     expect(status!.isExpired).toBe(false);
     expect(status!.minutesRemaining).toBe(60);
+  });
+
+  it("reports the active Ely.by session instead of assuming Microsoft", async () => {
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    await mockSecretsGet("ely_token", String(now + 60 * 60000), "elyby");
+
+    const status = await checkMsnaSession();
+
+    expect(status?.provider).toBe("elyby");
+    expect(status?.authenticated).toBe(true);
+    expect(status?.minutesRemaining).toBe(60);
   });
 
   it("startSessionAutoRefresh returns a stop function", () => {

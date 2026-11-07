@@ -73,7 +73,19 @@ export interface GithubSettings {
 export interface LauncherSettings {
   /** Azure (MSA) application client id — required for device-flow sign-in. */
   clientId: string;
+  /** Ely.by desktop application client id — required for Ely.by device flow. */
+  elyClientId: string;
   ramMb: number;
+}
+
+export type MinecraftAuthProvider = "microsoft" | "elyby";
+
+export interface MinecraftAccount {
+  provider: MinecraftAuthProvider;
+  username: string;
+  uuid: string;
+  accessToken: string;
+  expiresAt: number;
 }
 
 export interface AppSettings {

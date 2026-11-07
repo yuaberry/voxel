@@ -16,6 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha1::{Digest as _, Sha1};
+use sha2::Sha256;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -105,6 +106,12 @@ fn sha1_hex(bytes: &[u8]) -> String {
     hasher.finalize().iter().map(|b| format!("{b:02x}")).collect()
 }
 
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
 fn file_sha1_matches(path: &Path, expected: &str) -> bool {
     if expected.is_empty() {
         return path.exists();
@@ -132,11 +139,44 @@ fn ensure_file(url: &str, path: &Path, sha1: &str) -> Result<bool, String> {
     Ok(true)
 }
 
+/// Downloads an artifact only when its SHA-256 does not match the pinned
+/// official digest. The checked file is never trusted from a previous run
+/// unless its bytes still match exactly.
+fn ensure_sha256_file(
+    url: &str,
+    path: &Path,
+    expected_sha256: &str,
+) -> Result<bool, String> {
+    if std::fs::read(path)
+        .map(|bytes| sha256_hex(&bytes) == expected_sha256)
+        .unwrap_or(false)
+    {
+        return Ok(false);
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
+    }
+    let bytes = http_get_bytes(url)?;
+    if sha256_hex(&bytes) != expected_sha256 {
+        return Err(format!("SHA-256 mismatch for {}", path.display()));
+    }
+    std::fs::write(path, bytes).map_err(|e| format!("write {}: {e}", path.display()))?;
+    Ok(true)
+}
+
 // ---------------------------------------------------------------------------
 // Remote metadata models (official formats)
 // ---------------------------------------------------------------------------
 
 const MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+
+const AUTHLIB_INJECTOR_VERSION: &str = "1.2.8";
+const AUTHLIB_INJECTOR_URL: &str =
+    "https://github.com/yushijinhun/authlib-injector/releases/download/v1.2.8/authlib-injector-1.2.8.jar";
+const AUTHLIB_INJECTOR_SHA256: &str =
+    "9c7f4343e6c82034958ffb48c14a2cb0c85928be7283103ce17da00c6d5a7b10";
+const ELYBY_AUTHLIB_API: &str = "ely.by";
 
 fn fabric_profile_url(mc: &str, loader: &str) -> String {
     format!("https://meta.fabricmc.net/v2/versions/loader/{mc}/{loader}/profile/json")
@@ -410,6 +450,25 @@ fn mc_assets_dir(base: &Path) -> PathBuf {
 
 fn instance_dir(base: &Path, slug: &str) -> PathBuf {
     base.join("instances").join(slug)
+}
+
+fn authlib_injector_path(base: &Path) -> PathBuf {
+    base.join("minecraft")
+        .join("authlib-injector")
+        .join(format!("authlib-injector-{AUTHLIB_INJECTOR_VERSION}.jar"))
+}
+
+fn ensure_authlib_injector(base: &Path) -> Result<PathBuf, String> {
+    let path = authlib_injector_path(base);
+    ensure_sha256_file(AUTHLIB_INJECTOR_URL, &path, AUTHLIB_INJECTOR_SHA256)?;
+    Ok(path)
+}
+
+fn elyby_javaagent_argument(path: &Path) -> String {
+    format!(
+        "-javaagent:{}={ELYBY_AUTHLIB_API}",
+        path.to_string_lossy()
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -778,16 +837,51 @@ fn launcher_copy_mod_jar_impl(
 // Launch
 // ---------------------------------------------------------------------------
 
+#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AccountProvider {
+    #[default]
+    Microsoft,
+    Elyby,
+}
+
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfo {
+    /// Missing provider means Microsoft for payloads created by older VOXEL builds.
+    #[serde(default)]
+    pub provider: AccountProvider,
     pub username: String,
     pub uuid: String,
     pub access_token: String,
 }
 
 #[tauri::command]
-pub fn launcher_launch(
+pub async fn launcher_launch(
+    app: AppHandle,
+    base_path: String,
+    project_slug: String,
+    mc_version: String,
+    account: Option<AccountInfo>,
+    java_path: Option<String>,
+    ram_mb: Option<u32>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        launcher_launch_impl(
+            app,
+            base_path,
+            project_slug,
+            mc_version,
+            account,
+            java_path,
+            ram_mb,
+        )
+    })
+    .await
+    .map_err(|e| format!("launch worker failed: {e}"))?
+}
+
+fn launcher_launch_impl(
     app: AppHandle,
     base_path: String,
     project_slug: String,
@@ -803,6 +897,13 @@ pub fn launcher_launch(
     let base = std::path::PathBuf::from(&base_path);
     let inst = instance_dir(&base, &project_slug);
     let version_dir = mc_versions_dir(&base).join(&mc_version);
+    let (user_type, elyby_agent) = match account.provider {
+        AccountProvider::Microsoft => ("msa", None),
+        AccountProvider::Elyby => {
+            let injector = ensure_authlib_injector(&base)?;
+            ("mojang", Some(elyby_javaagent_argument(&injector)))
+        }
+    };
 
     let read_json = |path: PathBuf, what: &str| -> Result<Vec<u8>, String> {
         std::fs::read(&path).map_err(|e| format!("{what} missing: {e} — run Prepare first"))
@@ -849,7 +950,7 @@ pub fn launcher_launch(
     vars.insert("auth_access_token".into(), account.access_token);
     vars.insert("auth_xuid".into(), String::new());
     vars.insert("clientid".into(), "voxel".into());
-    vars.insert("user_type".into(), "msa".into());
+    vars.insert("user_type".into(), user_type.into());
     vars.insert("user_properties".into(), "{}".into());
     vars.insert("version_name".into(), mc_version.clone());
     vars.insert("game_directory".into(), inst.to_string_lossy().to_string());
@@ -889,6 +990,9 @@ pub fn launcher_launch(
         .unwrap_or_else(|| "java".to_string());
 
     let mut command = std::process::Command::new(&java);
+    if let Some(agent) = elyby_agent {
+        command.arg(agent);
+    }
     command.arg(format!("-Xmx{ram}M"));
     command.arg("-Dlog4j2.formatMsgNoLookups=true");
     for arg in &jvm_args {
@@ -904,6 +1008,64 @@ pub fn launcher_launch(
     let key = format!("launch/{project_slug}");
     process::spawn_monitored(app, &key, command, "launch", false)?;
     Ok(key)
+}
+
+#[cfg(test)]
+mod launcher_auth_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_account_payload_defaults_to_microsoft() {
+        let account: AccountInfo = serde_json::from_value(serde_json::json!({
+            "username": "Player",
+            "uuid": "00000000-0000-0000-0000-000000000000",
+            "accessToken": "token"
+        }))
+        .expect("legacy Microsoft payload must remain valid");
+        assert_eq!(account.provider, AccountProvider::Microsoft);
+    }
+
+    #[test]
+    fn unknown_account_provider_is_refused_at_the_boundary() {
+        let result = serde_json::from_value::<AccountInfo>(serde_json::json!({
+            "provider": "unknown",
+            "username": "Player",
+            "uuid": "00000000-0000-0000-0000-000000000000",
+            "accessToken": "token"
+        }));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn sha256_verification_matches_the_standard_digest() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn elyby_javaagent_uses_the_official_api_name() {
+        let path = Path::new("/tmp/authlib-injector.jar");
+        assert_eq!(
+            elyby_javaagent_argument(path),
+            "-javaagent:/tmp/authlib-injector.jar=ely.by"
+        );
+    }
+
+    #[test]
+    #[ignore = "e2e: downloads the official authlib-injector and verifies SHA-256"]
+    fn e2e_downloads_verified_authlib_injector() {
+        let base = std::env::temp_dir().join(format!(
+            "voxel-authlib-injector-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&base);
+        let path = ensure_authlib_injector(&base).expect("injector download must succeed");
+        let bytes = std::fs::read(&path).expect("injector file must exist");
+        assert_eq!(sha256_hex(&bytes), AUTHLIB_INJECTOR_SHA256);
+        let _ = std::fs::remove_dir_all(&base);
+    }
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { ProjectRecord } from "@/types";
+import type { MinecraftAccount, ProjectRecord } from "@/types";
 
 /**
  * Instance service (Fase 5) — prepare, deploy and launch with progress
@@ -67,13 +67,6 @@ export async function copyModJar(
   });
 }
 
-export interface MinecraftAccount {
-  username: string;
-  uuid: string;
-  accessToken: string;
-  expiresAt: number;
-}
-
 export async function launchGame(options: {
   basePath: string;
   projectSlug: string;
@@ -107,6 +100,7 @@ export async function launchGame(options: {
     projectSlug: options.projectSlug,
     mcVersion: options.mcVersion,
     account: {
+      provider: options.account.provider,
       username: options.account.username,
       uuid: options.account.uuid,
       accessToken: options.account.accessToken,

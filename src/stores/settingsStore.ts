@@ -42,6 +42,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   launcher: {
     clientId: "",
+    elyClientId: "",
     ramMb: 4096,
   },
   github: {

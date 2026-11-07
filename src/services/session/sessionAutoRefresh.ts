@@ -1,8 +1,9 @@
 /**
  * Session Auto-Refresh (Super Prompt §9.10).
  *
- * Monitors the MSA (Microsoft Account) session and other auth sessions,
- * alerting the owner when a session is about to expire or has expired.
+ * Monitors the selected Minecraft session (Microsoft or Ely.by) and other
+ * auth sessions, alerting the owner when a session is about to expire or has
+ * expired.
  * Does NOT auto-reauthenticate (that would require user interaction),
  * but keeps the owner informed so they can re-authenticate before
  * losing access.
@@ -15,13 +16,10 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { secretsGet } from "@/services/secrets/secretsService";
-
-const KEY_TOKEN = "mc_access_token";
-const KEY_EXPIRY = "mc_token_expiry";
+import { getStoredAccount } from "@/services/launcher/accountService";
 
 export interface SessionStatus {
-  provider: "microsoft" | "github";
+  provider: "microsoft" | "elyby" | "github";
   authenticated: boolean;
   expiresAt: number | null;
   minutesRemaining: number | null;
@@ -30,32 +28,29 @@ export interface SessionStatus {
 }
 
 /**
- * Check if the MSA session is still valid.
+ * Checks the selected Minecraft account session (Microsoft or Ely.by).
  * Returns null if no session exists, otherwise returns status.
  */
-export async function checkMsnaSession(): Promise<SessionStatus | null> {
-  const [token, expiryStr] = await Promise.all([
-    secretsGet(KEY_TOKEN),
-    secretsGet(KEY_EXPIRY),
-  ]);
+export async function checkMinecraftSession(): Promise<SessionStatus | null> {
+  const account = await getStoredAccount();
+  if (!account) return null;
 
-  if (!token || !expiryStr) {
-    return null;
-  }
-
-  const expiry = Number(expiryStr);
+  const expiry = account.expiresAt;
   const now = Date.now();
   const minutesRemaining = Math.max(0, Math.floor((expiry - now) / 60000));
 
   return {
-    provider: "microsoft",
-    authenticated: !!token && expiry > now,
+    provider: account.provider,
+    authenticated: expiry > now,
     expiresAt: expiry,
     minutesRemaining,
     isExpiring: minutesRemaining > 0 && minutesRemaining <= 10,
     isExpired: expiry <= now,
   };
 }
+
+/** Backwards-compatible alias for the original MSA-only monitor. */
+export const checkMsnaSession = checkMinecraftSession;
 
 /**
  * Auto-refresh loop: checks the MSA session every 5 minutes.
@@ -94,16 +89,17 @@ async function checkAndNotify(
   onSessionExpiring?: (status: SessionStatus) => void,
   onSessionExpired?: (status: SessionStatus) => void,
 ): Promise<void> {
-  const status = await checkMsnaSession();
+  const status = await checkMinecraftSession();
   if (!status) return;
 
+  const providerName = status.provider === "elyby" ? "Ely.by" : "Microsoft";
   if (status.isExpired) {
     onSessionExpired?.(status);
     // Notify via system notification
     try {
       await invoke("notify_desktop", {
         title: "VOXEL — Session Expired",
-        body: `Your Microsoft account session (${status.provider}) has expired. Sign in again in Settings → Launcher.`,
+        body: `Your ${providerName} account session has expired. Sign in again in Settings → Launcher.`,
       }).catch(() => {});
     } catch {
       // Notify may not be available in all environments
@@ -113,7 +109,7 @@ async function checkAndNotify(
     try {
       await invoke("notify_desktop", {
         title: "VOXEL — Session Expiring Soon",
-        body: `Your Microsoft account session expires in ${status.minutesRemaining} minutes. Sign in again soon.`,
+        body: `Your ${providerName} account session expires in ${status.minutesRemaining} minutes. Sign in again soon.`,
       }).catch(() => {});
     } catch {
       // Notify may not be available in all environments

@@ -25,9 +25,10 @@ import {
   type LaunchProgress,
 } from "@/services/launcher/instanceService";
 import {
+  getLaunchAccount,
   getStoredAccount,
-  type MinecraftAccount,
-} from "@/services/launcher/authService";
+} from "@/services/launcher/accountService";
+import type { MinecraftAccount } from "@/types";
 
 interface Props {
   project: ProjectRecord;
@@ -57,6 +58,7 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
 
   const slug = project.slug;
   const busy = phase === "checking" || phase === "downloading";
+  const accountProvider = account?.provider === "elyby" ? "Ely.by" : "Microsoft";
 
   const refreshStatus = useCallback(async () => {
     if (!basePath) return;
@@ -118,13 +120,17 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
     if (!basePath) return;
     if (!account) {
       toast.error("Sign in first", {
-        description: "Settings → Launcher → Sign in with Microsoft",
+        description: "Settings → Launcher → Microsoft or Ely.by",
       });
       navigate("/settings/launcher");
       return;
     }
     setPhase("checking");
     try {
+      const launchAccount = await getLaunchAccount();
+      if (!launchAccount) {
+        throw new Error("The selected account is no longer available. Sign in again.");
+      }
       const loaderVersion = await resolveLoaderVersion(project);
       if (!instanceReady) {
         await prepareInstance(basePath, slug, project.minecraft_version, loaderVersion);
@@ -136,7 +142,7 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
         basePath,
         projectSlug: slug,
         mcVersion: project.minecraft_version,
-        account,
+        account: launchAccount,
         javaPath,
         ramMb,
         onLog: (line) => setGameLog((prev) => [...prev.slice(-40), line]),
@@ -203,7 +209,7 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
           <StatusRow
             ok={account !== null}
             pending={false}
-            label="Microsoft account"
+            label={`${accountProvider} account`}
             okText={account?.username ?? ""}
             pendingText=""
             badText="sign in via Settings → Launcher"

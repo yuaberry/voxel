@@ -68,6 +68,18 @@
           "url": "https://api.minecraftservices.com/*"
         },
         {
+          "url": "https://account.ely.by/api/oauth2/v1/devicecode"
+        },
+        {
+          "url": "https://account.ely.by/api/oauth2/v1/token"
+        },
+        {
+          "url": "https://account.ely.by/api/oauth2/v1/revoke"
+        },
+        {
+          "url": "https://account.ely.by/api/mojang/services/minecraft/profile"
+        },
+        {
           "url": "https://github.com/*"
         },
         {

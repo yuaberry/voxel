@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ExternalLink, Loader2, LogOut, UserRound } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, ExternalLink, Loader2, LogOut, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,29 +15,65 @@ import {
 import { Field, SectionHeader } from "../SettingsBits";
 import { useSettingsStore } from "@/stores/settingsStore";
 import {
-  getStoredAccount,
   signInWithMicrosoft,
-  signOut,
-  type MinecraftAccount,
 } from "@/services/launcher/authService";
+import {
+  signInWithElyby,
+  type ElybyDeviceCodeInfo,
+} from "@/services/launcher/elyAuthService";
+import {
+  activateProvider,
+  getStoredAccountState,
+  signOutProvider,
+  type StoredMinecraftAccounts,
+} from "@/services/launcher/accountService";
+import { secretsBackendInfo } from "@/services/secrets/secretsService";
+import type {
+  MinecraftAccount,
+  MinecraftAuthProvider,
+  SecretBackend,
+} from "@/types";
 
 const RAM_OPTIONS = [2048, 4096, 6144, 8192, 12288, 16384];
+
+interface DeviceDialogInfo extends ElybyDeviceCodeInfo {
+  provider: MinecraftAuthProvider;
+}
 
 export function LauncherSettings() {
   const launcher = useSettingsStore((s) => s.settings.launcher);
   const update = useSettingsStore((s) => s.update);
 
   const [clientIdDraft, setClientIdDraft] = useState(launcher.clientId);
-  const [account, setAccount] = useState<MinecraftAccount | null>(null);
-  const [signingIn, setSigningIn] = useState(false);
-  const [deviceInfo, setDeviceInfo] = useState<{
-    userCode: string;
-    verificationUrl: string;
-  } | null>(null);
+  const [elyClientIdDraft, setElyClientIdDraft] = useState(launcher.elyClientId);
+  const [accounts, setAccounts] = useState<StoredMinecraftAccounts>({
+    microsoft: null,
+    elyby: null,
+  });
+  const [activeProvider, setActiveProvider] =
+    useState<MinecraftAuthProvider | null>(null);
+  const [secretBackend, setSecretBackend] = useState<SecretBackend | null>(null);
+  const [signingProvider, setSigningProvider] =
+    useState<MinecraftAuthProvider | null>(null);
+  const [deviceInfo, setDeviceInfo] = useState<DeviceDialogInfo | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const refreshAccounts = useCallback(async () => {
+    const [state, backend] = await Promise.all([
+      getStoredAccountState(),
+      secretsBackendInfo(),
+    ]);
+    setAccounts(state.accounts);
+    setActiveProvider(state.activeProvider);
+    setSecretBackend(backend.backend);
+  }, []);
 
   useEffect(() => {
-    void getStoredAccount().then(setAccount).catch(() => setAccount(null));
-  }, []);
+    void Promise.resolve()
+      .then(() => refreshAccounts())
+      .catch(() => {});
+    return () => abortRef.current?.abort();
+  }, [refreshAccounts]);
 
   const handleSaveClientId = () => {
     if (clientIdDraft.trim() === launcher.clientId) return;
@@ -46,70 +82,149 @@ export function LauncherSettings() {
       .catch(() => toast.error("Could not save client id"));
   };
 
-  const handleSignIn = async () => {
-    setSigningIn(true);
+  const handleSaveElyClientId = () => {
+    if (elyClientIdDraft.trim() === launcher.elyClientId) return;
+    update("launcher", { elyClientId: elyClientIdDraft.trim() })
+      .then(() => toast.success("Ely.by client id saved"))
+      .catch(() => toast.error("Could not save Ely.by client id"));
+  };
+
+  const handleSignIn = async (provider: MinecraftAuthProvider) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setSigningProvider(provider);
     setDeviceInfo(null);
+
     try {
-      const signed = await signInWithMicrosoft((info) => setDeviceInfo(info));
-      setAccount(signed);
+      if (provider === "microsoft") {
+        const signed = await signInWithMicrosoft(
+          (info) => setDeviceInfo({ ...info, provider }),
+          { clientId: clientIdDraft.trim(), signal: controller.signal },
+        );
+        setAccounts((current) => ({ ...current, microsoft: signed }));
+      } else {
+        const signed = await signInWithElyby(
+          (info) => setDeviceInfo({ ...info, provider }),
+          { clientId: elyClientIdDraft.trim(), signal: controller.signal },
+        );
+        setAccounts((current) => ({ ...current, elyby: signed }));
+      }
+      setActiveProvider(provider);
       setDeviceInfo(null);
     } catch (error) {
-      toast.error("Sign-in failed", {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error(`${provider === "elyby" ? "Ely.by" : "Microsoft"} sign-in failed`, {
         description: error instanceof Error ? error.message : String(error),
       });
     } finally {
-      setSigningIn(false);
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setSigningProvider(null);
+      }
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    setAccount(null);
-    toast.success("Signed out");
+  const handleSignOut = async (provider: MinecraftAuthProvider) => {
+    try {
+      const result = await signOutProvider(provider);
+      await refreshAccounts();
+      const providerName = provider === "elyby" ? "Ely.by" : "Microsoft";
+      if (result.warnings.length > 0) {
+        toast.warning(`${providerName} signed out locally with a warning`, {
+          description: result.warnings.join(" "),
+        });
+      } else {
+        toast.success(`${providerName} account signed out`);
+      }
+    } catch (error) {
+      toast.error("Could not sign out", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
   };
+
+  const handleActivate = async (provider: MinecraftAuthProvider) => {
+    try {
+      await activateProvider(provider);
+      setActiveProvider(provider);
+      toast.success(`${provider === "elyby" ? "Ely.by" : "Microsoft"} account selected`);
+    } catch (error) {
+      toast.error("Could not select account", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const cancelDeviceFlow = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setDeviceInfo(null);
+    setSigningProvider(null);
+  };
+
+  const openBrowser = async (url: string) => {
+    try {
+      const storage = await import("@/services/storage/storageService");
+      await storage.openAuthUrl(url);
+    } catch (error) {
+      toast.info("Open this URL in your browser", {
+        description: `${url} (${String(error)})`,
+      });
+    }
+  };
+
+  const sessionStorageHint =
+    secretBackend === "os-keyring"
+      ? "Session tokens are stored securely in the OS keyring."
+      : secretBackend === "local-file"
+        ? "The OS keyring is unavailable; tokens are stored in the protected local secrets file."
+        : "Session tokens are stored in the configured local secret store.";
 
   return (
     <section>
       <SectionHeader
         title="Launcher"
-        description="Run Minecraft with your mods through the legitimate Microsoft device-flow sign-in — the same used by open-source launchers."
+        description="Run Minecraft with your mods using legitimate Microsoft or Ely.by OAuth device-flow sign-in. VOXEL never receives your password."
       />
 
       <Field
         label="Microsoft account"
-        hint={account ? `Token valid — expires ${new Date(account.expiresAt).toLocaleString()}` : "Sign in to launch the game with your mods."}
+        hint={accounts.microsoft ? sessionStorageHint : "Sign in with an Azure public-client application."}
       >
-        <div className="max-w-md space-y-2 rounded-lg border border-border/70 bg-card/60 p-4">
-          {account ? (
-            <>
-              <div className="flex items-center gap-2">
-                <UserRound className="h-4 w-4 text-emerald-400" />
-                <Badge variant="success">{account.username}</Badge>
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  {account.uuid}
-                </span>
-              </div>
-              <Button size="sm" variant="outline" onClick={() => void handleSignOut()}>
-                <LogOut className="h-3.5 w-3.5" /> Sign out
-              </Button>
-            </>
-          ) : (
-            <Button
-              variant="gradient"
-              size="sm"
-              disabled={signingIn || clientIdDraft.trim().length < 10}
-              onClick={() => void handleSignIn()}
-            >
-              {signingIn ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              {signingIn ? "Waiting for sign-in…" : "Sign in with Microsoft"}
-            </Button>
-          )}
-        </div>
+        <AccountCard
+          provider="microsoft"
+          account={accounts.microsoft}
+          active={activeProvider === "microsoft"}
+          signing={signingProvider === "microsoft"}
+          disabled={signingProvider !== null}
+          canSignIn={clientIdDraft.trim().length > 10}
+          onSignIn={() => void handleSignIn("microsoft")}
+          onSignOut={() => void handleSignOut("microsoft")}
+          onActivate={() => void handleActivate("microsoft")}
+        />
+      </Field>
+
+      <Field
+        label="Ely.by account"
+        hint={accounts.elyby ? sessionStorageHint : "Sign in with an Ely.by desktop application (public OAuth client)."}
+      >
+        <AccountCard
+          provider="elyby"
+          account={accounts.elyby}
+          active={activeProvider === "elyby"}
+          signing={signingProvider === "elyby"}
+          disabled={signingProvider !== null}
+          canSignIn={elyClientIdDraft.trim().length > 0}
+          onSignIn={() => void handleSignIn("elyby")}
+          onSignOut={() => void handleSignOut("elyby")}
+          onActivate={() => void handleActivate("elyby")}
+        />
       </Field>
 
       <Field
         label="MSA client id (Azure app)"
-        hint="Device-flow authentication needs an app registration — free at portal.azure.com → App registrations (public client, mobile/desktop). This is the same mechanism legitimate open-source launchers use."
+        hint="Device-flow authentication needs a public desktop/mobile app registration at portal.azure.com → App registrations. Enable “Allow public client flows”; no secret is needed."
       >
         <div className="max-w-md space-y-1.5">
           <Input
@@ -120,9 +235,35 @@ export function LauncherSettings() {
             onBlur={handleSaveClientId}
           />
           <p className="text-[10px] leading-relaxed text-muted-foreground/70">
-            The app must allow "Allow public client flows" so the device-code
-            grant works. No secret needed on desktop.
+            Microsoft account tokens remain isolated from Ely.by tokens, so
+            enabling Ely.by never replaces the existing local session.
           </p>
+        </div>
+      </Field>
+
+      <Field
+        label="Ely.by client id (desktop app)"
+        hint="Create a Desktop application at account.ely.by/dev/applications/new. Public desktop clients use device flow without a client secret."
+      >
+        <div className="max-w-md space-y-2">
+          <Input
+            className="font-mono text-xs"
+            placeholder="VOXEL desktop application client id"
+            value={elyClientIdDraft}
+            onChange={(e) => setElyClientIdDraft(e.target.value)}
+            onBlur={handleSaveElyClientId}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              void openBrowser("https://account.ely.by/dev/applications/new")
+            }
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Create Ely.by desktop app
+          </Button>
         </div>
       </Field>
 
@@ -148,21 +289,26 @@ export function LauncherSettings() {
       <Field label="Legal" hint="Always on, by design.">
         <div className="max-w-md rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
           <p className="text-[11px] leading-relaxed text-amber-200/80">
-            Minecraft files are downloaded at runtime from Mojang's official
-            endpoints for your local use — nothing is redistributed. VOXEL
-            never implements account bypasses or cracked authentication.
+            Minecraft files and the verified authlib-injector are downloaded at
+            runtime for your local use — nothing is redistributed. VOXEL never
+            implements account bypasses or cracked authentication.
           </p>
         </div>
       </Field>
 
-      {/* Device code dialog */}
-      <Dialog open={deviceInfo !== null} onOpenChange={(open) => { if (!open) setDeviceInfo(null); }}>
+      <Dialog
+        open={deviceInfo !== null}
+        onOpenChange={(open) => {
+          if (!open) cancelDeviceFlow();
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Finish signing in</DialogTitle>
             <DialogDescription>
-              Open the link below in any browser and enter the code. This
-              page is Microsoft's — VOXEL only receives the token.
+              {deviceInfo?.provider === "elyby"
+                ? "Open Ely.by below and approve the code. VOXEL only receives the OAuth token."
+                : "Open Microsoft's page below and approve the code. VOXEL only receives the token."}
             </DialogDescription>
           </DialogHeader>
           {deviceInfo && (
@@ -174,12 +320,8 @@ export function LauncherSettings() {
                 variant="secondary"
                 size="sm"
                 onClick={() =>
-                  import("@/services/storage/storageService").then((m) =>
-                    m.openAuthUrl(deviceInfo.verificationUrl).catch((error) =>
-                      toast.info("Open this URL in your browser", {
-                        description: `${deviceInfo.verificationUrl} (${String(error)})`,
-                      }),
-                    ),
+                  void openBrowser(
+                    deviceInfo.verificationUrlComplete ?? deviceInfo.verificationUrl,
                   )
                 }
               >
@@ -193,18 +335,84 @@ export function LauncherSettings() {
             </div>
           )}
           <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setDeviceInfo(null);
-                setSigningIn(false);
-              }}
-            >
+            <Button variant="ghost" onClick={cancelDeviceFlow}>
               Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </section>
+  );
+}
+
+function AccountCard({
+  provider,
+  account,
+  active,
+  signing,
+  disabled,
+  canSignIn,
+  onSignIn,
+  onSignOut,
+  onActivate,
+}: {
+  provider: MinecraftAuthProvider;
+  account: MinecraftAccount | null;
+  active: boolean;
+  signing: boolean;
+  disabled: boolean;
+  canSignIn: boolean;
+  onSignIn: () => void;
+  onSignOut: () => void;
+  onActivate: () => void;
+}) {
+  const providerName = provider === "elyby" ? "Ely.by" : "Microsoft";
+
+  return (
+    <div className="max-w-md space-y-2 rounded-lg border border-border/70 bg-card/60 p-4">
+      {account ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <UserRound className="h-4 w-4 text-emerald-400" />
+            <Badge variant="success">{account.username}</Badge>
+            {active ? (
+              <Badge variant="outline" className="gap-1">
+                <Check className="h-3 w-3" /> Active
+              </Badge>
+            ) : null}
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {account.uuid}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {!active ? (
+              <Button size="sm" variant="secondary" onClick={onActivate}>
+                <Check className="h-3.5 w-3.5" /> Use this account
+              </Button>
+            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={disabled || signing}
+              onClick={onSignOut}
+            >
+              <LogOut className="h-3.5 w-3.5" /> Sign out
+            </Button>
+          </div>
+        </>
+      ) : (
+        <Button
+          variant="gradient"
+          size="sm"
+          disabled={disabled || !canSignIn || signing}
+          onClick={onSignIn}
+        >
+          {signing ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : null}
+          {signing ? "Waiting for sign-in…" : `Sign in with ${providerName}`}
+        </Button>
+      )}
+    </div>
   );
 }
