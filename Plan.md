@@ -53,7 +53,10 @@ src/
     ai/                      # providers, streaming (3 protocolos), connectionService, sessions, contextService, references
     ai/agent/                # tools (12), orchestrator (loop), audit, promptBuilder, toolCallFormat (3 providers)
     build/                   # buildService (process events), errorParser (javac/dependency/configuration)
-    launcher/                # authService (MSA device flow), instanceService (prepare/launch/stop)
+    launcher/                # authService (MSA device flow), elyAuthService (Ely.by device flow),
+                             #   accountStore (mc_active_provider) · accountService (provider efetivo),
+                             #   oauthHttp (timeout/abort) · oauthSessionCoordinator (generation),
+                             #   instanceService (prepare/launch/stop)
     servers/                 # serverService (create/start/stop/backup/restore/console)
     servers/serverModules.ts # Economy/Prison/Token Chain datapack generators
     servers/economyService.ts # Token Chain panel + market + tunnel (playit.gg)
@@ -76,6 +79,7 @@ src-tauri/src/commands/
   templates.rs    # token engine ({{...}}) + write_template (embedded files)
   templates_embed.rs # include_bytes! de TODOS os arquivos do template
   launcher.rs     # download oficial (manifest→version.json→libs→assets→natives) + launch (KnotClient)
+                  #   + provider (msa|mojang) + authlib-injector v1.2.8 com SHA-256 verificado
   servers.rs      # create (vanilla/Paper jar) + start/stop (stdin) + backup/restore (zip)
   ledger.rs       # Token Chain: SHA-256 hash chain (init/apply/list/verify) + purchase intents (log tail)
   shaders.rs      # shaderpacks: create (allowlist vsh/fsh/glsl/properties/json, immutável),
@@ -150,7 +154,20 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 - **`launcher_prepare`**: piston-meta manifest → version.json (BOM-safe) → Fabric profile (meta.fabricmc.net) merge → downloads SHA-1 (client.jar + 88 libs vanilla + 8 fabric + 3.672 assets com 8 workers scoped-threads) → natives extraídos (zip-slip guard) → instância isolada `instances/<slug>/`.
 - **`launcher_launch`**: args vanilla+Fabric mesclados (Mojang rules avaliadas), placeholders `${...}` substituídos, KnotClient, `java -Xmx{ram}M -cp ...` → processo monitorado com eventos `launch:log`/`launch:exit`.
 - **Auth MSA**: device flow (devicecode → MSA token → XBL → XSTS → Minecraft services → profile), tokens no keyring, client_id configurável em Settings→Launcher.
+- **Auth Ely.by** (§4.5.1): device flow RFC 8628 oficial (sem senha, sem client secret) — `devicecode` → polling `token` → profile `minecraft/profile`; scopes `account_info offline_access minecraft_server_session`. Tokens no keyring, namespaces separados (`ely_*` vs `mc_*`), `mc_active_provider` escolhe a conta ativa. Lançamento usa `authlib-injector v1.2.8` (SHA-256 fixo `9c7f4343…a7b10`) com `-javaagent:<injector>=ely.by` e `user_type=mojang`; a Microsoft continua `user_type=msa`.
 - **Mod deployment**: `launcher_copy_mod_jar` copia o jar mais recente de `build/libs/` para `instances/<slug>/mods/`.
+
+### 4.5.1 Ely.by como provider de autenticação (Sessão 75)
+- **Provider modelado**: `MinecraftAuthProvider = "microsoft" | "elyby"`. A conta ativa é `mc_active_provider` (keyring). Payload legado sem provider = Microsoft. Trocar de provider NUNCA apaga a outra sessão (namespaces `mc_*` e `ely_*` separados).
+- **Device flow oficial** (`elyAuthService.ts`): `POST /api/oauth2/v1/devicecode` → polling `POST /api/oauth2/v1/token` (`authorization_pending` continua, `slow_down` aumenta o intervalo) → `GET /api/mojang/services/minecraft/profile`. Scopes: `account_info offline_access minecraft_server_session`. **Public client: sem client secret**.
+- **Credenciais**: `ely_username` · `ely_uuid` · `ely_access_token` · `ely_token_expiry` · `ely_refresh_token` · `ely_client_id` — todas no keyring (o `ely_client_id` fica guardado porque é ele quem possui o refresh grant). O **access token é escrito por último**: sua presença = sessão completa.
+- **Rollback**: escrita parcial limpa as credenciais; **cancelamento durante os writes finais** também reverte (credenciais apagadas + provider anterior restaurado) — o cancelamento ganha do commit.
+- **Refresh**: só no caminho explícito de lançamento (`getLaunchAccount` → `ensureFreshElybyAccount`); valida identidade (uuid+username+access token) antes de escrever, então um refresh tardio não sobrescreve uma sessão nova.
+- **Sign-out**: limpa local SEMPRE (inclusive quando a revogação remota falha) e revoga o refresh token em `POST /api/oauth2/v1/revoke`. Depois volta para a Microsoft se ela existir.
+- **Perímetro HTTP (Rust)**: ACL do `plugin-http` enumerada só para os 4 endpoints oficiais; `open_auth_url` aceita apenas `https://account.ely.by/code` e `/dev/applications/new` (host/porta/path exatos).
+- **Lançamento**: `authlib-injector v1.2.8` baixado do release oficial do GitHub e conferido por SHA-256 (`9c7f4343e6c82034958ffb48c14a2cb0c85928be7283103ce17da00c6d5a7b10`); `user_type=mojang` + `-javaagent:<injector>=ely.by`.
+- **Honestidade do backend de secrets**: a UI mostra o backend real (keyring do SO ou fallback local protegido) — nunca promete keyring onde não há.
+- **Pendente (depende do dono)**: o `client_id` do Desktop Application público do VOXEL precisa ser aprovado em `https://account.ely.by/dev/applications/new` e é configurável em Settings→Launcher.
 
 ### 4.6 Server Studio (Fase 6)
 - **`server_create`**: vanilla (piston-meta, SHA-1) ou Paper (Fill API, SHA-256), eula gate obrigatório, properties curadas (`online-mode=true` SEMPRE), isolated `servers/<slug>/`.
@@ -211,6 +228,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | 20 | Visão + iOS PWA | Imagem no chat (desktop clip + mobile 📎 + bridge multimodal 3 dialetos) + **PWA embutida no desktop servida pelo bridge** (iOS Add to Home Screen sem App Store) + APK 0.2.0 | react aninhado duplicado quebrando SSR web do Metro |
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
+| 75 | Ely.by como provider de autenticação | **Device flow oficial Ely.by** (RFC 8628, sem senha, sem client secret) no Launcher + **authlib-injector v1.2.8 com SHA-256** para o lançamento + provider efetivo (`mc_active_provider`) com namespaces Microsoft/Ely.by separados + UI Microsoft/Ely.by em Settings→Launcher + hardening (timeout total, abort, redirects bloqueados, ACL HTTP de 4 endpoints, allowlist de `open_auth_url`) + **v0.32.0** | SkipLink removido (S74) · card azul flutuante · **sign-out Ely.by não voltava para a Microsoft** (o sign-out interno limpava o provider antes do fallback) · **cancelamento durante os writes finais deixava credenciais Ely.by** (rollback incompleto) · import `secretsHas` morto |
 | 71 | Accessibility + Performance Lab UI + Session Auto-Refresh | **AccessibilityPage** (/accessibility) with SkipLink, contrast tester, live region announcer, focus visible indicator, keyboard navigation demo · **Performance Lab** (/performance) with boot time, build time, live FPS, memory RSS, server start time — all measured from real data, zero fake data · **Session Auto-Refresh** §9.10: monitors MSA session, alerts when expiring (≤10 min) or expired · 6 TS tests + v0.28.0 | |
 | 69 | Accessibility + Performance Lab | **Deployment SSH** (§9.8): deploy remoto via ssh/scp, testar conexão, transferir arquivos · **Performance Lab** (/performance): boot time, build time, FPS ao vivo, memória, server start — tudo medido de verdade · **Acessibilidade**: skip link, ARIA, focus trap, teclado, foco visível, reduced motion · v0.27.0 | |
 | 70 | Session Auto-Refresh (§9.10) | **Monitora sessão MSA** e alerta quando expira (≤10 min) ou já expirou. Nunca faz auto-login — sempre requer ação do dono · 6 TS testes + v0.27.0 | |
@@ -277,6 +295,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 10. **Esquema versões 2026** — `26.x` sem yarn → mojmap; `1.x` com yarn; >1.21.1 experimental.
 11. **Template embedded** (`include_bytes!`) — determinístico em dev/release.
 12. **Token Chain compliance** — moeda interna do jogo, sem valor monetário. Externo = `ChainProvider` reservada.
+13. **Provider de autenticação explícito** — `microsoft | elyby`; payload legado sem provider = Microsoft. As duas sessões são independentes (namespaces `mc_*` e `ely_*`): trocar a conta ativa **nunca** destrói a outra. Nenhum client secret — Ely.by é public client; o `client_id` é configurável pelo dono.
 
 ## 7. Bugs caçados (18 total — NÃO re-introduzir)
 
@@ -308,20 +327,22 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **Keyword heurística genérica** — "friendly" solta casava "Friendly SMP survival" como family-craft | teste de inferência | keywords compostas ("family friendly") |
 | **§ não-ASCII em `br#"…"#`** — Rust byte-string exige ASCII | cargo test não compilava | string normal + `.as_bytes()` |
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
+| **Sign-out Ely.by não voltava para a Microsoft** — o sign-out interno limpa `mc_active_provider` antes do fallback, então o fallback lia "não estava ativo" e não selecionava a Microsoft | teste do service com o sign-out mockado igual ao real (limpa o provider) | `signOutProvider` lê a seleção **antes** do sign-out e decide o fallback a partir dela |
+| **Cancelamento durante os writes finais do login Ely.by deixava credenciais no keyring** — o `throwIfAborted` posterior ao commit lançava fora do bloco de rollback | teste que aborta no `secretsSet` do access token | rollback completo: credenciais apagadas + provider anterior restaurado (o cancelamento ganha do commit) |
 
-## 8. Estado atual (verificado — Sessão 72, v0.29.0)
+## 8. Estado atual (verificado — Sessão 75, v0.32.0 em preparação)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (89) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge |
-| Vitest (105) | ✅ 32 shaders, gerador GLSL, errorParser, serverModules, **task-force personas + read-only toolset**, **loader availability + maven ranges** |
-| Vitest (260) | ✅ todos os testes incluindo Player Management, Moderation Assistant, dialogs render-smoke, Performance Lab, Accessibility, Deployment SSH, Session Auto-Refresh |
+| Rust unit (110 + 12 ignored) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge, **launcher Ely.by/authlib-injector**, allowlist de HTTP/URL |
+| Vitest (291 em 38 arquivos) | ✅ inclui Player Management, Moderation Assistant, dialogs render-smoke, Performance Lab, Accessibility, Deployment SSH, Session Auto-Refresh e **device flow Ely.by/Microsoft + coordinator de sessão + HTTP com timeout/abort + seleção de provider** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
 | E2E SLP multi-server | ✅ Hypixel + CubeCraft + **Minemen via SRV** (reprodução do bug do dono) |
 | **E2E compilação ×6 templates** | ✅ **fabric 158s · forge 339s · neo-legacy 170s · neo-NG7 854s · neo-MDG 64s · neo-26.x 71s(warm)/19min(1ª) — todos produzem dark_kingdom-0.1.0.jar real** (Sessões 22-35) |
+| **E2E authlib-injector** | ✅ download do release oficial + SHA-256 conferido ao vivo (Sessão 75) |
 | Typecheck / ESLint | ✅ 0 errors (warns set-state-in-effect = backlog família conhecida) |
 | Mobile typecheck | ✅ `pnpm --filter @voxel/mobile typecheck` (CI verde) |
 | Vite build | ✅ resolve @voxel/core via workspace |
@@ -330,7 +351,8 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 ### Releases publicadas (tudo HTTP 206)
 | Tag | Conteúdo |
 |---|---|
-| **v0.29.0 (latest)** | Desktop: **Player Management + Moderation Assistant** (arquivos vanilla reais, ações via stdin, ban requer motivo, histórico migration 004; IA nunca bane sozinha, sugestões groundadas em evidência literal) + **typecheck/lint fixes** (10 TS errors, 2 lint errors) + release multi-OS 8 assets HTTP 200 |
+| **v0.32.0 (em preparação)** | Desktop: **Ely.by como provider de autenticação** (device flow oficial, sem senha, authlib-injector v1.2.8 com SHA-256, provider efetivo com sessões Microsoft/Ely.by isoladas, UI Microsoft/Ely.by) + **SkipLink removido** (o card azul sumiu de vez) + hardening de OAuth (timeout total, abort, redirects bloqueados, ACL HTTP de 4 endpoints, allowlist de `open_auth_url`) |
+| v0.29.0 (latest publicada) | Desktop: **Player Management + Moderation Assistant** (arquivos vanilla reais, ações via stdin, ban requer motivo, histórico migration 004; IA nunca bane sozinha, sugestões groundadas em evidência literal) + **typecheck/lint fixes** (10 TS errors, 2 lint errors) + release multi-OS 8 assets HTTP 200 |
 | v0.28.0 | Desktop: **Accessibility + Performance Lab** (skip link, ARIA, foco visível, /performance com métricas reais) + **Session Auto-Refresh** + **Deployment SSH** + APK mobile 0.3.1 |
 | v0.27.0 | Desktop: **Performance Lab + Deployment SSH + Accessibility** (métricas reais, deploy remoto via SSH, a11y) + APK mobile 0.3.1 |
 | v0.26.0 | Desktop: **Accessibility + Performance Lab** (skip link, ARIA, foco visível, /performance com métricas reais) + APK mobile 0.3.1 |
@@ -392,10 +414,10 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 
 ### Comandos de verificação
 ```bash
-cd ~/nexuscraft-studio
+cd ~/voxel-source                    # repo local atual (o antigo ~/nexuscraft-studio foi movido)
 pnpm verify                         # typecheck + lint + vitest + vite build
-cd src-tauri && cargo test          # 89 unit
-cargo test --lib -- --ignored --nocapture # 11 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real) (compilação ×4 templates, launcher, server, SLP real)
+cd src-tauri && cargo test          # 110 unit (+12 ignored)
+cargo test --lib -- --ignored --nocapture # 12 E2E (compilação ×6 templates, launcher, server, SLP, modrinth real, authlib-injector SHA-256)
 pnpm --filter @voxel/mobile typecheck
 gh run list --limit 4               # CI/Pages/Mobile/Release status
 ```
@@ -496,7 +518,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ## 12. Protocolo de Retomada (executar após ler este arquivo)
 
-1. **`cd ~/nexuscraft-studio && git log --oneline | head -20 && git status --short`** — confirme estado limpo e commits.
+1. **`cd ~/voxel-source && git log --oneline | head -20 && git status --short`** — confirme estado limpo e commits.
 2. **`pnpm typecheck && pnpm lint && pnpm test:unit`** e **`cd src-tauri && cargo test`** — tudo verde antes de qualquer mudança.
 3. Leia `README.md` + `docs/architecture.md` + este arquivo de novo se necessário.
 4. **NÃO reescrever sistemas existentes** — seguir princípios (§6) e o briefing original.
@@ -586,7 +608,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 73 — correções de UI reportadas pelo dono (SkipLink, versão, a11y, testes). Estado: vitest 265 · cargo 104 (+11 E2E) · lint 0/0 · release v0.29.0 (latest).*
+*Última atualização: Sessão 75 — Ely.by como provider de autenticação + v0.32.0. Estado: vitest 291 · cargo 110 (+12 E2E, incl. authlib-injector SHA-256 ao vivo) · lint 0/0 · typecheck 0 · release v0.32.0 em preparação (latest publicada: v0.29.0).*
 
 ---
 
@@ -989,3 +1011,37 @@ Mantido: o `<main id="main-content">` único do `AppLayout` (landmark semântica
 **Nota honesta**: sem skip link, quem navega só por teclado perde o atalho "pular para o conteúdo" — o landmark continua correto e a ordem de foco segue natural (sidebar → conteúdo).
 
 **Verificação**: typecheck 0 · lint 0/0 · vitest 262/262 (os 3 testes do skip link foram removidos junto com o componente) · cargo **104 passed, 11 ignored** e **ZERO warnings** (os 21 avisos antigos do compilador foram eliminados: imports mortos, código morto, valor inicial nunca lido e tipos privados em API pública) · vite build ✓ · prova visual no bundle de produção (nenhum elemento fixo no topo; `/accessibility` renderiza sem o card) · CI verde.
+
+---
+
+## 75. Sessão 75 — Ely.by como provider de autenticação + release v0.32.0
+
+**Pedido do dono**: (1) tirar o card azul flutuante (feito na S74, commit `a55147b`); (2) adicionar **Ely.by** no Launcher, com login funcional para Minecraft Java, mantendo o login Microsoft; (3) publicar a release **v0.32.0** sem o card azul.
+
+**Arquitetura entregue** (detalhe funcional em §4.5.1):
+- **Device flow oficial Ely.by** (RFC 8628): `devicecode` → polling `token` → `minecraft/profile`. Sem senha, sem client secret (public client). Scopes `account_info offline_access minecraft_server_session`.
+- **Provider efetivo**: `mc_active_provider` no keyring + `accountService` como fonte única da verdade para UI e lançamento. Namespaces `mc_*` (Microsoft) e `ely_*` (Ely.by) separados — trocar a conta ativa não destrói a outra. Payload legado sem provider = Microsoft.
+- **Lançamento Ely.by**: `authlib-injector v1.2.8` (SHA-256 `9c7f4343e6c82034958ffb48c14a2cb0c85928be7283103ce17da00c6d5a7b10`), `-javaagent:<injector>=ely.by`, `user_type=mojang`; Microsoft segue `user_type=msa`.
+- **UI**: Settings→Launcher com abas Microsoft/Ely.by, client IDs, backend real de secrets (keyring ou fallback local), e o seletor de conta ativa.
+
+**Hardening (achados de auditoria externa, todos tratados)**:
+- ACL do `plugin-http` enumerada para os **4 endpoints oficiais** (devicecode/token/revoke/profile) — nada mais.
+- `open_auth_url` aceita apenas `https://account.ely.by/code` e `/dev/applications/new` (host, porta e path exatos).
+- Timeout total cobrindo o **corpo HTTP** (não só a conexão) + abort do chamador + `maxRedirections: 0`.
+- Polling respeita a expiração do device code; `slow_down` aumenta o intervalo.
+- Refresh valida identidade (uuid+username+access token) antes de escrever → refresh tardio não sobrescreve sessão nova.
+- Escrita parcial limpa as credenciais; cancelamento durante os writes finais também reverte (credenciais + provider anterior).
+- Sign-out Ely.by limpa local **antes** da revogação remota e sempre; depois volta para a Microsoft.
+
+**Bugs reais corrigidos e cobertos por teste novo** (§7):
+1. `signOutProvider("elyby")` **não voltava para a Microsoft** — o sign-out interno limpa `mc_active_provider` antes do fallback. Fix: ler a seleção **antes** do sign-out.
+2. **Cancelamento durante os writes finais** do login Ely.by deixava credenciais no keyring. Fix: rollback completo dentro do bloco de commit.
+3. Import `secretsHas` morto em `elyAuthService.ts` (typecheck quebrado) — `hasStoredElybyAccount` passou a validar a sessão **completa** (username+uuid+token+refresh+client id).
+
+**Verificação**: typecheck 0 ✓ · lint 0/0 ✓ · vitest **291/291** (38 arquivos, +4 novos) ✓ · cargo **110 passed + 12 ignored** ✓ · **E2E authlib-injector ao vivo** (download oficial + SHA-256 conferido) ✓ · vite build ✓ · bundle de produção **sem nenhum texto de skip link** ✓.
+
+**Prova de que os testes novos pegam as regressões**: cada correção foi revertida temporariamente e a suíte falhou (1 falha em `accountService.test.ts`, 2 falhas em `elyAuthService.test.ts`); com as correções, tudo passa.
+
+**Pendência honesta (depende do dono)**: o `client_id` do Desktop Application público do VOXEL ainda não foi fornecido/aprovado em `https://account.ely.by/dev/applications/new`. Sem ele o **device flow real** não pode ser exercitado ao vivo — o campo fica configurável em Settings→Launcher e o resto (perímetro, UI, rollback, revoke, refresh, lançamento com injector) está pronto e testado.
+
+**Próximo passo**: commit lógico → push `main` → tag `v0.32.0` → release multi-OS → validar os 8 assets → instalar o `.deb` sobre o `voxel 0.29.0` local e confirmar a versão e o bundle sem o card azul.

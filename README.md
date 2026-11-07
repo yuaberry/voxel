@@ -8,16 +8,16 @@
 > AI-Powered Creation Platform
 
 **[🌐 Site oficial](https://yuaberry.github.io/voxel/)** ·
-**[⬇️ Downloads (v0.5.11)](https://github.com/yuaberry/voxel/releases/latest)** —
+**[⬇️ Downloads (v0.32.0)](https://github.com/yuaberry/voxel/releases/latest)** —
 Windows `.exe`/`.msi` · Linux `.deb`/`.AppImage` · macOS `.dmg` (Apple Silicon + Intel)
 
 VOXEL é uma plataforma desktop de criação assistida por IA para Minecraft Java Edition. **O MVP está completo e provado de ponta a ponta**: descreva um mod em linguagem natural, compile-o de verdade com Gradle, corrija erros com um agente sandboxado, rode o Minecraft com o seu jar instalado, monte servidores com economia própria e publique o projeto no GitHub.
 
 ```
 NO FAKE DATA — cada tela mostra apenas o que funciona.
-Prova real: 18 testes unitários Rust + 28 Vitest + 3 E2E executados
-(mod compilado, launcher de 718MB oficiais com SHA-1, servidor
-boot/stop/backup) — tudo verde, na CI e local.
+Prova real: 110 testes unitários Rust + 291 Vitest + 12 E2E executados
+(mod compilado, launcher de 718MB oficiais com SHA-1, authlib-injector
+oficial com SHA-256, servidor boot/stop/backup) — tudo verde, na CI e local.
 ```
 
 ---
@@ -34,7 +34,7 @@ boot/stop/backup) — tudo verde, na CI e local.
 | Projects Core — wizard com versão selecionável (esquemas 1.x e 26.x), Monaco, snapshots git | ✅ |
 | VOXEL Agent — sandbox Rust, auditoria em `ai_tool_calls`, auto-snapshot, task force multi-agente (Architect→Developer→Reviewer) e tools de arte (texturas/blocos/estruturas .nbt/dimensões) | ✅ |
 | Build System — `./gradlew build` ao vivo, Error Center, Auto-Fix ≤5 tentativas | ✅ |
-| Launcher — instâncias isoladas, downloads oficiais SHA-1 (718MB provados), MS device flow | ✅ |
+| Launcher — instâncias isoladas, downloads oficiais SHA-1 (718MB provados), Microsoft + Ely.by OAuth device flow, authlib-injector SHA-256 para Ely.by | ✅ |
 | Server Studio — vanilla/Paper oficiais, console stdin, backups/restore, properties | ✅ |
 | Server Modules misturáveis — 8 sistemas: Economy/Prison/Token Chain, SkyBlock Islands, Factions War, BedWars Lite, Monuments (.nbt reais com /place) e Custom Realm (dimensão real) — cada um com comandos documentados no README do servidor | ✅ |
 | Token Chain — ledger SHA-256 real (mint/transfer/burn/verify, tamper-evidente) | ✅ Wave 1 |
@@ -49,7 +49,7 @@ boot/stop/backup) — tudo verde, na CI e local.
 | **Mobile** — VOXEL Bridge (token no keyring, biometria), APK Android 0.3.1, PWA iOS instalável, build notifications | ✅ |
 | Dark Kingdom — projeto-exemplo criado automaticamente (espada, receita, advancement) | ✅ |
 | Release multi-OS + site oficial no GitHub Pages | ✅ |
-| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), **145 testes verdes**; toda ação fora da main thread (async + spawn_blocking — congelamento extinto como classe) | ✅ |
+| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), **401 testes verdes** (110 Rust + 291 Vitest); toda ação fora da main thread (async + spawn_blocking — congelamento extinto como classe) | ✅ |
 
 ## 🚀 Como rodar (desenvolvimento)
 
@@ -64,7 +64,7 @@ Fluxo completo em 4 passos (primeira vez):
 1. **Settings → AI** — configure provider, key (vai para o keyring) e modelo; **Settings → Storage** — escolha a pasta do workspace (`~/VOXEL`)
 2. O **Dark Kingdom** nasce automaticamente como exemplo — abra o workspace e pressione **Build** (cache Gradle compartilhado; primeira build baixa dependências)
 3. **AI Creator (Agent mode)** — *"add a Voidcutter sword: item, model, lang and recipe"* — o agente edita os arquivos com auditoria e snapshot
-4. **Run** — instância isolada preparada com arquivos oficiais → Minecraft abre com o seu mod (requer Microsoft sign-in uma vez: Settings → Launcher)
+4. **Run** — instância isolada preparada com arquivos oficiais → Minecraft abre com o seu mod (requer sign-in Microsoft ou Ely.by uma vez: Settings → Launcher)
 
 Para **estilos visuais**: aba **Shaders** — escolha entre 32 presets (BSL, SEUS, Complementary Reimagined, Solas…) com preview WebGL ao vivo → Create → Install na instância → ative no Iris/OptiFire. Cada preset gera GLSL 100% original; nada é copiado dos originais.
 
@@ -92,7 +92,7 @@ Decisões-chave no [`docs/architecture.md`](docs/architecture.md) (AD-1..AD-11 +
 
 ## Segurança & Legal
 
-- Nenhum bypass de autenticação, DRM ou conta — Microsoft e GitHub via **device flow** legítimo, com client_id configurável
+- Nenhum bypass de autenticação, DRM ou conta — Microsoft, Ely.by e GitHub via **device flow** legítimo, com client_id configurável
 - Arquivos do Minecraft obtidos em runtime dos endpoints oficiais, para uso local — **nada é redistribuído**
 - Tokens: OS keyring; push GitHub usa header transitório que nunca toca o disco
 - Sandbox: toda operação de arquivos passa pelo path guard Rust; shell arbitrário é proibido por design
@@ -103,9 +103,9 @@ Decisões-chave no [`docs/architecture.md`](docs/architecture.md) (AD-1..AD-11 +
 
 | Suíte | Escopo |
 |---|---|
-| `cargo test` | 68 unit (templates ×6 eras, ledger+tamper, shaderpacks, SLP+SRV, bridge multimodal, modpacks, snapshots, deploy, structures NBT, assets animados) |
-| `cargo test -- --ignored` | 10 E2E: **compilação REAL de 6 templates** (fabric/forge/neoforge ×4 eras até 26.3), launcher 718MB SHA-1, server ciclo, SLP de servidores públicos (hypixel/nerdzone…), Modrinth com checksum |
-| `pnpm test:unit` | 77 Vitest (shaders + gerador GLSL, error parser, 6+8 módulos de servidor com comandos, inferência de estilo, task force, model routing, i18n pt-BR, manifestos, parser de MOTD) |
+| `cargo test` | 110 unit (templates ×6 eras, ledger+tamper, shaderpacks, SLP+SRV, bridge multimodal, modpacks, snapshots, deploy, structures NBT, assets animados, launcher Ely.by/authlib-injector, allowlist de HTTP/URL) |
+| `cargo test -- --ignored` | 12 E2E: **compilação REAL de 6 templates** (fabric/forge/neoforge ×4 eras até 26.3), launcher 718MB SHA-1, **authlib-injector oficial com SHA-256**, server ciclo, SLP de servidores públicos (hypixel/nerdzone…), Modrinth com checksum |
+| `pnpm test:unit` | 291 Vitest em 38 arquivos (shaders + gerador GLSL, error parser, 6+8 módulos de servidor com comandos, inferência de estilo, task force, model routing, i18n pt-BR, manifestos, parser de MOTD, **device flow Microsoft + Ely.by**, coordinator de sessão OAuth, HTTP com timeout/abort e seleção de provider) |
 | CI (`.github/workflows/ci.yml`) | typecheck + lint + vitest + vite build + cargo test |
 | Release (`.github/workflows/release.yml`) | tag `v*` → .exe/.msi/.deb/.AppImage/.dmg (Windows, Linux, macOS arm64+x64) |
 
