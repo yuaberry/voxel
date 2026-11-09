@@ -202,7 +202,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (71 sessões)
+## 5. Histórico de sessões (72+ sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
@@ -229,6 +229,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
 | 75 | Ely.by como provider de autenticação | **Device flow oficial Ely.by** (RFC 8628, sem senha, sem client secret) no Launcher + **authlib-injector v1.2.8 com SHA-256** para o lançamento + provider efetivo (`mc_active_provider`) com namespaces Microsoft/Ely.by separados + UI Microsoft/Ely.by em Settings→Launcher + hardening (timeout total, abort, redirects bloqueados, ACL HTTP de 4 endpoints, allowlist de `open_auth_url`) + **v0.32.0** | SkipLink removido (S74) · card azul flutuante · **sign-out Ely.by não voltava para a Microsoft** (o sign-out interno limpava o provider antes do fallback) · **cancelamento durante os writes finais deixava credenciais Ely.by** (rollback incompleto) · import `secretsHas` morto |
+| 76 | Mine Rank (Rankup próprio) | **Módulo `mine_rank`** com manifesto único de **39 comandos** → datapack `nexus_rank` (203 arquivos): 8 tiers, 4 moedas, prestígio, 8 minas privadas, mercado, loja, pesca, arena, clans · **mundo compacto** (grade 4×2, ≤5 chunks do hub) sobre plataforma em y=100 · **painel na UI** (instalação, tiers, moedas, comandos, mapa com atribuição) como aba do console · **import de mapa ZIP com licença gravada dentro do mundo** (Rust) · **E2E real** (jar vanilla 1.20.1 oficial + cliente mineflayer, 117 triggers, mineração pagando coin) | `give` (ordem do NBT) · `team join` impossível em datapack → tags · `players add` só aceita inteiro · `clear` com count 0 · **jogador novo sem score** (todo `matches 0` era branch morto) · **teleporte de 48 chunks travava o servidor (~45s)** · `/trigger` recusado no console · throttle de chat do vanilla |
 | 71 | Accessibility + Performance Lab UI + Session Auto-Refresh | **AccessibilityPage** (/accessibility) with SkipLink, contrast tester, live region announcer, focus visible indicator, keyboard navigation demo · **Performance Lab** (/performance) with boot time, build time, live FPS, memory RSS, server start time — all measured from real data, zero fake data · **Session Auto-Refresh** §9.10: monitors MSA session, alerts when expiring (≤10 min) or expired · 6 TS tests + v0.28.0 | |
 | 69 | Accessibility + Performance Lab | **Deployment SSH** (§9.8): deploy remoto via ssh/scp, testar conexão, transferir arquivos · **Performance Lab** (/performance): boot time, build time, FPS ao vivo, memória, server start — tudo medido de verdade · **Acessibilidade**: skip link, ARIA, focus trap, teclado, foco visível, reduced motion · v0.27.0 | |
 | 70 | Session Auto-Refresh (§9.10) | **Monitora sessão MSA** e alerta quando expira (≤10 min) ou já expirou. Nunca faz auto-login — sempre requer ação do dono · 6 TS testes + v0.27.0 | |
@@ -297,7 +298,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 12. **Token Chain compliance** — moeda interna do jogo, sem valor monetário. Externo = `ChainProvider` reservada.
 13. **Provider de autenticação explícito** — `microsoft | elyby`; payload legado sem provider = Microsoft. As duas sessões são independentes (namespaces `mc_*` e `ely_*`): trocar a conta ativa **nunca** destrói a outra. Nenhum client secret — Ely.by é public client; o `client_id` é configurável pelo dono.
 
-## 7. Bugs caçados (18 total — NÃO re-introduzir)
+## 7. Bugs caçados (25 total — NÃO re-introduzir)
 
 | Bug | Como foi achado | Fix |
 |---|---|---|
@@ -329,20 +330,29 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **`online-mode` via properties** — presets nunca podem desligar | teste Rust dedicado | merge Rust descarta a key explicitamente (defense in depth no server_create) |
 | **Sign-out Ely.by não voltava para a Microsoft** — o sign-out interno limpa `mc_active_provider` antes do fallback, então o fallback lia "não estava ativo" e não selecionava a Microsoft | teste do service com o sign-out mockado igual ao real (limpa o provider) | `signOutProvider` lê a seleção **antes** do sign-out e decide o fallback a partir dela |
 | **Cancelamento durante os writes finais do login Ely.by deixava credenciais no keyring** — o `throwIfAborted` posterior ao commit lançava fora do bloco de rollback | teste que aborta no `secretsSet` do access token | rollback completo: credenciais apagadas + provider anterior restaurado (o cancelamento ganha do commit) |
+| **`give` com NBT antes do count não carregava no 1.20.1** (`give @s item 1{...}` → *"Expected whitespace to end one argument"*) | E2E real: 16 funções do datapack falharam no boot | no 1.20.1 o NBT vai **anexado ao id** e o count depois: `give @s item{NBT} 1` |
+| **`team join` é IMPOSSÍVEL dentro de um datapack** — o vanilla valida o nome do time no *parse* da função (antes do `load` criar o time) → 16 funções não carregavam | E2E real: *"Incorrect argument for command: …mr_plot_1"* | acesso de construção e filiação de clan migraram para **tags** (`mr_trust_N`, `mr_deny_N`, `mr_clan_N`) — tags não têm validação de nome |
+| **`scoreboard players add <alvo> <obj> <fonte>`** — o vanilla só aceita **inteiro** como valor | E2E real: *"Expected integer"* | `scoreboard players operation X obj += Y obj` (soma de score) |
+| **`clear @s <item> 0 1`** é inválido (count 0 não existe) | E2E real ao vender minério | `clear @s <item> 1` |
+| **Jogador novo NÃO tem score** — todo `execute if score @s mr_x matches 0` era branch morto (o `/trigger mr_t_plot_auto` não fazia nada) | cliente real (mineflayer) no 1º probe | função `init_player` (zera todos os objetivos + tag `mr_ready`) chamada pelo tick em `@a[tag=!mr_ready]` |
+| **Teleporte de 48 chunks TRAVA o servidor** — o vanilla carrega o corredor inteiro (chain de holders): ~45s de tick parado e *"A single server tick took 60.00 seconds"* (watchdog matou o servidor) | probe de teleporte (x=768 → 46s) | mundo **compacto**: hub (0,0), terrenos em grade 4×2 (spacing 16, origin 20), lago (0,80), arena (−80,0) — tudo a ≤5 chunks |
+| **`/trigger` do console é recusado** — *"A player is required to run this command here"* (o objetivo nem é resolvido) | probe no vanilla 1.20.1 | o E2E usa **cliente real** (mineflayer); a varredura completa usa `execute as <jogador> run trigger …` pelo console (mesma semântica, sem throttle de chat) |
+| **Chat do vanilla tem throttle** (~20 msgs/10s) — o sweep de 39+78 mensagens perdia o feedback e o comando era engolido | E2E real (comando 39 sem resposta) | E2E confirma pelo **log do servidor** (fonte de verdade) e usa pacing + retry; o sweep completo vai pelo console |
 
-## 8. Estado atual (verificado — Sessão 75, v0.32.0 publicada)
+## 8. Estado atual (verificado — Sessão 76, v0.32.0 publicada + Mine Rank entregue)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (110 + 12 ignored) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge, **launcher Ely.by/authlib-injector**, allowlist de HTTP/URL |
-| Vitest (291 em 38 arquivos) | ✅ inclui Player Management, Moderation Assistant, dialogs render-smoke, Performance Lab, Accessibility, Deployment SSH, Session Auto-Refresh e **device flow Ely.by/Microsoft + coordinator de sessão + HTTP com timeout/abort + seleção de provider** |
+| Rust unit (110 + 12 ignored) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge, **launcher Ely.by/authlib-injector**, allowlist de HTTP/URL, **import de mundo com atribuição de mapa** |
+| Vitest (316 em 40 arquivos) | ✅ inclui Player Management, Moderation Assistant, dialogs render-smoke, **Mine Rank (manifesto + datapack + layout do mundo + render do painel)**, Performance Lab, Accessibility, Deployment SSH, Session Auto-Refresh e **device flow Ely.by/Microsoft + coordinator de sessão + HTTP com timeout/abort + seleção de provider** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
 | E2E SLP multi-server | ✅ Hypixel + CubeCraft + **Minemen via SRV** (reprodução do bug do dono) |
 | **E2E compilação ×6 templates** | ✅ **fabric 158s · forge 339s · neo-legacy 170s · neo-NG7 854s · neo-MDG 64s · neo-26.x 71s(warm)/19min(1ª) — todos produzem dark_kingdom-0.1.0.jar real** (Sessões 22-35) |
 | **E2E authlib-injector** | ✅ download do release oficial + SHA-256 conferido ao vivo (Sessão 75) |
+| **E2E Mine Rank (vanilla real)** | ✅ jar 1.20.1 oficial (SHA-1), cliente mineflayer, **117 triggers** (39 comandos × 3 valores), mineração real pagando coin, **zero stall de tick** (Sessão 76) |
 | Typecheck / ESLint | ✅ 0 errors (warns set-state-in-effect = backlog família conhecida) |
 | Mobile typecheck | ✅ `pnpm --filter @voxel/mobile typecheck` (CI verde) |
 | Vite build | ✅ resolve @voxel/core via workspace |
@@ -1051,3 +1061,37 @@ Mantido: o `<main id="main-content">` único do `AppLayout` (landmark semântica
 **Re-tag deliberado**: a primeira build da tag (commit `cba826d`) já publicava os 8 assets, mas faltava o ajuste de UX que explica o botão desabilitado. Release + tag foram apagados e a tag foi recriada no commit final — a release publicada vem de **um único commit** (mesma prática da S14).
 
 **Instalação local — FEITA**: o `voxel 0.29.0` foi atualizado para **0.32.0** (`A descompactar voxel (0.32.0) sobre (0.29.0)`), via `pkexec apt-get install` (diálogo polkit na sessão Cinnamon). O binário instalado em `/usr/bin/nexuscraft-studio` tem **sha256 idêntico ao asset publicado** (`b2f2b621…effe`), reporta a versão `0.32.0`, **zero** vestígio de skip link e carrega o código Ely.by (`account.ely.by`, `ely_client_id`, `ely_refresh_token`, `authlib-injector`).
+
+---
+
+## 76. Sessão 76 — Mine Rank: módulo de Rankup completo, testado num servidor vanilla real
+
+**Pedido do dono**: (1) evoluir o servidor "Mine Rank" — variação própria do Rankup do NerdZone — **testando TODOS os comandos**; (2) usar mapa baixado da internet se necessário; (3) deixar a UI mais bonita; (4) validar o login Ely.by real no launcher Minecraft.
+
+**Referência coletada ao vivo**: `nerdzone.gg/guia` + `/wiki` (público, sem conta Minecraft) → conjunto de comandos do Rankup e o que cada um significa. **Não foi possível entrar no NerdZone como cliente** (exige conta Minecraft + protocolo de jogo) — a referência vem da documentação pública, e o Mine Rank é uma **variação própria** (comandos, mundo e código originais do VOXEL).
+
+### O que foi entregue
+
+**Módulo `mine_rank`** (`src/services/servers/mineRankServer.ts`, ~2.000 linhas):
+- **Manifesto único** `MINE_RANK_COMMANDS` — **39 comandos** em 8 famílias, alimentando o datapack, o `COMMANDS.md`, a UI e os testes (uma fonte de verdade).
+- **Datapack `nexus_rank`** gerado (203 arquivos): objectives `trigger` + `dummy`, 8 tiers, 4 moedas (Coins/Tokens/Rubies/Cash), prestígio no level 1000 (+1 coin por bloco para sempre), 8 minas privadas com 8 camadas de minério, mercado, loja, pesca com nível, arena de expedição, 8 slots de clan e chat por frases prontas.
+- **Mundo gerado**: hub, 8 terrenos (grade 4×2), lago e arena — **compacto** (≤5 chunks do hub) sobre uma plataforma própria em y=100, para funcionar em qualquer bioma.
+- **Superfície honesta do vanilla 1.20.1**: só `/trigger <obj> [set <int>]` + menus clicáveis (`tellraw`); texto livre virou frases prontas; alvo social = **jogador mais próximo**; nomes de objective ≤16 chars. Tudo documentado no `COMMANDS.md` do próprio datapack.
+
+**UI**: painel `MineRankPanel` (instalação do datapack, tiers, moedas, todos os comandos, mapa do mundo com atribuição) ligado como aba **"Mine Rank"** no console do servidor; barra de abas do console refeita como segmented control; render-smoke novo (`mineRankPanel.render.test.tsx`).
+
+**Mapa de terceiros**: `server_import_world` (Rust) estendido com `credits: Option<WorldCredits>` — a **atribuição/licença é gravada dentro do mundo** (`VOXEL_MAP_CREDITS.md` + `voxel-map-credits.json`), escrita no **staging** antes do swap atômico. O app **nunca baixa mapa de site nenhum por conta própria** — o dono escolhe o ZIP e a licença viaja com os arquivos.
+
+**E2E REAL** (`mineRankServer.e2e.test.ts`, opt-in `VOXEL_E2E=1`): jar vanilla 1.20.1 **oficial** (SHA-1 do piston-meta), cliente **mineflayer** de verdade, **39 comandos × 3 valores = 117 triggers**, mineração real que paga coin, e **nenhum stall de tick**. `mineflayer@4.39.0` entrou como devDependency.
+
+### Bugs do vanilla descobertos pelo E2E real (todos em §7)
+
+`give` (ordem do NBT), `team join` (impossível em datapack → tags), `scoreboard players add` (só inteiro), `clear` com count 0, jogador novo sem score (todo `matches 0` era branch morto), **teleporte de 48 chunks travando o servidor por ~45s** (mundo compacto), `/trigger` recusado no console (→ `execute as <jogador> run trigger`) e o throttle de chat do vanilla (→ log do servidor como fonte de verdade).
+
+### Verificação
+
+typecheck ✓ · lint ✓ · **Vitest 316/316** (40 arquivos, +27 do Mine Rank) · **Rust 110 passed + 12 ignored** (teste do import com créditos) · **E2E real verde em 56s** · `pnpm build` ✓.
+
+### Pendência honesta (depende do dono)
+
+O **device flow Ely.by ao vivo** continua bloqueado pelo `client_id` do Desktop Application público do VOXEL (aprovação em `https://account.ely.by/dev/applications/new`). Sem ele o device flow real (devicecode → aprovação → token → profile → refresh → lançamento com authlib-injector) não pode ser exercitado com a **conta real do dono**; o campo continua configurável em Settings → Launcher e todo o resto (perímetro, rollback, revoke, refresh, lançamento) está pronto e testado.

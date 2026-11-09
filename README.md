@@ -15,9 +15,10 @@ VOXEL é uma plataforma desktop de criação assistida por IA para Minecraft Jav
 
 ```
 NO FAKE DATA — cada tela mostra apenas o que funciona.
-Prova real: 110 testes unitários Rust + 291 Vitest + 12 E2E executados
+Prova real: 110 testes unitários Rust + 316 Vitest + 12 E2E executados
 (mod compilado, launcher de 718MB oficiais com SHA-1, authlib-injector
-oficial com SHA-256, servidor boot/stop/backup) — tudo verde, na CI e local.
+oficial com SHA-256, servidor boot/stop/backup, Mine Rank em servidor
+vanilla 1.20.1 real) — tudo verde, na CI e local.
 ```
 
 ---
@@ -36,7 +37,7 @@ oficial com SHA-256, servidor boot/stop/backup) — tudo verde, na CI e local.
 | Build System — `./gradlew build` ao vivo, Error Center, Auto-Fix ≤5 tentativas | ✅ |
 | Launcher — instâncias isoladas, downloads oficiais SHA-1 (718MB provados), Microsoft + Ely.by OAuth device flow, authlib-injector SHA-256 para Ely.by | ✅ |
 | Server Studio — vanilla/Paper oficiais, console stdin, backups/restore, properties | ✅ |
-| Server Modules misturáveis — 8 sistemas: Economy/Prison/Token Chain, SkyBlock Islands, Factions War, BedWars Lite, Monuments (.nbt reais com /place) e Custom Realm (dimensão real) — cada um com comandos documentados no README do servidor | ✅ |
+| Server Modules misturáveis — 9 sistemas: Economy/Prison/Token Chain, SkyBlock Islands, Factions War, BedWars Lite, Monuments (.nbt reais com /place), Custom Realm (dimensão real) e **Mine Rank** (Rankup completo: 39 comandos, 8 tiers, prestígio, 8 minas privadas, 4 moedas, clans, pesca e arena) — cada um com comandos documentados no README do servidor | ✅ |
 | Token Chain — ledger SHA-256 real (mint/transfer/burn/verify, tamper-evidente) | ✅ Wave 1 |
 | Túnel público grátis — playit.gg (servidor acessível de qualquer lugar) | ✅ Wave 1 |
 | Shader Studio — 32 looks icônicos como presets → shaderpacks GLSL originais; Asset Studio — sprites pixel-art (estáticos E animados com .mcmeta), faces de bloco, estruturas .nbt com preview isométrico e dimensões custom | ✅ |inais Iris/OptiFire-compat, preview WebGL vivo, editor Monaco, install na instância | ✅ Wave 2 |
@@ -49,7 +50,7 @@ oficial com SHA-256, servidor boot/stop/backup) — tudo verde, na CI e local.
 | **Mobile** — VOXEL Bridge (token no keyring, biometria), APK Android 0.3.1, PWA iOS instalável, build notifications | ✅ |
 | Dark Kingdom — projeto-exemplo criado automaticamente (espada, receita, advancement) | ✅ |
 | Release multi-OS + site oficial no GitHub Pages | ✅ |
-| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), **401 testes verdes** (110 Rust + 291 Vitest); toda ação fora da main thread (async + spawn_blocking — congelamento extinto como classe) | ✅ |
+| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), **426 testes verdes** (110 Rust + 316 Vitest); toda ação fora da main thread (async + spawn_blocking — congelamento extinto como classe) | ✅ |
 
 ## 🚀 Como rodar (desenvolvimento)
 
@@ -68,7 +69,9 @@ Fluxo completo em 4 passos (primeira vez):
 
 Para **estilos visuais**: aba **Shaders** — escolha entre 32 presets (BSL, SEUS, Complementary Reimagined, Solas…) com preview WebGL ao vivo → Create → Install na instância → ative no Iris/OptiFire. Cada preset gera GLSL 100% original; nada é copiado dos originais.
 
-Para **jogadores de servidor**: aba **Servers** → wizard (vanilla/Paper, versão do catálogo ao vivo) → módulos misturáveis (Economia/Prison/Token Chain) → console em tempo real, VoxelCoin com ledger verificável, backups, túnel público e restore.
+Para **jogadores de servidor**: aba **Servers** → wizard (vanilla/Paper, versão do catálogo ao vivo) → módulos misturáveis (Economy/Prison/Token Chain/**Mine Rank**) → console em tempo real, VoxelCoin com ledger verificável, backups, túnel público e restore.
+
+Para **servidor estilo Rankup**: aba **Servers** → console do servidor → aba **Mine Rank** → *Instalar* (escreve o datapack `nexus_rank` no mundo: hub, 8 terrenos com mina privada de 8 camadas, lago e arena, tudo compacto para não travar o vanilla). A seção **Mapa do mundo** importa um ZIP de mapa de terceiros com **atribuição e licença gravadas dentro do próprio mundo** (`VOXEL_MAP_CREDITS.md`) — o app nunca baixa mapa de site nenhum por conta própria.
 
 Para **publicar**: workspace → **Publish** → commit + repo GitHub + push.
 
@@ -105,7 +108,8 @@ Decisões-chave no [`docs/architecture.md`](docs/architecture.md) (AD-1..AD-11 +
 |---|---|
 | `cargo test` | 110 unit (templates ×6 eras, ledger+tamper, shaderpacks, SLP+SRV, bridge multimodal, modpacks, snapshots, deploy, structures NBT, assets animados, launcher Ely.by/authlib-injector, allowlist de HTTP/URL) |
 | `cargo test -- --ignored` | 12 E2E: **compilação REAL de 6 templates** (fabric/forge/neoforge ×4 eras até 26.3), launcher 718MB SHA-1, **authlib-injector oficial com SHA-256**, server ciclo, SLP de servidores públicos (hypixel/nerdzone…), Modrinth com checksum |
-| `pnpm test:unit` | 291 Vitest em 38 arquivos (shaders + gerador GLSL, error parser, 6+8 módulos de servidor com comandos, inferência de estilo, task force, model routing, i18n pt-BR, manifestos, parser de MOTD, **device flow Microsoft + Ely.by**, coordinator de sessão OAuth, HTTP com timeout/abort e seleção de provider) |
+| `pnpm test:unit` | 316 Vitest em 40 arquivos (shaders + gerador GLSL, error parser, 9 módulos de servidor com comandos, **Mine Rank** — manifesto, datapack gerado, layout do mundo e render do painel, inferência de estilo, task force, model routing, i18n pt-BR, manifestos, parser de MOTD, **device flow Microsoft + Ely.by**, coordinator de sessão OAuth, HTTP com timeout/abort e seleção de provider) |
+| `VOXEL_E2E=1 pnpm vitest run src/services/servers/mineRankServer.e2e.test.ts` | **E2E real do Mine Rank**: jar vanilla 1.20.1 oficial (SHA-1 do piston-meta), cliente **mineflayer** de verdade, os 39 comandos do manifesto × 3 valores (117 triggers) + mineração real que paga coin + nenhum stall de tick |
 | CI (`.github/workflows/ci.yml`) | typecheck + lint + vitest + vite build + cargo test |
 | Release (`.github/workflows/release.yml`) | tag `v*` → .exe/.msi/.deb/.AppImage/.dmg (Windows, Linux, macOS arm64+x64) |
 
