@@ -1095,3 +1095,5 @@ typecheck ✓ · lint ✓ · **Vitest 316/316** (40 arquivos, +27 do Mine Rank) 
 ### Pendência honesta (depende do dono)
 
 O **device flow Ely.by ao vivo** continua bloqueado pelo `client_id` do Desktop Application público do VOXEL (aprovação em `https://account.ely.by/dev/applications/new`). Sem ele o device flow real (devicecode → aprovação → token → profile → refresh → lançamento com authlib-injector) não pode ser exercitado com a **conta real do dono**; o campo continua configurável em Settings → Launcher e todo o resto (perímetro, rollback, revoke, refresh, lançamento) está pronto e testado.
+
+**Decisão do dono na S76**: *"deixar pronto para depois"* — o login real fica pendente até o `client_id` existir; nenhuma outra parte do Mine Rank depende dele.
