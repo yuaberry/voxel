@@ -107,17 +107,17 @@ export const PROOFS = [
   {
     label: "Triggers exercitados",
     value: String(MINE_RANK_COMMANDS.length * 3),
-    hint: "39 comandos × 3 valores",
+    hint: `${MINE_RANK_COMMANDS.length} comandos × 3 valores`,
   },
   {
     label: "Tiers de progressão",
     value: String(MINE_RANK_TIERS.length),
-    hint: "do Novato ao Mítico",
+    hint: `do ${MINE_RANK_TIERS[0].name} ao ${MINE_RANK_TIERS[MINE_RANK_TIERS.length - 1].name}`,
   },
   {
     label: "Moedas",
     value: String(MINE_RANK_CURRENCIES.length),
-    hint: "coins, tokens, rubies e cash",
+    hint: MINE_RANK_CURRENCIES.map((currency) => currency.name.toLowerCase()).join(", "),
   },
   {
     label: "Terrenos com mina",
@@ -127,7 +127,7 @@ export const PROOFS = [
   {
     label: "Clans",
     value: String(MINE_RANK_CLAN_SLOTS),
-    hint: "slots fixos (Clan 1..8)",
+    hint: `slots fixos (Clan 1..${MINE_RANK_CLAN_SLOTS})`,
   },
 ];
 
