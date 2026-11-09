@@ -11,7 +11,16 @@
  * keys, `online-mode` is never overridable.
  */
 
-export type ServerModuleId = "economy" | "prison" | "token" | "skyblock" | "factions" | "bedwars" | "monuments" | "realm";
+export type ServerModuleId =
+  | "economy"
+  | "prison"
+  | "token"
+  | "skyblock"
+  | "factions"
+  | "bedwars"
+  | "monuments"
+  | "realm"
+  | "mine_rank";
 
 export type ServerPresetCategory = "official" | "community";
 
@@ -134,6 +143,23 @@ export const SERVER_STYLE_PRESETS: readonly ServerStylePreset[] = [
       pvp: "true",
     },
     modules: ["prison", "economy", "token"],
+  },
+  {
+    id: "mine-rank",
+    name: "Mine Rank",
+    tagline: "Rankup with private mines, plots and four coins",
+    description:
+      "A complete Rankup-style progression written by VOXEL: 39 player commands (private mine with 8 ore layers, 8 tiers, prestige, 8 plots with trust rules, four coins, market, shop, fishing, expedition arena, clans and quick chat) — all in vanilla 1.20.1, no plugin.",
+    category: "community",
+    software: "paper",
+    ramMb: 4096,
+    properties: {
+      motd: "A VOXEL Mine Rank — reserve seu terreno e minere",
+      difficulty: "normal",
+      "spawn-protection": "0",
+      pvp: "true",
+    },
+    modules: ["mine_rank"],
   },
   {
     id: "economy-town",

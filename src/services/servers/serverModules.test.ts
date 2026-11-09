@@ -50,6 +50,47 @@ describe("serverModules", () => {
   });
 });
 
+describe("mine rank module", () => {
+  it("ships the datapack under its own namespace with load and tick", () => {
+    const files = generateModuleFiles("mine_rank");
+    const paths = files.map((f) => f.path);
+    expect(paths).toContain("world/datapacks/nexus_rank/pack.mcmeta");
+    expect(paths).toContain(
+      "world/datapacks/nexus_rank/data/nexus_rank/functions/load.mcfunction",
+    );
+    expect(paths).toContain(
+      "world/datapacks/nexus_rank/data/nexus_rank/functions/tick.mcfunction",
+    );
+    // the reference ships with the pack
+    expect(paths).toContain("world/datapacks/nexus_rank/COMMANDS.md");
+    expect(paths).toContain("world/datapacks/nexus_rank/README.md");
+  });
+
+  it("mixes with the other modules without namespace collisions", () => {
+    const files = generateSelectedModules([
+      "economy",
+      "prison",
+      "token",
+      "factions",
+      "bedwars",
+      "mine_rank",
+    ]);
+    const roots = new Set(files.map((f) => f.path.split("/")[2]));
+    expect(roots).toContain("nexus_rank");
+    expect(roots).toContain("nexus_economy");
+    expect(roots.size).toBe(6);
+
+    const all = files.map((f) => f.path);
+    expect(new Set(all).size).toBe(all.length);
+
+    // the Mine Rank namespace is never touched by another module
+    const foreign = files.filter(
+      (f) => f.path.includes("nexus_rank") && !f.path.startsWith("world/datapacks/nexus_rank/"),
+    );
+    expect(foreign).toEqual([]);
+  });
+});
+
 describe("prison /mine command (the owner's ask)", () => {
   it("registers the trigger, plays the loading screen and warps by rank", () => {
     const files = generateSelectedModules(["prison"], DEFAULT_MODULE_OPTIONS);

@@ -12,6 +12,7 @@
  */
 
 import type { ServerModuleId } from "@voxel/core/serverPresets";
+import { generateMineRankFiles } from "@/services/servers/mineRankServer";
 export type { ServerModuleId };
 
 export interface ServerModuleMeta {
@@ -86,6 +87,14 @@ export const SERVER_MODULES: ServerModuleMeta[] = [
     description:
       "A ready arena datapack: /trigger nexus_bedwars hands a kit, warps into the arena with a countdown title, and tracks bed destruction — every broken bed announces the destroyer to the whole server.",
     icon: "Bed",
+  },
+  {
+    id: "mine_rank",
+    name: "Mine Rank",
+    tagline: "Rankup with private mines and four coins",
+    description:
+      "A complete Rankup-style progression authored by VOXEL: private mine with 8 ore layers, 8 tiers, prestige, 8 plots with trust rules, Coins/Tokens/Rubies/Cash, market, shop, fishing, expedition arena, clans and quick chat — 39 commands, vanilla 1.20.1, no plugin.",
+    icon: "Pickaxe",
   },
 ];
 
@@ -811,6 +820,8 @@ export function generateModuleFiles(
       return monumentsFiles();
     case "realm":
       return realmFiles(options.mcVersion);
+    case "mine_rank":
+      return generateMineRankFiles();
   }
 }
 

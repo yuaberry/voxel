@@ -101,7 +101,17 @@ describe("server style presets", () => {
         expect(key).not.toBe("online-mode"); // security: never preset it
       }
       for (const module of preset.modules) {
-        expect(["economy", "prison", "token", "skyblock", "factions", "bedwars", "monuments", "realm"]).toContain(module);
+        expect([
+          "economy",
+          "prison",
+          "token",
+          "skyblock",
+          "factions",
+          "bedwars",
+          "monuments",
+          "realm",
+          "mine_rank",
+        ]).toContain(module);
       }
     }
   });
