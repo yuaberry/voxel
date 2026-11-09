@@ -1537,6 +1537,42 @@ pub fn server_write_info_impl(payload: ServerInfoPayload) -> Result<String, Stri
 // Real files, verified, zip-slip guarded — the disk stays the truth.
 // ---------------------------------------------------------------------------
 
+/// The attribution of a third-party map: who made it, under which license
+/// and where it came from. It is written INSIDE the imported world so the
+/// license travels with the files.
+#[derive(Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct WorldCredits {
+    pub title: String,
+    pub author: String,
+    pub license: String,
+    pub source_url: String,
+}
+
+impl WorldCredits {
+    /// True when the user filled at least the title — a map without any
+    /// attribution is refused (licenses of community maps require it).
+    fn is_meaningful(&self) -> bool {
+        !self.title.trim().is_empty()
+    }
+
+    fn markdown(&self) -> String {
+        let mut md = String::from("# Map credits\n\n");
+        md.push_str(&format!("- **Map**: {}\n", self.title.trim()));
+        if !self.author.trim().is_empty() {
+            md.push_str(&format!("- **Author**: {}\n", self.author.trim()));
+        }
+        if !self.license.trim().is_empty() {
+            md.push_str(&format!("- **License**: {}\n", self.license.trim()));
+        }
+        if !self.source_url.trim().is_empty() {
+            md.push_str(&format!("- **Source**: {}\n", self.source_url.trim()));
+        }
+        md.push_str("\nImported into VOXEL — keep this file with the world and keep the license terms.\n");
+        md
+    }
+}
+
 /// Imports a world zip into a server (replaces world/ atomically: the old
 /// world is renamed aside first, never destroyed on failure). Accepts a
 /// zip that contains either `world/...` at root or the level.dat directly
@@ -1546,14 +1582,22 @@ pub async fn server_import_world(
     base_path: String,
     slug: String,
     zip_path: String,
+    credits: Option<WorldCredits>,
 ) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || server_import_world_impl(base_path, slug, zip_path))
-        .await
-        .map_err(|e| format!("worker failed: {e}"))?
+    tauri::async_runtime::spawn_blocking(move || {
+        server_import_world_impl(base_path, slug, zip_path, credits)
+    })
+    .await
+    .map_err(|e| format!("worker failed: {e}"))?
 }
 
 /// Sync impl — tests call this directly.
-fn server_import_world_impl(base_path: String, slug: String, zip_path: String) -> Result<String, String> {
+fn server_import_world_impl(
+    base_path: String,
+    slug: String,
+    zip_path: String,
+    credits: Option<WorldCredits>,
+) -> Result<String, String> {
     if process::is_running(&format!("server/{slug}")) {
         return Err("Stop the server before importing a world".to_string());
     }
@@ -1563,6 +1607,11 @@ fn server_import_world_impl(base_path: String, slug: String, zip_path: String) -
     let dir = server_dir(&base, &slug);
     if !dir.is_dir() {
         return Err(format!("Server \"{slug}\" not found", ));
+    }
+    if let Some(credits) = &credits {
+        if !credits.is_meaningful() {
+            return Err("A map import needs the map name (attribution)".to_string());
+        }
     }
     let source = Path::new(&zip_path)
         .canonicalize()
@@ -1630,6 +1679,31 @@ fn server_import_world_impl(base_path: String, slug: String, zip_path: String) -
         return Err("This zip does not look like a Minecraft world (no level.dat inside)".to_string());
     }
 
+    // The attribution travels with the world: a community map usually comes
+    // with license terms that the owner has to keep. It is written into the
+    // STAGING folder, so the world and its credits are installed together.
+    let mut credited = None;
+    if let Some(credits) = &credits {
+        if let Err(e) = std::fs::write(staging.join("VOXEL_MAP_CREDITS.md"), credits.markdown()) {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(format!("could not write the map credits: {e}"));
+        }
+        let json = serde_json::json!({
+            "title": credits.title.trim(),
+            "author": credits.author.trim(),
+            "license": credits.license.trim(),
+            "sourceUrl": credits.source_url.trim(),
+        });
+        if let Err(e) = std::fs::write(
+            staging.join("voxel-map-credits.json"),
+            serde_json::to_string_pretty(&json).unwrap_or_else(|_| "{}".to_string()),
+        ) {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(format!("could not write the map credits: {e}"));
+        }
+        credited = Some(credits.title.trim().to_string());
+    }
+
     // Swap: old world renamed aside (user can delete it), staging becomes world/
     let old = dir.join(format!(".old-world-{stamp}"));
     let live = dir.join("world");
@@ -1643,10 +1717,16 @@ fn server_import_world_impl(base_path: String, slug: String, zip_path: String) -
         }
         return Err(format!("could not install the imported world: {e}"));
     }
-    Ok(format!(
-        "world imported ({entries} files) — the previous world was kept at {}",
+
+    let mut note = format!("world imported ({entries} files)");
+    if let Some(title) = credited {
+        note.push_str(&format!(" — map “{title}” credited inside the world"));
+    }
+    note.push_str(&format!(
+        " — the previous world was kept at {}",
         old.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()
-    ))
+    ));
+    Ok(note)
 }
 
 /// Imports a structure file (.nbt — the vanilla format our own Studio and
@@ -2537,6 +2617,12 @@ l5
             base.to_string_lossy().to_string(),
             "arena".to_string(),
             zip_path.to_string_lossy().to_string(),
+            Some(WorldCredits {
+                title: "Rankup Valley".to_string(),
+                author: "Community cartographer".to_string(),
+                license: "CC BY-SA 4.0".to_string(),
+                source_url: "https://example.org/maps/rankup-valley".to_string(),
+            }),
         )
         .expect("import must succeed");
         assert!(msg.contains("world imported"), "{msg}");
@@ -2551,6 +2637,17 @@ l5
         assert_eq!(old.len(), 1, "the previous world is kept aside, never destroyed");
         assert_eq!(std::fs::read(dir.join(&old[0]).join("level.dat")).unwrap(), b"OLD WORLD");
 
+        // the attribution travels inside the world (license compliance)
+        let credits = std::fs::read_to_string(dir.join("world/VOXEL_MAP_CREDITS.md")).unwrap();
+        assert!(credits.contains("Rankup Valley"), "{credits}");
+        assert!(credits.contains("CC BY-SA 4.0"), "{credits}");
+        assert!(credits.contains("Community cartographer"), "{credits}");
+        let json: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(dir.join("world/voxel-map-credits.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(json["license"], "CC BY-SA 4.0");
+
         // a zip WITHOUT level.dat is honestly refused
         let bad_path = base.join("nope.zip");
         let file = std::fs::File::create(&bad_path).unwrap();
@@ -2562,6 +2659,7 @@ l5
             base.to_string_lossy().to_string(),
             "arena".to_string(),
             bad_path.to_string_lossy().to_string(),
+            None,
         )
         .unwrap_err();
         assert!(err.contains("level.dat"), "{err}");

@@ -575,6 +575,9 @@ export function ServerCustomizeDialog({
         basePath,
         slug,
         zipPath: picked,
+        // no attribution here — the Mine Rank panel is where a third-party
+        // map is imported WITH its license
+        credits: null,
       });
       toast.success("World imported", { description: message, duration: 12000 });
     } catch (error) {

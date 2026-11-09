@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Archive,
+  Coins,
   FileCog,
   Loader2,
+  Pickaxe,
   Play,
   RotateCcw,
   Send,
@@ -24,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { ServerEconomyPanel } from "./ServerEconomyPanel";
+import { MineRankPanel } from "./MineRankPanel";
 import { pingServer } from "@/services/servers/serverPingService";
 import { parseMotd } from "@voxel/core/motd";
 import type { ServerPingData } from "@voxel/core/serverPing";
@@ -66,7 +69,7 @@ export function ServerConsoleDialog({ server, basePath, onClose }: Props) {
   const [backups, setBackups] = useState<ServerBackupInfo[]>([]);
   const [properties, setProperties] = useState<string | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<ServerBackupInfo | null>(null);
-  const [tab, setTab] = useState<"console" | "economy">("console");
+  const [tab, setTab] = useState<"console" | "economy" | "mine_rank">("console");
   const logRef = useRef<HTMLDivElement>(null);
   const customJava = useSettingsStore((s) => s.settings.java.customJavaPath);
 
@@ -353,20 +356,38 @@ export function ServerConsoleDialog({ server, basePath, onClose }: Props) {
           </Button>
         </div>
 
-        {/* Console / Economy tabs */}
-        <div className="flex items-center gap-1 border-b border-border/40 pb-1">
-          <button
-            className={"rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors " + (tab === "console" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground")}
-            onClick={() => setTab("console")}
-          >
-            <Terminal className="mr-1 inline h-3 w-3" /> Console
-          </button>
-          <button
-            className={"rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors " + (tab === "economy" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground")}
-            onClick={() => setTab("economy")}
-          >
-            Economy & Public
-          </button>
+        {/* Console / Economy / Mine Rank tabs — segmented control */}
+        <div
+          role="tablist"
+          aria-label="Server console sections"
+          className="flex items-center gap-1 rounded-lg border border-border/60 bg-background/60 p-1"
+        >
+          {(
+            [
+              { id: "console", label: "Console", icon: <Terminal className="h-3 w-3" /> },
+              { id: "economy", label: "Economy & Public", icon: <Coins className="h-3 w-3" /> },
+              { id: "mine_rank", label: "Mine Rank", icon: <Pickaxe className="h-3 w-3" /> },
+            ] as const
+          ).map((item) => {
+            const active = tab === item.id;
+            return (
+              <button
+                key={item.id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(item.id)}
+                className={
+                  "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-all " +
+                  (active
+                    ? "bg-primary/15 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.35)]"
+                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground")
+                }
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Properties editor */}
@@ -420,6 +441,13 @@ export function ServerConsoleDialog({ server, basePath, onClose }: Props) {
         {tab === "economy" && server && (
           <div className="max-h-[50%] overflow-y-auto rounded-lg border border-border/60 bg-background/70 p-3">
             <ServerEconomyPanel server={server} basePath={basePath} />
+          </div>
+        )}
+
+        {/* Mine Rank */}
+        {tab === "mine_rank" && server && (
+          <div className="max-h-[62%] overflow-y-auto rounded-lg border border-border/60 bg-background/70 p-3">
+            <MineRankPanel server={server} basePath={basePath} running={running} />
           </div>
         )}
 
