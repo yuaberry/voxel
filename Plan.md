@@ -229,7 +229,8 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | 21 | Task force + polimento | NVIDIA NIM + model picker por seleção + **SRV fix do live import** (reproduzido: 49s→2s) + Launcher page + 7 temas + micro-motion + ~/Voxel + migration + CSP real + live preview no console + **Task force multi-agent** (Architect→Developer→Reviewer) + v0.3.3 | shields DDoS só aceitam o alvo SRV; Bungee reporta max=0; TDZ do ESLint (família sessão 9) |
 | 22 | Era dos três loaders | **Templates Forge + NeoForge** derivados dos MDKs oficiais (FG6, mods.toml, DeferredRegister, pack.mcmeta factual) + wizard com chips por loader + disponibilidade viva + consistência loader↔template no Rust + **E2E 3/3: fabric/forge/neoforge compilam jar real** + v0.3.4 | wrapper files na raiz do template; `#` não é comentário Groovy; `pkill -f` self-match mata o próprio shell (pattern `"tauri de[v]"`) |
 | 75 | Ely.by como provider de autenticação | **Device flow oficial Ely.by** (RFC 8628, sem senha, sem client secret) no Launcher + **authlib-injector v1.2.8 com SHA-256** para o lançamento + provider efetivo (`mc_active_provider`) com namespaces Microsoft/Ely.by separados + UI Microsoft/Ely.by em Settings→Launcher + hardening (timeout total, abort, redirects bloqueados, ACL HTTP de 4 endpoints, allowlist de `open_auth_url`) + **v0.32.0** | SkipLink removido (S74) · card azul flutuante · **sign-out Ely.by não voltava para a Microsoft** (o sign-out interno limpava o provider antes do fallback) · **cancelamento durante os writes finais deixava credenciais Ely.by** (rollback incompleto) · import `secretsHas` morto |
-| 76 | Mine Rank (Rankup próprio) | **Módulo `mine_rank`** com manifesto único de **39 comandos** → datapack `nexus_rank` (203 arquivos): 8 tiers, 4 moedas, prestígio, 8 minas privadas, mercado, loja, pesca, arena, clans · **mundo compacto** (grade 4×2, ≤5 chunks do hub) sobre plataforma em y=100 · **painel na UI** (instalação, tiers, moedas, comandos, mapa com atribuição) como aba do console · **import de mapa ZIP com licença gravada dentro do mundo** (Rust) · **E2E real** (jar vanilla 1.20.1 oficial + cliente mineflayer, 117 triggers, mineração pagando coin) | `give` (ordem do NBT) · `team join` impossível em datapack → tags · `players add` só aceita inteiro · `clear` com count 0 · **jogador novo sem score** (todo `matches 0` era branch morto) · **teleporte de 48 chunks travava o servidor (~45s)** · `/trigger` recusado no console · throttle de chat do vanilla |
+| 77 | Site do Mine Rank (React+Tailwind) | **App novo** `apps/mine-rank-site` (Vite+React+Tailwind, base `/voxel/mine-rank/`) que renderiza o **mesmo manifesto** do datapack (alias `@mine-rank`, zero dado duplicado) · 7 seções (comandos com busca+filtro, progressão, mundo em SVG 1:1, referência de 19 linhas, prova do E2E, **dedicatória ao NerdZone.gg**) · deploy no GitHub Pages pelo `pages.yml` (site estático antigo preservado) · **7 testes** (6 de render em jsdom + 1 de contagem de arquivos) | filtro de família com lista digitada à mão (quebrava o filtro) · contagem de arquivos errada na doc (203 vs 204) · cor dos terrenos digitada à mão · site afirmava "open source" sem LICENSE · texto em inglês + trecho em coreano · transcript do terminal com linha que o servidor não imprime |
+| 76 | Mine Rank (Rankup próprio) | **Módulo `mine_rank`** com manifesto único de **39 comandos** → datapack `nexus_rank` (204 arquivos): 8 tiers, 4 moedas, prestígio, 8 minas privadas, mercado, loja, pesca, arena, clans · **mundo compacto** (grade 4×2, ≤5 chunks do hub) sobre plataforma em y=100 · **painel na UI** (instalação, tiers, moedas, comandos, mapa com atribuição) como aba do console · **import de mapa ZIP com licença gravada dentro do mundo** (Rust) · **E2E real** (jar vanilla 1.20.1 oficial + cliente mineflayer, 117 triggers, mineração pagando coin) | `give` (ordem do NBT) · `team join` impossível em datapack → tags · `players add` só aceita inteiro · `clear` com count 0 · **jogador novo sem score** (todo `matches 0` era branch morto) · **teleporte de 48 chunks travava o servidor (~45s)** · `/trigger` recusado no console · throttle de chat do vanilla |
 | 71 | Accessibility + Performance Lab UI + Session Auto-Refresh | **AccessibilityPage** (/accessibility) with SkipLink, contrast tester, live region announcer, focus visible indicator, keyboard navigation demo · **Performance Lab** (/performance) with boot time, build time, live FPS, memory RSS, server start time — all measured from real data, zero fake data · **Session Auto-Refresh** §9.10: monitors MSA session, alerts when expiring (≤10 min) or expired · 6 TS tests + v0.28.0 | |
 | 69 | Accessibility + Performance Lab | **Deployment SSH** (§9.8): deploy remoto via ssh/scp, testar conexão, transferir arquivos · **Performance Lab** (/performance): boot time, build time, FPS ao vivo, memória, server start — tudo medido de verdade · **Acessibilidade**: skip link, ARIA, focus trap, teclado, foco visível, reduced motion · v0.27.0 | |
 | 70 | Session Auto-Refresh (§9.10) | **Monitora sessão MSA** e alerta quando expira (≤10 min) ou já expirou. Nunca faz auto-login — sempre requer ação do dono · 6 TS testes + v0.27.0 | |
@@ -339,13 +340,13 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **`/trigger` do console é recusado** — *"A player is required to run this command here"* (o objetivo nem é resolvido) | probe no vanilla 1.20.1 | o E2E usa **cliente real** (mineflayer); a varredura completa usa `execute as <jogador> run trigger …` pelo console (mesma semântica, sem throttle de chat) |
 | **Chat do vanilla tem throttle** (~20 msgs/10s) — o sweep de 39+78 mensagens perdia o feedback e o comando era engolido | E2E real (comando 39 sem resposta) | E2E confirma pelo **log do servidor** (fonte de verdade) e usa pacing + retry; o sweep completo vai pelo console |
 
-## 8. Estado atual (verificado — Sessão 76, v0.32.0 publicada + Mine Rank entregue)
+## 8. Estado atual (verificado — Sessão 77, v0.32.0 publicada + Mine Rank entregue + site do Mine Rank no ar)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
 | Rust unit (110 + 12 ignored) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge, **launcher Ely.by/authlib-injector**, allowlist de HTTP/URL, **import de mundo com atribuição de mapa** |
-| Vitest (316 em 40 arquivos) | ✅ inclui Player Management, Moderation Assistant, dialogs render-smoke, **Mine Rank (manifesto + datapack + layout do mundo + render do painel)**, Performance Lab, Accessibility, Deployment SSH, Session Auto-Refresh e **device flow Ely.by/Microsoft + coordinator de sessão + HTTP com timeout/abort + seleção de provider** |
+| Vitest (323 em 41 arquivos) | ✅ inclui Player Management, Moderation Assistant, dialogs render-smoke, **Mine Rank (manifesto + datapack + layout do mundo + render do painel)**, Performance Lab, Accessibility, Deployment SSH, Session Auto-Refresh e **device flow Ely.by/Microsoft + coordinator de sessão + HTTP com timeout/abort + seleção de provider** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -354,6 +355,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **E2E authlib-injector** | ✅ download do release oficial + SHA-256 conferido ao vivo (Sessão 75) |
 | **E2E Mine Rank (vanilla real)** | ✅ jar 1.20.1 oficial (SHA-1), cliente mineflayer, **117 triggers** (39 comandos × 3 valores), mineração real pagando coin, **zero stall de tick** (Sessão 76) |
 | Typecheck / ESLint | ✅ 0 errors (warns set-state-in-effect = backlog família conhecida) |
+| **Site do Mine Rank** | ✅ `apps/mine-rank-site` — typecheck + build + 6 render-smoke em jsdom; deploy no GitHub Pages (`/voxel/mine-rank/`) |
 | Mobile typecheck | ✅ `pnpm --filter @voxel/mobile typecheck` (CI verde) |
 | Vite build | ✅ resolve @voxel/core via workspace |
 | Boot smoke | ✅ vivo com CSP ativa, 0 violações |
@@ -420,7 +422,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 **Assets por release**: `.exe`+`.msi` (Win) · `.deb`+`.AppImage` (Linux) · `.dmg` arm64+x64 (macOS) · `VOXEL-mobile-0.2.0-android.apk` · iOS via **PWA servida pelo Bridge** (`http://seu-pc:3717` → Add to Home Screen) + xcarchive unsigned no CI.
 
 ### Workflows (todos verdes)
-`ci.yml` (desktop+core, com --filter) · `release.yml` (multi-OS, tags v*) · `pages.yml` (site) · `mobile.yml` (typecheck) · `mobile-builds.yml` (APK no CI + xcarchive iOS, dispatch + tags `mobile-v*`)
+`ci.yml` (desktop+core+site, com --filter) · `release.yml` (multi-OS, tags v*) · `pages.yml` (site estático + **build do site do Mine Rank** em `website/mine-rank/`) · `mobile.yml` (typecheck) · `mobile-builds.yml` (APK no CI + xcarchive iOS, dispatch + tags `mobile-v*`)
 
 ### Comandos de verificação
 ```bash
@@ -618,7 +620,7 @@ gh run list --limit 4               # CI/Pages/Mobile/Release status
 
 ---
 
-*Última atualização: Sessão 75 — Ely.by como provider de autenticação + v0.32.0. Estado: vitest 291 · cargo 110 (+12 E2E, incl. authlib-injector SHA-256 ao vivo) · lint 0/0 · typecheck 0 · release v0.32.0 em preparação (latest publicada: v0.29.0).*
+*Última atualização: Sessão 77 — site do Mine Rank (React+Tailwind) no GitHub Pages. Estado: vitest 323 · cargo 110 (+12 E2E) · lint 0/0 · typecheck 0 · release v0.32.0 publicada (latest).*
 
 ---
 
@@ -1074,7 +1076,7 @@ Mantido: o `<main id="main-content">` único do `AppLayout` (landmark semântica
 
 **Módulo `mine_rank`** (`src/services/servers/mineRankServer.ts`, ~2.000 linhas):
 - **Manifesto único** `MINE_RANK_COMMANDS` — **39 comandos** em 8 famílias, alimentando o datapack, o `COMMANDS.md`, a UI e os testes (uma fonte de verdade).
-- **Datapack `nexus_rank`** gerado (203 arquivos): objectives `trigger` + `dummy`, 8 tiers, 4 moedas (Coins/Tokens/Rubies/Cash), prestígio no level 1000 (+1 coin por bloco para sempre), 8 minas privadas com 8 camadas de minério, mercado, loja, pesca com nível, arena de expedição, 8 slots de clan e chat por frases prontas.
+- **Datapack `nexus_rank`** gerado (204 arquivos): objectives `trigger` + `dummy`, 8 tiers, 4 moedas (Coins/Tokens/Rubies/Cash), prestígio no level 1000 (+1 coin por bloco para sempre), 8 minas privadas com 8 camadas de minério, mercado, loja, pesca com nível, arena de expedição, 8 slots de clan e chat por frases prontas.
 - **Mundo gerado**: hub, 8 terrenos (grade 4×2), lago e arena — **compacto** (≤5 chunks do hub) sobre uma plataforma própria em y=100, para funcionar em qualquer bioma.
 - **Superfície honesta do vanilla 1.20.1**: só `/trigger <obj> [set <int>]` + menus clicáveis (`tellraw`); texto livre virou frases prontas; alvo social = **jogador mais próximo**; nomes de objective ≤16 chars. Tudo documentado no `COMMANDS.md` do próprio datapack.
 
@@ -1097,3 +1099,40 @@ typecheck ✓ · lint ✓ · **Vitest 316/316** (40 arquivos, +27 do Mine Rank) 
 O **device flow Ely.by ao vivo** continua bloqueado pelo `client_id` do Desktop Application público do VOXEL (aprovação em `https://account.ely.by/dev/applications/new`). Sem ele o device flow real (devicecode → aprovação → token → profile → refresh → lançamento com authlib-injector) não pode ser exercitado com a **conta real do dono**; o campo continua configurável em Settings → Launcher e todo o resto (perímetro, rollback, revoke, refresh, lançamento) está pronto e testado.
 
 **Decisão do dono na S76**: *"deixar pronto para depois"* — o login real fica pendente até o `client_id` existir; nenhuma outra parte do Mine Rank depende dele.
+
+---
+
+## 77. Sessão 77 — Site do Mine Rank (React + Tailwind) no GitHub Pages
+
+**Pedido do dono**: *"agora quero que crie um website com tudo, todas as informações do projeto Mine Rank e Referencia, dedicação ao Servidor Nerdstone.gg quero um site muito bonito, com tailwind, React e muito mais... tem que ser rapidinho."*
+
+### O que foi entregue
+
+**App novo do workspace** `apps/mine-rank-site` (Vite 5 + React 18 + Tailwind 3.4, `base: /voxel/mine-rank/`):
+
+- **Uma fonte de verdade**: o site importa o **mesmo** módulo do desktop (`src/services/servers/mineRankServer.ts`) por alias Vite/TS `@mine-rank` — o manifesto que gera o datapack é literalmente o mesmo que renderiza o site. Zero dado duplicado.
+- **7 seções**: Hero (com o terminal do servidor real), Comandos (busca + filtro por família), Progressão (8 tiers + 4 moedas + economia da mina), Mundo (mapa SVG 1:1 com as coordenadas reais), Referência (comparação de 19 linhas com o Rankup público + as armadilhas do vanilla + os limites honestos), Prova (o E2E real) e **Dedicação ao NerdZone.gg** (tom honesto: "inspired by", sem afiliação, sem código/marca/textura copiados).
+- **Design system próprio** (`src/index.css`): tokens VOXEL (violeta/ciano sobre preto), `.panel` com glass, `.brand-text` em gradiente, `.grid-lines` de blueprint, `prefers-reduced-motion` respeitado.
+- **Deploy**: `pages.yml` agora builda o app no CI e o copia para `website/mine-rank/` antes do upload — o site estático antigo **não foi tocado** (só ganhou um link no nav). `ci.yml` também typechecka e builda o site: um site quebrado nunca chega ao Pages.
+
+### Bugs reais encontrados e corrigidos nesta sessão
+
+| Bug | Como foi achado | Fix |
+|---|---|---|
+| **Filtro de família do site quebrado** — a lista de famílias era digitada à mão (`terreno`, `mundo`, `clan`, `ajuda`) e **não existia** no manifesto (`terrenos`, `sistemas`, `geral`): cada chip filtrava para zero resultado | inspeção do manifesto contra o `data.ts` do site | `FAMILY_ORDER` agora é **derivado** de `MINE_RANK_FAMILY_LABELS`; teste novo pega a regressão |
+| **Contagem de arquivos do datapack errada na doc** (203 no `Plan.md`, real **204**) | o site cites o número; a contagem foi medida pelo gerador | `MINE_RANK_DATAPACK_FILE_COUNT` exportado + **teste que compara com a saída real do gerador** (nunca mais um número escrito à mão) |
+| **Cor dos terrenos digitada à mão** no site (8 hexes) — podia divergir da lã real do mundo | o comentário dizia "the same wool blocks of the world" | `MINE_RANK_PLOT_MARKERS` exportado; o site mapeia o id do bloco vanilla → cor |
+| **Site afirmava "open source"** — o repo **não tem** arquivo de licença (regra do §1: sem LICENSE, não afirmar open source) | leitura do `Plan.md` §1 durante o protocolo de retomada | texto corrigido ("originais do VOXEL", "repositório público") |
+| **Texto em inglês no meio do PT-BR** (`behaviours`) e **um trecho em coreano** vazado na dedicatória (`커뮤니티`) | varredura de scripts não-latinos em todos os `.tsx` | corrigidos; a varredura agora retorna zero |
+| **Transcrição do terminal com uma linha que o servidor nunca imprime** (a regra do mineração é do `COMMANDS.md`, não do chat) | conferência linha a linha com o gerador do datapack | o terminal mostra **só** as 3 linhas reais do menu; a regra virou legenda fora do transcript |
+
+### Verificação
+
+- **typecheck** ✓ · **lint** ✓ (0/0) · **Vitest 323/323** em 41 arquivos (+7: 6 do site em jsdom + 1 da contagem do datapack) · **Rust 110 passed + 12 ignored** · `pnpm build` ✓ · **site typecheck + build** ✓ (193 KB JS / 59 KB gzip).
+- **Prova de que o teste novo pega a regressão**: `FAMILY_ORDER` foi quebrada de propósito → a suíte falhou (`offers a filter chip for EVERY family the manifest declares`) → restaurada → verde.
+- **Deploy provado localmente**: `pnpm install --frozen-lockfile --filter @voxel/mine-rank-site` + build em uma cópia limpa da repo → `dist/` com `index.html`, `favicon.svg` e `assets/`; servido no path real do Pages (`/voxel/mine-rank/`) → **200** no index, no JS, no CSS e no favicon, com o site principal em `/voxel/` ainda **200**.
+- **Prova visual**: o site foi renderizado em Chrome headless (1440×9000) — hero, terminal, stats, filtros, comandos, escada de tiers, moedas, mapa SVG, tabela de comparação, limites, prova e dedicatória, todos com o layout correto.
+
+### Pendência honesta (depende do dono)
+
+O **device flow Ely.by ao vivo** continua bloqueado pelo `client_id` do Desktop Application público do VOXEL — **inalterado** pela S77 (nada do site depende dele). O link do site no GitHub Pages só fica no ar depois do **primeiro deploy** do workflow `pages.yml` com o build novo.

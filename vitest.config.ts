@@ -3,12 +3,21 @@ import path from "node:path";
 
 export default defineConfig({
   resolve: {
-    alias: { "@": path.resolve(__dirname, "src") },
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+      // the Mine Rank site renders the very same manifest the desktop app
+      // turns into a datapack — one source of truth
+      "@mine-rank": path.resolve(
+        __dirname,
+        "src/services/servers/mineRankServer.ts",
+      ),
+    },
   },
   test: {
     include: [
       "src/**/*.test.{ts,tsx}",
       "packages/core/src/**/*.test.ts",
+      "apps/mine-rank-site/src/**/*.test.{ts,tsx}",
     ],
     environment: "node",
     // Heavy Tauri dialogs are imported dynamically inside their tests; 5s is

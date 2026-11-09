@@ -74,6 +74,13 @@ export const MINE_RANK_ARENA = { x: -80, y: MINE_RANK_DECK_Y, z: 0 };
 export const MINE_RANK_RAID_MOBS = 8;
 /** Blocks the hype train needs for each extra coin multiplier. */
 export const MINE_RANK_HYPE_STEP = 1000;
+/**
+ * How many files the generated datapack contains.
+ *
+ * It is asserted against the real generator output by the unit test — never a
+ * hand-written number that can drift when a function is added.
+ */
+export const MINE_RANK_DATAPACK_FILE_COUNT = 204;
 
 /** The eight ore layers of every private mine (top → bottom). */
 export const MINE_RANK_ORE_LAYERS = [
@@ -94,7 +101,7 @@ export const MINE_RANK_MINE_TOP_Y =
   MINE_RANK_MINE_FLOOR_Y + MINE_RANK_ORE_LAYERS.length - 1;
 
 /** Colored marker of each plot — the owner sees which one is which. */
-const PLOT_MARKERS = [
+export const MINE_RANK_PLOT_MARKERS = [
   "white_wool",
   "orange_wool",
   "magenta_wool",
@@ -772,7 +779,7 @@ function buildPlotLines(plot: number): string[] {
     `fill ${cx - 5} ${MINE_RANK_BASE_Y} ${cz - 5} ${cx + 5} ${MINE_RANK_BASE_Y} ${cz + 5} minecraft:stone`,
     `fill ${cx - 1} ${MINE_RANK_BASE_Y} ${cz - 1} ${cx + 1} ${MINE_RANK_BASE_Y} ${cz + 1} minecraft:air`,
     // the colored marker: a ring around the hole
-    `fill ${cx - 2} ${MINE_RANK_DECK_Y} ${cz - 2} ${cx + 2} ${MINE_RANK_DECK_Y} ${cz + 2} minecraft:${PLOT_MARKERS[plot - 1]}`,
+    `fill ${cx - 2} ${MINE_RANK_DECK_Y} ${cz - 2} ${cx + 2} ${MINE_RANK_DECK_Y} ${cz + 2} minecraft:${MINE_RANK_PLOT_MARKERS[plot - 1]}`,
     `fill ${cx - 1} ${MINE_RANK_DECK_Y} ${cz - 1} ${cx + 1} ${MINE_RANK_DECK_Y} ${cz + 1} minecraft:air`,
     `setblock ${cx - 4} ${MINE_RANK_DECK_Y} ${cz} minecraft:sea_lantern`,
     `setblock ${cx + 4} ${MINE_RANK_DECK_Y} ${cz} minecraft:sea_lantern`,
@@ -2176,7 +2183,16 @@ export function generateMineRankFiles(): GeneratedFile[] {
 // ---------------------------------------------------------------------------
 
 /** How each NerdZone command maps to the Mine Rank (own variation). */
-const NERDZONE_COMPARISON: Array<{ nz: string; mineRank: string; note: string }> = [
+/**
+ * The Rankup reference (the public NerdZone guide) next to what the Mine
+ * Rank became — the honest comparison shipped in COMMANDS.md and in the
+ * official site.
+ */
+export const NERDZONE_COMPARISON: Array<{
+  nz: string;
+  mineRank: string;
+  note: string;
+}> = [
   {
     nz: "/mina · /mina ir · /mina resetar",
     mineRank: "mr_t_mine · mr_t_mine_go · mr_t_mine_reset",

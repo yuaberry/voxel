@@ -5,6 +5,9 @@ node_modules/
 dist/
 src-tauri/target/
 
+# GitHub Pages — the Mine Rank site is built in CI and dropped here
+website/mine-rank/
+
 # Logs
 *.log
 

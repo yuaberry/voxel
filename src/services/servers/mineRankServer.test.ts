@@ -4,6 +4,7 @@ import {
   MINE_RANK_BASE_Y,
   MINE_RANK_COMMANDS,
   MINE_RANK_CURRENCIES,
+  MINE_RANK_DATAPACK_FILE_COUNT,
   MINE_RANK_DECK_Y,
   MINE_RANK_HUB,
   MINE_RANK_MINE_FLOOR_Y,
@@ -70,6 +71,12 @@ describe("Mine Rank — the manifest is the single source of truth", () => {
 });
 
 describe("Mine Rank — the datapack", () => {
+  it("publishes the exact file count it really generates", () => {
+    // the site and the docs quote this number — it must never drift
+    expect(MINE_RANK_DATAPACK_FILE_COUNT).toBe(files.length);
+    expect(new Set(files.map((file) => file.path)).size).toBe(files.length);
+  });
+
   it("writes the pack manifest and the load/tick tags", () => {
     const mcmeta = JSON.parse(byPath.get(`world/datapacks/${MINE_RANK_NS}/pack.mcmeta`)!);
     expect(mcmeta.pack.pack_format).toBe(15);

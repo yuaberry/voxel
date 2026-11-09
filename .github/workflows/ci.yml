@@ -18,13 +18,19 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile --filter voxel --filter @voxel/core
+      - run: pnpm install --frozen-lockfile --filter voxel --filter @voxel/core --filter @voxel/mine-rank-site
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test:unit
       - run: pnpm build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+      # the public Mine Rank site is a real app — a broken site fails the CI,
+      # it never reaches GitHub Pages
+      - name: Mine Rank site — typecheck and build
+        run: |
+          pnpm --filter @voxel/mine-rank-site typecheck
+          pnpm --filter @voxel/mine-rank-site build
 
   rust:
     name: Rust — unit tests

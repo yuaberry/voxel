@@ -8,6 +8,7 @@
 > AI-Powered Creation Platform
 
 **[🌐 Site oficial](https://yuaberry.github.io/voxel/)** ·
+**[⛏️ Mine Rank](https://yuaberry.github.io/voxel/mine-rank/)** (site do módulo de Rankup) ·
 **[⬇️ Downloads (v0.32.0)](https://github.com/yuaberry/voxel/releases/latest)** —
 Windows `.exe`/`.msi` · Linux `.deb`/`.AppImage` · macOS `.dmg` (Apple Silicon + Intel)
 
@@ -15,7 +16,7 @@ VOXEL é uma plataforma desktop de criação assistida por IA para Minecraft Jav
 
 ```
 NO FAKE DATA — cada tela mostra apenas o que funciona.
-Prova real: 110 testes unitários Rust + 316 Vitest + 12 E2E executados
+Prova real: 110 testes unitários Rust + 323 Vitest + 12 E2E executados
 (mod compilado, launcher de 718MB oficiais com SHA-1, authlib-injector
 oficial com SHA-256, servidor boot/stop/backup, Mine Rank em servidor
 vanilla 1.20.1 real) — tudo verde, na CI e local.
@@ -50,7 +51,8 @@ vanilla 1.20.1 real) — tudo verde, na CI e local.
 | **Mobile** — VOXEL Bridge (token no keyring, biometria), APK Android 0.3.1, PWA iOS instalável, build notifications | ✅ |
 | Dark Kingdom — projeto-exemplo criado automaticamente (espada, receita, advancement) | ✅ |
 | Release multi-OS + site oficial no GitHub Pages | ✅ |
-| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), **426 testes verdes** (110 Rust + 316 Vitest); toda ação fora da main thread (async + spawn_blocking — congelamento extinto como classe) | ✅ |
+| **Site do Mine Rank** (`apps/mine-rank-site`) — React 18 + Vite + Tailwind, deploy no GitHub Pages; renderiza o **mesmo manifesto** que gera o datapack (uma fonte de verdade), com busca de comandos, mapa do mundo em SVG e a dedicatória ao NerdZone.gg | ✅ |
+| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), **433 testes verdes** (110 Rust + 323 Vitest); toda ação fora da main thread (async + spawn_blocking — congelamento extinto como classe) | ✅ |
 
 ## 🚀 Como rodar (desenvolvimento)
 
@@ -108,7 +110,7 @@ Decisões-chave no [`docs/architecture.md`](docs/architecture.md) (AD-1..AD-11 +
 |---|---|
 | `cargo test` | 110 unit (templates ×6 eras, ledger+tamper, shaderpacks, SLP+SRV, bridge multimodal, modpacks, snapshots, deploy, structures NBT, assets animados, launcher Ely.by/authlib-injector, allowlist de HTTP/URL) |
 | `cargo test -- --ignored` | 12 E2E: **compilação REAL de 6 templates** (fabric/forge/neoforge ×4 eras até 26.3), launcher 718MB SHA-1, **authlib-injector oficial com SHA-256**, server ciclo, SLP de servidores públicos (hypixel/nerdzone…), Modrinth com checksum |
-| `pnpm test:unit` | 316 Vitest em 40 arquivos (shaders + gerador GLSL, error parser, 9 módulos de servidor com comandos, **Mine Rank** — manifesto, datapack gerado, layout do mundo e render do painel, inferência de estilo, task force, model routing, i18n pt-BR, manifestos, parser de MOTD, **device flow Microsoft + Ely.by**, coordinator de sessão OAuth, HTTP com timeout/abort e seleção de provider) |
+| `pnpm test:unit` | 323 Vitest em 41 arquivos (shaders + gerador GLSL, error parser, 9 módulos de servidor com comandos, **Mine Rank** — manifesto, datapack gerado, layout do mundo e render do painel, **site do Mine Rank renderizado em jsdom**, inferência de estilo, task force, model routing, i18n pt-BR, manifestos, parser de MOTD, **device flow Microsoft + Ely.by**, coordinator de sessão OAuth, HTTP com timeout/abort e seleção de provider) |
 | `VOXEL_E2E=1 pnpm vitest run src/services/servers/mineRankServer.e2e.test.ts` | **E2E real do Mine Rank**: jar vanilla 1.20.1 oficial (SHA-1 do piston-meta), cliente **mineflayer** de verdade, os 39 comandos do manifesto × 3 valores (117 triggers) + mineração real que paga coin + nenhum stall de tick |
 | CI (`.github/workflows/ci.yml`) | typecheck + lint + vitest + vite build + cargo test |
 | Release (`.github/workflows/release.yml`) | tag `v*` → .exe/.msi/.deb/.AppImage/.dmg (Windows, Linux, macOS arm64+x64) |

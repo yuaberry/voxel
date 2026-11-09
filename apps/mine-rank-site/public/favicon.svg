@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="mr-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1018"/>
+      <stop offset="100%" stop-color="#060709"/>
+    </linearGradient>
+    <linearGradient id="mr-pick" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3d7dff"/>
+      <stop offset="55%" stop-color="#9155ff"/>
+      <stop offset="100%" stop-color="#17d9f0"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#mr-bg)"/>
+  <!-- the pickaxe: a diagonal shaft with a curved head -->
+  <path d="M17 50 L44 23" stroke="url(#mr-pick)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M31 13c9 0 14 4.5 15.5 12-6 .2-11.5-2-15-7" stroke="url(#mr-pick)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M22 21c-4 1.5-6.5 4.5-7.5 9 3.5 1.5 6.5 1 9-1" stroke="url(#mr-pick)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- the ore block it hits -->
+  <rect x="39" y="41" width="14" height="14" rx="2" fill="#1b2030" stroke="#9155ff" stroke-width="2"/>
+  <rect x="43" y="45" width="4" height="4" fill="#17d9f0"/>
+  <rect x="47" y="50" width="3" height="3" fill="#b79cff"/>
+</svg>

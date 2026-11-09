@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Mine Rank site — the VOXEL "Next" skin.
+ * Deep-black surfaces, electric violet/cyan energy, glass, blueprint grid.
+ * The tokens mirror the desktop app (src/index.css) so both feel like the
+ * same product.
+ */
+@layer base {
+  :root {
+    --background: 232 30% 3%;
+    --foreground: 220 32% 94%;
+    --card: 230 24% 5%;
+    --card-foreground: 220 32% 94%;
+    --primary: 258 96% 70%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 230 18% 10%;
+    --secondary-foreground: 220 26% 90%;
+    --muted: 230 17% 8%;
+    --muted-foreground: 225 13% 62%;
+    --accent: 230 20% 13%;
+    --accent-foreground: 220 30% 96%;
+    --border: 230 16% 11%;
+    --input: 230 16% 13%;
+    --ring: 258 96% 70%;
+    --radius: 0.85rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Inter", Inter, system-ui, sans-serif;
+    background-image:
+      radial-gradient(ellipse 70% 50% at 50% -10%, hsl(258 96% 70% / 0.16), transparent 65%),
+      radial-gradient(ellipse 50% 40% at 90% 10%, hsl(187 92% 54% / 0.10), transparent 70%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.4);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(230 14% 18% / 0.85);
+    border-radius: 8px;
+    border: 2px solid hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.45);
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring) / 0.8);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .shell {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
+  }
+
+  .panel {
+    @apply rounded-2xl border border-border/70 bg-card/60 backdrop-blur-xl;
+    box-shadow:
+      inset 0 1px 0 hsl(220 40% 90% / 0.05),
+      0 24px 60px -30px hsl(258 96% 70% / 0.35);
+  }
+
+  .panel-soft {
+    @apply rounded-xl border border-border/60 bg-card/40;
+  }
+
+  .brand-text {
+    background-image: linear-gradient(115deg, #b79cff 0%, #6ea2ff 55%, #3ee7fb 110%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .brand-bar {
+    background-image: linear-gradient(120deg, #9155ff 0%, #3d7dff 55%, #17d9f0 115%);
+  }
+
+  .grid-lines {
+    background-image:
+      linear-gradient(hsl(228 36% 50% / 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(228 36% 50% / 0.07) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 25%, transparent 78%);
+    -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 25%, transparent 78%);
+  }
+
+  .glow {
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.3),
+      0 0 34px hsl(var(--primary) / 0.16);
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/60 px-3 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground;
+  }
+
+  .chip-active {
+    @apply border-primary/50 bg-primary/15 text-foreground;
+  }
+
+  .link {
+    @apply text-primary underline-offset-4 transition-colors hover:underline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

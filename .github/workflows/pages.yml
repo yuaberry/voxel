@@ -3,7 +3,14 @@ name: Deploy website
 on:
   push:
     branches: [main]
-    paths: ["website/**"]
+    paths:
+      - "website/**"
+      # the Mine Rank site is a real Vite app — it must be rebuilt whenever
+      # its own sources OR the shared manifest it renders change
+      - "apps/mine-rank-site/**"
+      - "src/services/servers/mineRankServer.ts"
+      - "pnpm-lock.yaml"
+      - "package.json"
   workflow_dispatch:
 
 permissions:
@@ -23,6 +30,25 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # the static landing page stays as it is; the Mine Rank site is built
+      # from the workspace and dropped under /mine-rank/ (base: /voxel/mine-rank/)
+      - name: Build the Mine Rank site
+        run: |
+          pnpm install --frozen-lockfile --filter @voxel/mine-rank-site
+          pnpm --filter @voxel/mine-rank-site build
+          rm -rf website/mine-rank
+          mkdir -p website/mine-rank
+          cp -r apps/mine-rank-site/dist/. website/mine-rank/
 
       - uses: actions/configure-pages@v5
 

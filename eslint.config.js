@@ -5,7 +5,7 @@ export default tseslint.config(
   { ignores: ["dist", "node_modules", "src-tauri/target", "src-tauri"] },
   ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.{ts,tsx}"],
+    files: ["src/**/*.{ts,tsx}", "apps/mine-rank-site/src/**/*.{ts,tsx}"],
     plugins: { "react-hooks": hooks },
     rules: {
       ...hooks.configs.recommended.rules,
