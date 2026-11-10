@@ -47,6 +47,7 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
   const basePath = useSettingsStore((s) => s.settings.storage.basePath);
   const ramMb = useSettingsStore((s) => s.settings.launcher.ramMb);
   const javaPath = useSettingsStore((s) => s.settings.java.customJavaPath);
+  const elyClientId = useSettingsStore((s) => s.settings.launcher.elyClientId);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<LaunchProgress | null>(null);
@@ -121,6 +122,16 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
     if (!account) {
       toast.error("Sign in first", {
         description: "Settings → Launcher → Microsoft or Ely.by",
+      });
+      navigate("/settings/launcher");
+      return;
+    }
+    // Ely.by needs a configured desktop client id to refresh tokens and to
+    // launch with authlib-injector. Refuse early with a clear message.
+    if (account.provider === "elyby" && !elyClientId.trim()) {
+      toast.error("Ely.by client id not configured", {
+        description:
+          "Settings → Launcher → add the Ely.by desktop app client id (create one at account.ely.by/dev/applications/new).",
       });
       navigate("/settings/launcher");
       return;

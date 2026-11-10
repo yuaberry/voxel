@@ -73,6 +73,20 @@ export function BuildDrawer({ project, open, onToggle, buildStatus }: Props) {
     return () => clearInterval(id);
   }, [building]);
 
+  const [isJavaMod, setIsJavaMod] = useState<boolean | null>(null);
+  // Check once on mount whether this project can be built with Gradle.
+  // Datapack-only projects (e.g. Mine Rank server modules) have no build.gradle.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const pre = await preflightBuild(project, basePath);
+      if (!cancelled) setIsJavaMod(pre.ok);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [basePath, project]);
+
   const [autoFix, setAutoFix] = useState<AutoFixState | null>(null);
   const abortRef = useRef(false);
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -292,7 +306,26 @@ export function BuildDrawer({ project, open, onToggle, buildStatus }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
-          {busy ? (
+          {isJavaMod === false ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 text-[11px]"
+              disabled
+              title="This project is not a Java mod — it has no build.gradle/gradlew. Build is for Fabric/Forge/NeoForge mod projects only."
+            >
+              <Zap className="h-3 w-3 opacity-50" /> Build (Java mod only)
+            </Button>
+          ) : isJavaMod === null ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 text-[11px]"
+              disabled
+            >
+              <Loader2 className="h-3 w-3 animate-spin" />
+            </Button>
+          ) : busy ? (
             <Button size="sm" variant="secondary" className="h-7 text-[11px]" onClick={() => void handleStop()}>
               <Square className="h-3 w-3" /> Stop
             </Button>
