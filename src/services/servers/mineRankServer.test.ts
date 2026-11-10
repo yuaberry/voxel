@@ -15,6 +15,8 @@ import {
   MINE_RANK_POND,
   MINE_RANK_PRESTIGE_LEVEL,
   MINE_RANK_TIERS,
+  SHOVEL_MULTIPLIER_MILLE,
+  SHOVEL_UPGRADE_PRICE_COINS,
   generateMineRankFiles,
   mineRankCommandsMarkdown,
   mineRankPlotCenter,
@@ -47,7 +49,19 @@ describe("Mine Rank — the manifest is the single source of truth", () => {
   it("covers every family the owner asked for", () => {
     const families = new Set(MINE_RANK_COMMANDS.map((command) => command.family));
     expect([...families].sort()).toEqual(
-      ["economia", "geral", "mina", "progressao", "social", "sistemas", "terrenos"].sort(),
+      [
+        "economia",
+        "geral",
+        "mina",
+        "progressao",
+        "social",
+        "sistemas",
+        "terrenos",
+        "prerank",
+        "pickaxe",
+        "mine_terra",
+        "mine_areia",
+      ].sort(),
     );
   });
 
@@ -364,6 +378,86 @@ describe("Mine Rank — the commands really do something", () => {
       const path = `world/datapacks/${MINE_RANK_NS}/data/${MINE_RANK_NS}/functions/${command.fn}.mcfunction`;
       expect(byPath.has(path), `${command.id} has no function`).toBe(true);
     }
+  });
+
+  it("pre-ranks Terra and Areia exist with valid triggers", () => {
+    const prerank = MINE_RANK_COMMANDS.find((c) => c.id === "pre-rank");
+    expect(prerank).toBeDefined();
+    expect(prerank!.trigger).toBe("mr_t_prerank");
+    expect(prerank!.trigger.length).toBeLessThanOrEqual(16);
+
+    const terra = MINE_RANK_COMMANDS.find((c) => c.id === "terra");
+    expect(terra).toBeDefined();
+    expect(terra!.trigger).toBe("mr_t_terra");
+    expect(terra!.trigger.length).toBeLessThanOrEqual(16);
+
+    const areia = MINE_RANK_COMMANDS.find((c) => c.id === "areia");
+    expect(areia).toBeDefined();
+    expect(areia!.trigger).toBe("mr_t_areia");
+    expect(areia!.trigger.length).toBeLessThanOrEqual(16);
+
+    const terraMine = MINE_RANK_COMMANDS.find((c) => c.id === "mina terra");
+    expect(terraMine).toBeDefined();
+    expect(terraMine!.trigger).toBe("mr_t_terra_mine");
+    expect(terraMine!.trigger.length).toBeLessThanOrEqual(16);
+
+    const areiaMine = MINE_RANK_COMMANDS.find((c) => c.id === "mina areia");
+    expect(areiaMine).toBeDefined();
+    expect(areiaMine!.trigger).toBe("mr_t_areia_mine");
+    expect(areiaMine!.trigger.length).toBeLessThanOrEqual(16);
+  });
+
+  it("shovel merchant and upgrade commands exist", () => {
+    const mercador = MINE_RANK_COMMANDS.find((c) => c.id === "mercador");
+    expect(mercador).toBeDefined();
+    expect(mercador!.trigger).toBe("mr_t_mercador");
+
+    const pickUp = MINE_RANK_COMMANDS.find((c) => c.id === "pá upgrade");
+    expect(pickUp).toBeDefined();
+    expect(pickUp!.trigger).toBe("mr_t_pick_up");
+    expect(pickUp!.trigger.length).toBeLessThanOrEqual(16);
+
+    const fn = (name: string) =>
+      byPath.get(
+        `world/datapacks/${MINE_RANK_NS}/data/${MINE_RANK_NS}/functions/${name}.mcfunction`,
+      );
+    expect(fn("cmd_mercador")).toBeDefined();
+    expect(fn("cmd_pickaxe_upgrade")).toBeDefined();
+    expect(fn("do_pickaxe_upgrade_confirm")).toBeDefined();
+    expect(fn("menu_mnc")).toBeDefined();
+  });
+
+  it("pre-rank and shovel scoreboard objectives exist in load", () => {
+    const load = fn("load");
+    for (const objective of [
+      "mr_prerank",
+      "mr_pickaxe_level",
+      "mr_pickaxe_mult",
+      "mr_pickaxe_price",
+      "mr_block_value",
+      "mr_pick_reward",
+      "mr_mnc",
+      "mr_blocks_terra",
+      "mr_blocks_areia",
+    ]) {
+      expect(load).toContain(`scoreboard objectives add ${objective} dummy`);
+    }
+  });
+
+  it("shovel multiplier constants are configured", () => {
+    expect(SHOVEL_MULTIPLIER_MILLE.wood).toBe(200);
+    expect(SHOVEL_MULTIPLIER_MILLE.diamond).toBe(1500);
+    expect(SHOVEL_MULTIPLIER_MILLE.netherite).toBe(2000);
+    expect(SHOVEL_UPGRADE_PRICE_COINS.stone).toBe(50);
+    expect(SHOVEL_UPGRADE_PRICE_COINS.diamond).toBe(600);
+  });
+
+  it("MineCoin is only unlocked at Bronze", () => {
+    const mnc = MINE_RANK_COMMANDS.find((c) => c.id === "mnc");
+    expect(mnc).toBeDefined();
+    expect(mnc!.family).toBe("economia");
+    const load = fn("load");
+    expect(load).toContain("scoreboard objectives add mr_mnc dummy");
   });
 });
 

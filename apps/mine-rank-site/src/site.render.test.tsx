@@ -87,7 +87,9 @@ describe("Mine Rank site — the command explorer", () => {
     const input = screen.getByLabelText("Buscar comando") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "prestigio" } });
     expect(input.value).toBe("prestigio");
-    expect(screen.getByText(/de 39 comandos/)).toBeTruthy();
+    expect(
+      screen.getByText(new RegExp(`de ${MINE_RANK_COMMANDS.length} comandos`)),
+    ).toBeTruthy();
   });
 });
 

@@ -38,7 +38,7 @@ vanilla 1.20.1 real) — tudo verde, na CI e local.
 | Build System — `./gradlew build` ao vivo, Error Center, Auto-Fix ≤5 tentativas | ✅ |
 | Launcher — instâncias isoladas, downloads oficiais SHA-1 (718MB provados), Microsoft + Ely.by OAuth device flow, authlib-injector SHA-256 para Ely.by | ✅ |
 | Server Studio — vanilla/Paper oficiais, console stdin, backups/restore, properties | ✅ |
-| Server Modules misturáveis — 9 sistemas: Economy/Prison/Token Chain, SkyBlock Islands, Factions War, BedWars Lite, Monuments (.nbt reais com /place), Custom Realm (dimensão real) e **Mine Rank** (Rankup completo: 39 comandos, 8 tiers, prestígio, 8 minas privadas, 4 moedas, clans, pesca e arena) — cada um com comandos documentados no README do servidor | ✅ |
+| Server Modules misturáveis — 9 sistemas: Economy/Prison/Token Chain, SkyBlock Islands, Factions War, BedWars Lite, Monuments (.nbt reais com /place), Custom Realm (dimensão real) e **Mine Rank** (Rankup completo: 47 comandos, pré-ranks Terra/Areia, sistema de pás com multiplicadores, MineCoin, 8 tiers, prestígio, 8 minas privadas, 4 moedas, clans, pesca e arena) — cada um com comandos documentados no README do servidor | ✅ |
 | Token Chain — ledger SHA-256 real (mint/transfer/burn/verify, tamper-evidente) | ✅ Wave 1 |
 | Túnel público grátis — playit.gg (servidor acessível de qualquer lugar) | ✅ Wave 1 |
 | Shader Studio — 32 looks icônicos como presets → shaderpacks GLSL originais; Asset Studio — sprites pixel-art (estáticos E animados com .mcmeta), faces de bloco, estruturas .nbt com preview isométrico e dimensões custom | ✅ |inais Iris/OptiFire-compat, preview WebGL vivo, editor Monaco, install na instância | ✅ Wave 2 |
@@ -73,7 +73,7 @@ Para **estilos visuais**: aba **Shaders** — escolha entre 32 presets (BSL, SEU
 
 Para **jogadores de servidor**: aba **Servers** → wizard (vanilla/Paper, versão do catálogo ao vivo) → módulos misturáveis (Economy/Prison/Token Chain/**Mine Rank**) → console em tempo real, VoxelCoin com ledger verificável, backups, túnel público e restore.
 
-Para **servidor estilo Rankup**: aba **Servers** → console do servidor → aba **Mine Rank** → *Instalar* (escreve o datapack `nexus_rank` no mundo: hub, 8 terrenos com mina privada de 8 camadas, lago e arena, tudo compacto para não travar o vanilla). A seção **Mapa do mundo** importa um ZIP de mapa de terceiros com **atribuição e licença gravadas dentro do próprio mundo** (`VOXEL_MAP_CREDITS.md`) — o app nunca baixa mapa de site nenhum por conta própria.
+Para **servidor estilo Rankup**: aba **Servers** → console do servidor → aba **Mine Rank** → *Instalar* (escreve o datapack `nexus_rank` no mundo: hub, 8 terrenos com mina privada de 8 camadas, lago e arena, tudo compacto para não travar o vanilla). Pré-ranks Terra e Areia com sistema de pás e multiplicadores; Rank Bronze libera MineCoin. A seção **Mapa do mundo** importa um ZIP de mapa de terceiros com **atribuição e licença gravadas dentro do próprio mundo** (`VOXEL_MAP_CREDITS.md`) — o app nunca baixa mapa de site nenhum por conta própria.
 
 Para **publicar**: workspace → **Publish** → commit + repo GitHub + push.
 

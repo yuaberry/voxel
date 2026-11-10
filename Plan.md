@@ -1136,3 +1136,71 @@ O **device flow Ely.by ao vivo** continua bloqueado pelo `client_id` do Desktop 
 ### Pendência honesta (depende do dono)
 
 O **device flow Ely.by ao vivo** continua bloqueado pelo `client_id` do Desktop Application público do VOXEL — **inalterado** pela S77 (nada do site depende dele). O link do site no GitHub Pages só fica no ar depois do **primeiro deploy** do workflow `pages.yml` com o build novo.
+
+---
+
+## 78. Sessão 78 — Pré-Ranks Terra e Areia, sistema de pás, MineCoin e textura da picareta
+
+**Pedido do dono**: estender o Mine Rank (caminho A — datapack vanilla 1.20.1) com pré-ranks econômicos (Terra e Areia antes do Bronze), mineração baseada em pás com multiplicadores por material, mercador de pás, fórmula de recompensa exata (valor_base × multiplicador × bônus, inteiros), transição para o Bronze, MineCoin liberada a partir do Bronze com permissões separadas, comandos adicionais (`/pre-rank`, `/terra`, `/areia`, `/mercador`, `/pá`, `/pa upgrade`, `/mina terra`, `/mina areia`) e uma textura diferente para a picareta de mineração.
+
+### O que foi entregue
+
+**Pré-Ranks Terra e Areia** (novos objetivos scoreboard `mr_prerank`):
+- **Pré-Rank Terra** (`mr_prerank = 0`): Mina da Terra exclusiva, valor-base de 10 centavos por bloco de terra, multiplicador aplicado pela pá.
+- **Pré-Rank Areia** (`mr_prerank = 1`): Mina da Areia, valor-base de 25 centavos por bloco de areia, upgrades mais caros.
+- **Rank Bronze** (`mr_prerank = 2`): liberado após cumprir requisitos da Areia, libera picaretas normais e MineCoin.
+- Requisitos configuráveis: Terra→Areia (500 blocos + 1000 coins), Areia→Bronze (1000 blocos + 5000 coins).
+
+**Sistema de pás** (`mr_pickaxe_level`, `mr_pickaxe_mult`, `mr_pickaxe_price`):
+- 6 materiais: madeira (0.20x), pedra (0.40x), ferro (0.70x), ouro (0.90x), diamante (1.50x), netherite (2.00x).
+- Multiplicadores em milésimos (matemática inteira, sem float/double).
+- Preços de upgrade: pedra 50, ferro 150, ouro 300, diamante 600, netherite 1200 coins.
+- O multiplicador é aplicado **uma única vez** por evento de recompensa válido (sem aplicação dupla).
+- Picareta customizada com `CustomModelData: 1` e nome via NBT.
+
+**Fórmula de recompensa**:
+`recompensa = valor_base_do_bloco × multiplicador_da_ferramenta × bônus_permitidos / 1000`
+- Tudo em inteiros (centavos para valores fracionários, milésimos para multiplicadores).
+- Limite máximo configurável: 5000 centavos (50 coins) por bloco.
+- Cálculo e validação exclusivamente pelo servidor.
+
+**MineCoin (MNC)** (objetivo `mr_mnc`):
+- Liberada apenas a partir do Rank Bronze.
+- Permissões separadas: visualizar saldo, consultar mercado, receber, transferir, negociar, serviços premium.
+- Não distribuída automaticamente em quantidades ilimitadas.
+
+**Comandos adicionais** (todos com trigger ≤ 16 chars):
+- `/pre-rank` → `mr_t_prerank`
+- `/terra` → `mr_t_terra`
+- `/areia` → `mr_t_areia`
+- `/mercador` → `mr_t_mercador`
+- `/pá upgrade` → `mr_t_pick_up`
+- `/mina terra` → `mr_t_terra_mine`
+- `/mina areia` → `mr_t_areia_mine`
+- `/mnc` → `mr_t_mnc` (MineCoin)
+
+**Textura da picareta**:
+- Resource pack gerado com `pack.mcmeta`, modelo `custom_pickaxe.json` (CustomModelData: 1) e especificação SVG da textura (`custom_pickaxe.svg`).
+- A textura PNG real deve ser substituída pelo dono; o modelo e o pack.mcmeta são gerados determinísticamente.
+
+### Novos comandos no manifest
+8 novos comandos adicionados a `MINE_RANK_COMMANDS` (total: 47 comandos). Novas famílias: `prerank`, `pickaxe`, `mine_terra`, `mine_areia`.
+
+### Testes novos
+- 7 novos testes no `mineRankServer.test.ts` (pré-ranks, pás, scoreboard, multiplicadores, MineCoin).
+- 1 teste existente corrigido no site (número de comandos não hardcoded).
+
+### Bugs reais corrigidos nesta sessão
+| Bug | Como foi achado | Fix |
+|---|---|---|
+| Função `do_pickaxe_upgrade` duplicada entre commandFunctions e systemFunctions | teste de caminhos únicos no gerador | remoção da definição duplicada em systemFunctions |
+| Número de comandos hardcoded no teste do site (39) | adição de 8 novos comandos | uso de `MINE_RANK_COMMANDS.length` dinâmico |
+
+### Verificação
+
+- **typecheck** ✓ · **lint** ✓ (0/0) · **Vitest 328/328** em 41 arquivos (+7 novos) · **Rust 110 passed + 12 ignored** · `pnpm build` ✓ · **site build** ✓.
+- **Prova de que o teste novo pega a regressão**: função duplicada `do_pickaxe_upgrade` foi detectada pelo teste de caminhos únicos.
+
+### Pendência honesta (depende do dono)
+
+O **device flow Ely.by ao vivo** continua bloqueado pelo `client_id` — inalterado pela S78. A textura PNG da picareta precisa ser adicionada pelo dono em `resource_pack/assets/minecraft/textures/item/custom_pickaxe.png` (o SVG de especificação já está gerado).
