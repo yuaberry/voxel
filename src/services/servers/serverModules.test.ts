@@ -75,7 +75,11 @@ describe("mine rank module", () => {
       "bedwars",
       "mine_rank",
     ]);
-    const roots = new Set(files.map((f) => f.path.split("/")[2]));
+    const roots = new Set(
+      files
+        .filter((f) => f.path.startsWith("world/datapacks/"))
+        .map((f) => f.path.split("/")[2]),
+    );
     expect(roots).toContain("nexus_rank");
     expect(roots).toContain("nexus_economy");
     expect(roots.size).toBe(6);

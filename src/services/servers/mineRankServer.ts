@@ -70,6 +70,35 @@ export const MINE_RANK_HUB = { x: 0, y: MINE_RANK_DECK_Y, z: 0 };
 export const MINE_RANK_POND = { x: 0, y: MINE_RANK_DECK_Y + 1, z: 80 };
 /** Raid arena coordinates (the player stands on the stone floor). */
 export const MINE_RANK_ARENA = { x: -80, y: MINE_RANK_DECK_Y, z: 0 };
+/**
+ * The Terra mine (the pre-rank ladder starts here).
+ *
+ * It has its OWN coordinates — the private mines of the 8 tiers live in the
+ * plot grid (20..68 on X) and the pre-rank mines would overlap them if they
+ * reused a plot. Both are still within 3 chunks of the hub, so a teleport
+ * never loads a long corridor of chunks.
+ */
+export const MINE_RANK_TERRA_MINE = { x: -24, z: 20 };
+/** The Areia mine (the second pre-rank). */
+export const MINE_RANK_AREIA_MINE = { x: -48, z: 20 };
+/**
+ * How many layers of dirt/sand the pre-rank mines hold.
+ *
+ * The player digs the block under their feet, layer by layer; the mine is
+ * restored automatically after MINE_RANK_MINE_RESET_BLOCKS blocks.
+ */
+export const MINE_RANK_PRE_MINE_LAYERS = 3;
+/** Half-size of the diggable platform of a pre-rank mine (7x7 blocks). */
+export const MINE_RANK_PRE_MINE_RADIUS = 3;
+/**
+ * How many ticks the mining session survives after the player steps off
+ * the dirt/sand (20 ticks = 1 second).
+ *
+ * The grace covers the instant between breaking the block and landing on
+ * the next layer of the mine — without it the session would close on the
+ * very block the player just mined.
+ */
+export const MINE_RANK_PRE_MINE_SESSION_GRACE = 20;
 /** Mobs spawned by one expedition. */
 export const MINE_RANK_RAID_MOBS = 8;
 /** Blocks the hype train needs for each extra coin multiplier. */
@@ -80,7 +109,7 @@ export const MINE_RANK_HYPE_STEP = 1000;
  * It is asserted against the real generator output by the unit test — never a
  * hand-written number that can drift when a function is added.
  */
-export const MINE_RANK_DATAPACK_FILE_COUNT = 223;
+export const MINE_RANK_DATAPACK_FILE_COUNT = 270;
 
 // ---------------------------------------------------------------------------
 // Pre-ranks Terra and Areia — the economic ladder before Bronze
@@ -88,6 +117,13 @@ export const MINE_RANK_DATAPACK_FILE_COUNT = 223;
 
 /** The pre-ranks: Terra (0) and Areia (1) come before Bronze (2). */
 export type MineRankPreRank = "terra" | "areia" | "bronze";
+
+/** The pre-rank ladder, in order — the index is the `mr_prerank` score. */
+export const MINE_RANK_PRERANK_ORDER: MineRankPreRank[] = [
+  "terra",
+  "areia",
+  "bronze",
+];
 
 /** Labels shown to the player for each pre-rank. */
 export const MINE_RANK_PRERANK_LABELS: Record<MineRankPreRank, string> = {
@@ -115,6 +151,33 @@ export const MINE_RANK_BLOCK_VALUE_CENTS: Record<MineRankPreRank, number> = {
 
 /** Maximum reward allowed for a single block (in cents) — anti-exploit cap. */
 export const MINE_RANK_MAX_BLOCK_REWARD_CENTS = 5000; // 50 coins per block
+
+/**
+ * MineCoin (MNC) — the premium currency, unlocked at the Bronze rank.
+ *
+ * It is NEVER handed out for free: the only way to get it is to convert
+ * coins into it, and the balance is capped so it can never flood.
+ */
+export const MINE_RANK_MNC_COIN_PRICE = 1000; // coins -> 1 MNC
+export const MINE_RANK_MNC_COIN_RETURN = 500; // 1 MNC -> coins
+export const MINE_RANK_MNC_CAP = 100; // the balance can never pass this
+export const MINE_RANK_MNC_PICKAXE_PRICE = 25; // the mining pickaxe, in MNC
+
+/**
+ * The MineCoin permissions, one objective each.
+ *
+ * They are separate on purpose: viewing the balance, opening the market,
+ * receiving, sending, trading and the premium services are different
+ * permissions — a server owner can close one without touching the others.
+ */
+export const MNC_PERMISSION_OBJECTIVES = [
+  "mr_p_view",
+  "mr_p_market",
+  "mr_p_recv",
+  "mr_p_send",
+  "mr_p_trade",
+  "mr_p_premium",
+] as const;
 
 // ---------------------------------------------------------------------------
 // Shovel tool system — the pickaxe progression starts at Bronze
@@ -158,6 +221,35 @@ export const SHOVEL_ITEM: Record<ShovelMaterial, string> = {
   diamond: "minecraft:diamond_shovel",
   netherite: "minecraft:netherite_shovel",
 };
+
+/** The shovel ladder, from the starting wooden shovel to netherite. */
+export const SHOVEL_LADDER: ShovelMaterial[] = [
+  "wood",
+  "stone",
+  "iron",
+  "gold",
+  "diamond",
+  "netherite",
+];
+
+/**
+ * The mining pickaxe — the item that carries the custom texture.
+ *
+ * `CustomModelData: 1` is what the resource pack keys the new art on, so
+ * the vanilla model is replaced ONLY for this pickaxe.
+ */
+export const MINE_RANK_PICKAXE_ITEM =
+  'minecraft:diamond_pickaxe{CustomModelData:1,Enchantments:[{id:"minecraft:efficiency",lvl:3},{id:"minecraft:unbreaking",lvl:3}],display:{Name:\'{"text":"Picareta de Mineração"}\'}}';
+
+/**
+ * The texture of the mining pickaxe — a real 16x16 RGBA PNG, original art.
+ *
+ * It is embedded as base64 so the datapack, the site and the app always
+ * ship the SAME texture (one source of truth) and the owner never has to
+ * draw anything by hand.
+ */
+export const MINE_RANK_PICKAXE_TEXTURE_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAV0lEQVR42mNgoAVY3v3rPzZMtMbf+1WwYrwGwTTish3ZcKyGIEsqXX6HFeM1AGYILs3IhhAVDtg0EhWQMADS5KUjAsYgNslROQwMAAGYAWQn6YE3gC4AAOYe3B9+4xc+AAAAAElFTkSuQmCC";
 
 /** Display name of each shovel material. */
 export const SHOVEL_DISPLAY_NAME: Record<ShovelMaterial, string> = {
@@ -854,6 +946,88 @@ function score(objective: string, name = "@s", color = "#a78bfa"): ChatPart {
   return { score: { objective, name }, color };
 }
 
+/**
+ * The pre-rank name of the player, as chat.
+ *
+ * Vanilla cannot map a score to a word — the honest way is one branch per
+ * rank, and only the matching branch prints anything.
+ */
+function prerankLabelTell(): string[] {
+  return MINE_RANK_PRERANK_ORDER.map(
+    (rank, index) =>
+      `execute if score @s mr_prerank matches ${index} run tellraw @s ${chat([
+        tag(),
+        {
+          text: MINE_RANK_PRERANK_LABELS[rank],
+          color: index === 2 ? "#fbbf24" : "#22d3ee",
+          bold: true,
+        },
+      ])}`,
+  );
+}
+
+/** The name of the shovel the player carries (one branch per material). */
+function shovelMaterialTell(): string[] {
+  return SHOVEL_LADDER.map(
+    (material, index) =>
+      `execute if score @s mr_pickaxe_level matches ${index} run tellraw @s ${chat([
+        tag(),
+        { text: `Sua pá: ${SHOVEL_DISPLAY_NAME[material]}`, color: "#22d3ee" },
+      ])}`,
+  );
+}
+
+/** Removes the shovel of the material the player is leaving. */
+function shovelClearOld(): string[] {
+  return SHOVEL_LADDER.slice(0, -1).map(
+    (material, index) =>
+      `execute if score @s mr_pickaxe_level matches ${index} run clear @s ${SHOVEL_ITEM[material]} 1`,
+  );
+}
+
+/** Sets the multiplier of the material the player just reached. */
+function shovelMultSet(): string[] {
+  return SHOVEL_LADDER.slice(1).map(
+    (material, index) =>
+      `execute if score @s mr_pickaxe_level matches ${index + 1} run scoreboard players set @s mr_pickaxe_mult ${SHOVEL_MULTIPLIER_MILLE[material]}`,
+  );
+}
+
+/** Sets the price of the NEXT upgrade (0 when the ladder is over). */
+function shovelNextPriceSet(): string[] {
+  return SHOVEL_LADDER.slice(1).map((_material, index) => {
+    const next = SHOVEL_LADDER[index + 2];
+    const price = next ? SHOVEL_UPGRADE_PRICE_COINS[next] : 0;
+    return `execute if score @s mr_pickaxe_level matches ${index + 1} run scoreboard players set @s mr_pickaxe_price ${price}`;
+  });
+}
+
+/** Gives the shovel of the material the player just reached. */
+function shovelGive(): string[] {
+  return SHOVEL_LADDER.slice(1).map(
+    (material, index) =>
+      `execute if score @s mr_pickaxe_level matches ${index + 1} run give @s ${SHOVEL_ITEM[material]} 1`,
+  );
+}
+
+/**
+ * The multiplier of the shovel the player HOLDS — the tool is validated
+ * SERVER SIDE, the client never tells the server what it is holding.
+ *
+ * The vanilla 1.20.1 has no `execute if items` (it arrived in 1.20.3), so
+ * the main hand is read from the player NBT: `SelectedItem` only exists
+ * when the hand really holds an item.
+ */
+function shovelToolMultSet(): string[] {
+  return [
+    "scoreboard players set @s mr_pick_mult 0",
+    ...SHOVEL_LADDER.map(
+      (material) =>
+        `execute if data entity @s {SelectedItem:{id:"${SHOVEL_ITEM[material]}"}} run scoreboard players set @s mr_pick_mult ${SHOVEL_MULTIPLIER_MILLE[material]}`,
+    ),
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // Datapack helpers
 // ---------------------------------------------------------------------------
@@ -930,6 +1104,12 @@ function buildWorldLines(): string[] {
   for (let p = 1; p <= MINE_RANK_PLOTS; p += 1) {
     lines.push(`function ${MINE_RANK_NS}:build_plot_${p}`);
   }
+  lines.push(
+    "# the pre-rank mines (they have their own coordinates — the plot grid",
+    "# belongs to the private mines of the 8 tiers)",
+    `function ${MINE_RANK_NS}:build_terra_mine`,
+    `function ${MINE_RANK_NS}:build_areia_mine`,
+  );
   return lines;
 }
 
@@ -1011,6 +1191,48 @@ function plotTeleports(y: number, offset = 0): string[] {
       `execute if score @s mr_plot matches ${p} run tp @s ${x} ${y} ${z + offset}`,
     );
   }
+  return lines;
+}
+
+/**
+ * One pre-rank mine (Terra = dirt, Areia = sand).
+ *
+ * The diggable block is the one under the player's feet: the platform is
+ * `MINE_RANK_PRE_MINE_LAYERS` layers deep, so the player digs layer by
+ * layer and the reward is paid for the block that was really removed.
+ *
+ * The area is cleared above and filled below, so the mine behaves the same
+ * on a flat world, on a plains biome or on a mountains biome.
+ */
+function preMineLines(
+  center: { x: number; z: number },
+  block: "dirt" | "sand",
+  label: string,
+): string[] {
+  const r = MINE_RANK_PRE_MINE_RADIUS;
+  const { x: cx, z: cz } = center;
+  const lines: string[] = [
+    `# the ${label} mine — ${MINE_RANK_PRE_MINE_LAYERS} layers of ${block} to dig`,
+    "# clear the sky above the mine (a mountain must never bury it)",
+    `fill ${cx - r - 2} ${MINE_RANK_BASE_Y - 1} ${cz - r - 2} ${cx + r + 2} ${MINE_RANK_DECK_Y + 10} ${cz + r + 2} minecraft:air`,
+    "# the solid base (the mine never floats)",
+    `fill ${cx - r} ${MINE_RANK_MINE_FLOOR_Y - 21} ${cz - r} ${cx + r} ${MINE_RANK_BASE_Y - 2} ${cz + r} minecraft:stone`,
+    "# the walls of the pit",
+    `fill ${cx - r - 1} ${MINE_RANK_BASE_Y - 2} ${cz - r - 1} ${cx - r - 1} ${MINE_RANK_DECK_Y} ${cz + r + 1} minecraft:stone`,
+    `fill ${cx + r + 1} ${MINE_RANK_BASE_Y - 2} ${cz - r - 1} ${cx + r + 1} ${MINE_RANK_DECK_Y} ${cz + r + 1} minecraft:stone`,
+    `fill ${cx - r - 1} ${MINE_RANK_BASE_Y - 2} ${cz - r - 1} ${cx + r + 1} ${MINE_RANK_BASE_Y - 2} ${cz - r - 1} minecraft:stone`,
+    `fill ${cx - r - 1} ${MINE_RANK_BASE_Y - 2} ${cz + r + 1} ${cx + r + 1} ${MINE_RANK_DECK_Y} ${cz + r + 1} minecraft:stone`,
+  ];
+  for (let i = 0; i < MINE_RANK_PRE_MINE_LAYERS; i += 1) {
+    const y = MINE_RANK_DECK_Y - i;
+    lines.push(
+      `fill ${cx - r} ${y} ${cz - r} ${cx + r} ${y} ${cz + r} minecraft:${block}`,
+    );
+  }
+  lines.push(
+    `# the lamp that shows the mine from the hub`,
+    `setblock ${cx - r - 1} ${MINE_RANK_DECK_Y + 1} ${cz} minecraft:sea_lantern`,
+  );
   return lines;
 }
 
@@ -1234,7 +1456,7 @@ function commandFunctions(): Record<string, string[]> {
   ];
 
   map.cmd_boosters = [
-    "scoreboard players operation @s mr_tmp = #mr_hype",
+    "scoreboard players operation @s mr_tmp = #mr_hype mr_hype",
     "scoreboard players operation @s mr_tmp /= #mr_k1000 mr_const",
     tell([tag(), { text: "Boosters", color: "#22d3ee", bold: true }]),
     tell([
@@ -1359,11 +1581,11 @@ function commandFunctions(): Record<string, string[]> {
       tag(),
       { text: "Você não tem terreno.", color: "red" },
     ])}`,
-    "scoreboard players operation @s mr_tmp = #mr_notice",
+    "scoreboard players operation @s mr_tmp = #mr_notice mr_notice",
     "tag @s add mr_req",
     ...plotAccessCalls("grant_plot"),
     "tag @s remove mr_req",
-    "scoreboard players operation @s mr_tmp2 = #mr_notice",
+    "scoreboard players operation @s mr_tmp2 = #mr_notice mr_notice",
     "scoreboard players operation @s mr_tmp2 -= @s mr_tmp",
     `execute if score @s mr_tmp2 matches 1.. run ${tell([
       tag(),
@@ -1377,11 +1599,11 @@ function commandFunctions(): Record<string, string[]> {
       tag(),
       { text: "Você não tem terreno.", color: "red" },
     ])}`,
-    "scoreboard players operation @s mr_tmp = #mr_notice",
+    "scoreboard players operation @s mr_tmp = #mr_notice mr_notice",
     "tag @s add mr_req",
     ...plotAccessCalls("revoke_plot"),
     "tag @s remove mr_req",
-    "scoreboard players operation @s mr_tmp2 = #mr_notice",
+    "scoreboard players operation @s mr_tmp2 = #mr_notice mr_notice",
     "scoreboard players operation @s mr_tmp2 -= @s mr_tmp",
     `execute if score @s mr_tmp2 matches 1.. run ${tell([
       tag(),
@@ -1395,11 +1617,11 @@ function commandFunctions(): Record<string, string[]> {
       tag(),
       { text: "Você não tem terreno.", color: "red" },
     ])}`,
-    "scoreboard players operation @s mr_tmp = #mr_notice",
+    "scoreboard players operation @s mr_tmp = #mr_notice mr_notice",
     "tag @s add mr_req",
     ...plotAccessCalls("deny_plot"),
     "tag @s remove mr_req",
-    "scoreboard players operation @s mr_tmp2 = #mr_notice",
+    "scoreboard players operation @s mr_tmp2 = #mr_notice mr_notice",
     "scoreboard players operation @s mr_tmp2 -= @s mr_tmp",
     `execute if score @s mr_tmp2 matches 1.. run ${tell([
       tag(),
@@ -1717,7 +1939,7 @@ function commandFunctions(): Record<string, string[]> {
   ];
 
   map.cmd_hype = [
-    "scoreboard players operation @s mr_tmp = #mr_hype",
+    "scoreboard players operation @s mr_tmp = #mr_hype mr_hype",
     "scoreboard players operation @s mr_tmp /= #mr_k1000 mr_const",
     tell([tag(), { text: "Hype Train", color: "#22d3ee", bold: true }]),
     tell([
@@ -1873,19 +2095,18 @@ function commandFunctions(): Record<string, string[]> {
   // ---- pre-ranks Terra and Areia ------------------------------------------
   map.cmd_prerank = [
     "# /trigger mr_t_prerank — shows pre-rank and progress",
-    tell([tag(), { text: "Pré-Rank", color: "#22d3ee", bold: true }]),
-    tell([
-      { text: " Pré-rank atual: ", color: "gray" },
-      score("mr_prerank", "@s", "#fbbf24"),
-      { text: " (0 = Terra, 1 = Areia, 2 = Bronze liberado)", color: "gray" },
-    ]),
+    ...prerankLabelTell(),
     tell([
       { text: " Blocos na Mina da Terra: ", color: "gray" },
       score("mr_blocks_terra", "@s", "#a78bfa"),
+      { text: " / ", color: "gray" },
+      { text: String(MINE_RANK_PRERANK_REQUIREMENTS.terra.blocks), color: "#fbbf24" },
     ]),
     tell([
       { text: " Blocos na Mina da Areia: ", color: "gray" },
       score("mr_blocks_areia", "@s", "#a78bfa"),
+      { text: " / ", color: "gray" },
+      { text: String(MINE_RANK_PRERANK_REQUIREMENTS.areia.blocks), color: "#fbbf24" },
     ]),
     tell([
       { text: " Requisito para Areia: ", color: "gray" },
@@ -1905,12 +2126,12 @@ function commandFunctions(): Record<string, string[]> {
   ];
 
   map.cmd_terra = [
-    "# /trigger mr_t_terra — Mina da Terra menu",
+    "# /trigger mr_t_terra — Terra mine menu",
     tell([tag(), { text: "Mina da Terra", color: "#22d3ee", bold: true }]),
     tell([
-      { text: " Valor do bloco de terra: ", color: "gray" },
-      { text: String(MINE_RANK_BLOCK_VALUE_CENTS.terra / 100), color: "#fbbf24" },
-      { text: " coins (pá aplicada)", color: "gray" },
+      { text: " Valor por bloco: ", color: "gray" },
+      { text: `${MINE_RANK_BLOCK_VALUE_CENTS.terra} centavos`, color: "#fbbf24" },
+      { text: " × o multiplicador da sua pá.", color: "gray" },
     ]),
     tell([
       option(" Ir para a Mina da Terra", "mr_t_terra_mine", 1, "#a78bfa"),
@@ -1919,12 +2140,12 @@ function commandFunctions(): Record<string, string[]> {
   ];
 
   map.cmd_areia = [
-    "# /trigger mr_t_areia — Mina da Areia menu",
+    "# /trigger mr_t_areia — Areia mine menu",
     tell([tag(), { text: "Mina da Areia", color: "#22d3ee", bold: true }]),
     tell([
-      { text: " Valor do bloco de areia: ", color: "gray" },
-      { text: String(MINE_RANK_BLOCK_VALUE_CENTS.areia / 100), color: "#fbbf24" },
-      { text: " coins (pá aplicada)", color: "gray" },
+      { text: " Valor por bloco: ", color: "gray" },
+      { text: `${MINE_RANK_BLOCK_VALUE_CENTS.areia} centavos`, color: "#fbbf24" },
+      { text: " × o multiplicador da sua pá.", color: "gray" },
     ]),
     tell([
       option(" Ir para a Mina da Areia", "mr_t_areia_mine", 1, "#a78bfa"),
@@ -1933,21 +2154,29 @@ function commandFunctions(): Record<string, string[]> {
   ];
 
   map.cmd_terra_mine = [
-    "# warp to the Terra mine deck",
-    `tp @s ${mineRankPlotCenter(1).x} ${MINE_RANK_DECK_Y + 1} ${mineRankPlotCenter(1).z + 2}`,
+    "# warp to the Terra mine and open the mining session",
+    `tp @s ${MINE_RANK_TERRA_MINE.x} ${MINE_RANK_DECK_Y + 1} ${MINE_RANK_TERRA_MINE.z}`,
+    "scoreboard players set @s mr_in_terra 1",
+    "scoreboard players set @s mr_in_areia 0",
+    "scoreboard players set @s mr_terra_off 0",
+    "scoreboard players set @s mr_terra_pending 0",
     tell([
       tag(),
-      { text: "Mina da Terra — use sua pá para coletar terra.", color: "#22d3ee" },
+      { text: "Mina da Terra — quebre a terra com a sua pá.", color: "#22d3ee" },
     ]),
     "scoreboard players set @s mr_t_terra_mine 0",
   ];
 
   map.cmd_areia_mine = [
-    "# warp to the Areia mine deck",
-    `tp @s ${mineRankPlotCenter(2).x} ${MINE_RANK_DECK_Y + 1} ${mineRankPlotCenter(2).z + 2}`,
+    "# warp to the Areia mine and open the mining session",
+    `tp @s ${MINE_RANK_AREIA_MINE.x} ${MINE_RANK_DECK_Y + 1} ${MINE_RANK_AREIA_MINE.z}`,
+    "scoreboard players set @s mr_in_areia 1",
+    "scoreboard players set @s mr_in_terra 0",
+    "scoreboard players set @s mr_areia_off 0",
+    "scoreboard players set @s mr_areia_pending 0",
     tell([
       tag(),
-      { text: "Mina da Areia — use sua pá para coletar areia.", color: "#22d3ee" },
+      { text: "Mina da Areia — quebre a areia com a sua pá.", color: "#22d3ee" },
     ]),
     "scoreboard players set @s mr_t_areia_mine 0",
   ];
@@ -1955,61 +2184,108 @@ function commandFunctions(): Record<string, string[]> {
   map.cmd_mercador = [
     "# /trigger mr_t_mercador — shovel merchant menu",
     tell([tag(), { text: "Mercador de Pás", color: "#22d3ee", bold: true }]),
+    ...shovelMaterialTell(),
     tell([
-      { text: " Sua pá: ", color: "gray" },
-      score("mr_pickaxe_material", "@s", "#a78bfa"),
-      { text: " · multiplicador: ", color: "gray" },
+      { text: " Multiplicador: ", color: "gray" },
       score("mr_pickaxe_mult", "@s", "#fbbf24"),
       { text: "/1000", color: "gray" },
     ]),
     tell([
-      option(" Melhorar pá (ver preços)", "mr_t_pick_up", 1, "#fbbf24"),
+      { text: " Próxima melhoria: ", color: "gray" },
+      score("mr_pickaxe_price", "@s", "#fbbf24"),
+      { text: " coins", color: "gray" },
+    ]),
+    tell([
+      option(" Melhorar a pá", "mr_t_pick_up", 1, "#fbbf24"),
     ]),
     "scoreboard players set @s mr_t_mercador 0",
   ];
 
   map.cmd_pickaxe_upgrade = [
     "# /trigger mr_t_pick_up — upgrade the shovel",
-    "scoreboard players operation @s mr_pick_reward = @s mr_pickaxe_price",
-    `execute if score @s mr_coins matches @s mr_pickaxe_price.. run function ${MINE_RANK_NS}:do_pickaxe_upgrade`,
-    `execute if score @s mr_coins matches ..@s mr_pickaxe_price run ${tell([
+    "# the netherite shovel is the last one — the upgrade path is closed there",
+    `execute if score @s mr_pickaxe_level matches 0..4 run function ${MINE_RANK_NS}:pickaxe_check`,
+    `execute if score @s mr_pickaxe_level matches 5 run function ${MINE_RANK_NS}:pickaxe_max`,
+    "scoreboard players set @s mr_t_pick_up 0",
+  ];
+
+  map.pickaxe_check = [
+    "# can the player pay? — `operation` accepts another score as the source",
+    "# (`remove` and `set` only accept an integer literal)",
+    "scoreboard players operation @s mr_pick_tmp = @s mr_coins",
+    "scoreboard players operation @s mr_pick_tmp -= @s mr_pickaxe_price",
+    `execute if score @s mr_pick_tmp matches 0.. run function ${MINE_RANK_NS}:do_pickaxe_upgrade`,
+    `execute if score @s mr_pick_tmp matches ..-1 run function ${MINE_RANK_NS}:pickaxe_poor`,
+  ];
+
+  map.pickaxe_poor = [
+    tell([
       tag(),
       { text: "Saldo insuficiente para melhorar a pá.", color: "red" },
       { text: " Preço: ", color: "gray" },
       score("mr_pickaxe_price", "@s", "#fbbf24"),
       { text: " coins.", color: "gray" },
-    ])}`,
-    "scoreboard players set @s mr_t_pick_up 0",
+    ]),
+  ];
+
+  map.pickaxe_max = [
+    tell([
+      tag(),
+      { text: "Sua pá já é a melhor (Netherite).", color: "#fbbf24" },
+    ]),
   ];
 
   map.do_pickaxe_upgrade = [
-    "scoreboard players remove @s mr_coins @s mr_pickaxe_price",
+    "# pay the price — a score source is valid for `operation`",
+    "scoreboard players operation @s mr_coins -= @s mr_pickaxe_price",
+    ...shovelClearOld(),
     "scoreboard players add @s mr_pickaxe_level 1",
-    "scoreboard players operation @s mr_pickaxe_material = @s mr_pickaxe_level",
-    "scoreboard players operation @s mr_pickaxe_mult = #mr_shovel_mult",
-    "scoreboard players operation @s mr_pickaxe_mult *= @s mr_pickaxe_level",
-    `scoreboard players set @s mr_pickaxe_price @s mr_next_shovel_price`,
+    "scoreboard players operation @s mr_pick_mat = @s mr_pickaxe_level",
+    ...shovelMultSet(),
+    ...shovelNextPriceSet(),
+    ...shovelGive(),
     tell([
       tag(),
       { text: "Pá melhorada! Novo multiplicador: ", color: "#22d3ee" },
       score("mr_pickaxe_mult", "@s", "#fbbf24"),
       { text: "/1000", color: "gray" },
     ]),
-    "scoreboard players set @s mr_t_pick_up 0",
+    "playsound minecraft:entity.player.levelup master @s ~ ~ ~ 0.6 1.1",
   ];
 
   // ---- MineCoin (Bronze only) ---------------------------------------------
   map.cmd_mnc = [
-    "# /trigger mr_t_mnc — MineCoin menu (Bronze only)",
-    `execute if score @s mr_prerank matches 2.. run function ${MINE_RANK_NS}:menu_mnc`,
-    `execute if score @s mr_prerank matches ..1 run ${tell([
-      tag(),
-      { text: "MineCoin só é liberada no Rank Bronze.", color: "red" },
-    ])}`,
+    "# /trigger mr_t_mnc — 1 saldo · 2 mercado · 3 receber · 4 transferir",
+    "# 5 negociar · 6 premium · 7 converter coins · 8 comprar a picareta",
+    `execute if score @s mr_prerank matches ..1 run function ${MINE_RANK_NS}:mnc_locked`,
+    `execute if score @s mr_prerank matches 2.. run function ${MINE_RANK_NS}:mnc_route`,
     "scoreboard players set @s mr_t_mnc 0",
   ];
 
-  map.menu_mnc = [
+  map.mnc_locked = [
+    tell([
+      tag(),
+      { text: "MineCoin só é liberada no Rank Bronze.", color: "red" },
+    ]),
+  ];
+
+  map.mnc_route = [
+    `execute if score @s mr_t_mnc matches 1 run function ${MINE_RANK_NS}:mnc_view`,
+    `execute if score @s mr_t_mnc matches 2 run function ${MINE_RANK_NS}:mnc_market`,
+    `execute if score @s mr_t_mnc matches 3 run function ${MINE_RANK_NS}:mnc_receive`,
+    `execute if score @s mr_t_mnc matches 4 run function ${MINE_RANK_NS}:mnc_transfer`,
+    `execute if score @s mr_t_mnc matches 5 run function ${MINE_RANK_NS}:mnc_trade`,
+    `execute if score @s mr_t_mnc matches 6 run function ${MINE_RANK_NS}:mnc_premium`,
+    `execute if score @s mr_t_mnc matches 7 run function ${MINE_RANK_NS}:mnc_convert`,
+    `execute if score @s mr_t_mnc matches 8 run function ${MINE_RANK_NS}:mnc_buy_pickaxe`,
+  ];
+
+  map.mnc_view = [
+    `execute if score @s mr_p_view matches 1 run function ${MINE_RANK_NS}:mnc_view_ok`,
+    `execute unless score @s mr_p_view matches 1 run function ${MINE_RANK_NS}:mnc_no_permission`,
+  ];
+
+  map.mnc_view_ok = [
     tell([tag(), { text: "MineCoin (MNC)", color: "#22d3ee", bold: true }]),
     tell([
       { text: " Saldo: ", color: "gray" },
@@ -2017,12 +2293,205 @@ function commandFunctions(): Record<string, string[]> {
       { text: " MNC", color: "gray" },
     ]),
     tell([
-      { text: " Permissões: ", color: "gray" },
-      { text: "ver · mercado · receber · transferir · negociar · premium", color: "gray" },
+      { text: " Limite do saldo: ", color: "gray" },
+      { text: String(MINE_RANK_MNC_CAP), color: "#fbbf24" },
+      { text: " MNC", color: "gray" },
     ]),
-    "scoreboard players set @s mr_t_mnc 0",
+    tell([
+      { text: " Permissões: ver · mercado · receber · transferir · negociar · premium", color: "gray" },
+    ]),
+    tell([
+      option(" Converter coins em MNC", "mr_t_mnc", 7, "#fbbf24"),
+    ]),
   ];
 
+  map.mnc_market = [
+    `execute if score @s mr_p_market matches 1 run function ${MINE_RANK_NS}:mnc_market_ok`,
+    `execute unless score @s mr_p_market matches 1 run function ${MINE_RANK_NS}:mnc_no_permission`,
+  ];
+
+  map.mnc_market_ok = [
+    tell([tag(), { text: "Mercado MineCoin", color: "#22d3ee", bold: true }]),
+    tell([
+      { text: " Picareta de Mineração (textura própria) — ", color: "gray" },
+      { text: `${MINE_RANK_MNC_PICKAXE_PRICE} MNC`, color: "#fbbf24" },
+    ]),
+    tell([
+      option(" Comprar a picareta", "mr_t_mnc", 8, "#fbbf24"),
+    ]),
+  ];
+
+  map.mnc_receive = [
+    `execute if score @s mr_p_recv matches 1 run function ${MINE_RANK_NS}:mnc_receive_ok`,
+    `execute unless score @s mr_p_recv matches 1 run function ${MINE_RANK_NS}:mnc_no_permission`,
+  ];
+
+  map.mnc_receive_ok = [
+    tell([tag(), { text: "Receber MineCoin", color: "#22d3ee", bold: true }]),
+    tell([
+      { text: " Seu saldo: ", color: "gray" },
+      score("mr_mnc", "@s", "#fbbf24"),
+      { text: " MNC", color: "gray" },
+    ]),
+    tell([
+      { text: " Peça ao jogador mais próximo para te enviar 1 MNC.", color: "gray" },
+    ]),
+  ];
+
+  map.mnc_transfer = [
+    `execute if score @s mr_p_send matches 1 run function ${MINE_RANK_NS}:mnc_transfer_ok`,
+    `execute unless score @s mr_p_send matches 1 run function ${MINE_RANK_NS}:mnc_no_permission`,
+  ];
+
+  map.mnc_transfer_ok = [
+    "tag @s add mr_req",
+    `execute if entity ${nearestPlayer()} run function ${MINE_RANK_NS}:mnc_send`,
+    `execute unless entity ${nearestPlayer()} run function ${MINE_RANK_NS}:mnc_no_target`,
+    "tag @s remove mr_req",
+  ];
+
+  map.mnc_send = [
+    "scoreboard players operation @s mr_pick_tmp = @s mr_mnc",
+    `execute if score @s mr_pick_tmp matches 1.. run function ${MINE_RANK_NS}:mnc_send_one`,
+    `execute if score @s mr_pick_tmp matches ..0 run function ${MINE_RANK_NS}:mnc_no_balance`,
+  ];
+
+  map.mnc_send_one = [
+    "scoreboard players remove @s mr_mnc 1",
+    `execute as ${nearestPlayer()} run scoreboard players add @s mr_mnc 1`,
+    tell([
+      tag(),
+      { text: "Você enviou 1 MNC.", color: "#22d3ee" },
+    ]),
+    `execute as ${nearestPlayer()} run tellraw @s ${chat([
+      tag(),
+      { text: "Você recebeu 1 MNC.", color: "#22d3ee" },
+    ])}`,
+  ];
+
+  map.mnc_no_target = [
+    tell([
+      tag(),
+      { text: "Nenhum outro jogador por perto para receber a MineCoin.", color: "red" },
+    ]),
+  ];
+
+  map.mnc_no_balance = [
+    tell([
+      tag(),
+      { text: "Você não tem MineCoin suficiente.", color: "red" },
+    ]),
+  ];
+
+  map.mnc_trade = [
+    `execute if score @s mr_p_trade matches 1 run function ${MINE_RANK_NS}:mnc_trade_ok`,
+    `execute unless score @s mr_p_trade matches 1 run function ${MINE_RANK_NS}:mnc_no_permission`,
+  ];
+
+  map.mnc_trade_ok = [
+    "scoreboard players operation @s mr_pick_tmp = @s mr_mnc",
+    `execute if score @s mr_pick_tmp matches 1.. run function ${MINE_RANK_NS}:mnc_trade_one`,
+    `execute if score @s mr_pick_tmp matches ..0 run function ${MINE_RANK_NS}:mnc_no_balance`,
+  ];
+
+  map.mnc_trade_one = [
+    "scoreboard players remove @s mr_mnc 1",
+    `scoreboard players add @s mr_coins ${MINE_RANK_MNC_COIN_RETURN}`,
+    tell([
+      tag(),
+      { text: `Você trocou 1 MNC por ${MINE_RANK_MNC_COIN_RETURN} coins.`, color: "#22d3ee" },
+    ]),
+  ];
+
+  map.mnc_premium = [
+    `execute if score @s mr_p_premium matches 1 run function ${MINE_RANK_NS}:mnc_premium_ok`,
+    `execute unless score @s mr_p_premium matches 1 run function ${MINE_RANK_NS}:mnc_no_permission`,
+  ];
+
+  map.mnc_premium_ok = [
+    tell([tag(), { text: "Serviços premium (MineCoin)", color: "#22d3ee", bold: true }]),
+    tell([
+      { text: " Picareta de Mineração — ", color: "gray" },
+      { text: `${MINE_RANK_MNC_PICKAXE_PRICE} MNC`, color: "#fbbf24" },
+    ]),
+    tell([
+      { text: " Mercado MineCoin — liberado no Rank Bronze.", color: "gray" },
+    ]),
+    tell([
+      option(" Abrir o mercado", "mr_t_mnc", 2, "#fbbf24"),
+    ]),
+  ];
+
+  map.mnc_convert = [
+    `execute if score @s mr_p_recv matches 1 run function ${MINE_RANK_NS}:mnc_convert_ok`,
+    `execute unless score @s mr_p_recv matches 1 run function ${MINE_RANK_NS}:mnc_no_permission`,
+  ];
+
+  map.mnc_convert_ok = [
+    "# the balance is capped — the MineCoin can never flood",
+    "scoreboard players operation @s mr_pick_tmp = @s mr_mnc",
+    `execute if score @s mr_pick_tmp matches ${MINE_RANK_MNC_CAP}.. run function ${MINE_RANK_NS}:mnc_cap`,
+    "# are the coins enough?",
+    "scoreboard players operation @s mr_pick_tmp = @s mr_coins",
+    `scoreboard players remove @s mr_pick_tmp ${MINE_RANK_MNC_COIN_PRICE}`,
+    `execute if score @s mr_pick_tmp matches 0.. run function ${MINE_RANK_NS}:mnc_convert_one`,
+    `execute if score @s mr_pick_tmp matches ..-1 run function ${MINE_RANK_NS}:mnc_poor_coins`,
+  ];
+
+  map.mnc_convert_one = [
+    `scoreboard players remove @s mr_coins ${MINE_RANK_MNC_COIN_PRICE}`,
+    "scoreboard players add @s mr_mnc 1",
+    tell([
+      tag(),
+      { text: `Você converteu ${MINE_RANK_MNC_COIN_PRICE} coins em 1 MNC.`, color: "#22d3ee" },
+    ]),
+  ];
+
+  map.mnc_cap = [
+    tell([
+      tag(),
+      { text: `Seu saldo de MineCoin já está no limite (${MINE_RANK_MNC_CAP}).`, color: "red" },
+    ]),
+  ];
+
+  map.mnc_poor_coins = [
+    tell([
+      tag(),
+      { text: `Você precisa de ${MINE_RANK_MNC_COIN_PRICE} coins para converter 1 MNC.`, color: "red" },
+    ]),
+  ];
+
+  map.mnc_no_permission = [
+    tell([
+      tag(),
+      { text: "Você não tem a permissão de MineCoin para esta ação.", color: "red" },
+    ]),
+  ];
+
+  map.mnc_buy_pickaxe = [
+    `execute unless score @s mr_p_market matches 1 run function ${MINE_RANK_NS}:mnc_no_permission`,
+    "scoreboard players operation @s mr_pick_tmp = @s mr_mnc",
+    `scoreboard players remove @s mr_pick_tmp ${MINE_RANK_MNC_PICKAXE_PRICE}`,
+    `execute if score @s mr_pick_tmp matches 0.. run function ${MINE_RANK_NS}:mnc_buy_ok`,
+    `execute if score @s mr_pick_tmp matches ..-1 run function ${MINE_RANK_NS}:mnc_poor`,
+  ];
+
+  map.mnc_buy_ok = [
+    `scoreboard players remove @s mr_mnc ${MINE_RANK_MNC_PICKAXE_PRICE}`,
+    `give @s ${MINE_RANK_PICKAXE_ITEM} 1`,
+    tell([
+      tag(),
+      { text: "Você comprou a Picareta de Mineração!", color: "#22d3ee" },
+    ]),
+    "playsound minecraft:entity.player.levelup master @s ~ ~ ~ 0.6 1.1",
+  ];
+
+  map.mnc_poor = [
+    tell([
+      tag(),
+      { text: `Saldo insuficiente — a picareta custa ${MINE_RANK_MNC_PICKAXE_PRICE} MNC.`, color: "red" },
+    ]),
+  ];
   // ---- general ----------------------------------------------------------
   map.cmd_warps = [
     "# /trigger mr_t_warps — 1 = menu, 2..7 = destinations",
@@ -2159,13 +2628,24 @@ const PLAYER_ZERO_OBJECTIVES = [
   "mr_tp_sent",
   "mr_prerank",
   "mr_pickaxe_level",
+  "mr_pick_mat",
   "mr_pickaxe_mult",
   "mr_pickaxe_price",
   "mr_block_value",
   "mr_pick_reward",
+  "mr_pick_accum",
+  "mr_pick_tmp",
   "mr_mnc",
   "mr_blocks_terra",
   "mr_blocks_areia",
+  "mr_terra_pending",
+  "mr_areia_pending",
+  "mr_in_terra",
+  "mr_in_areia",
+  "mr_terra_off",
+  "mr_areia_off",
+  "mr_pick_mult",
+  ...MNC_PERMISSION_OBJECTIVES,
   "mr_ore_coal",
   "mr_ore_iron",
   "mr_ore_gold",
@@ -2184,7 +2664,7 @@ function systemFunctions(): Record<string, string[]> {
     ),
     "scoreboard players set @s mr_rank 1",
     "tag @s add mr_ready",
-    "function ${MINE_RANK_NS}:init_prerank",
+    `function ${MINE_RANK_NS}:init_prerank`,
   ];
 
   map.collect_blocks = [
@@ -2339,77 +2819,228 @@ function systemFunctions(): Record<string, string[]> {
     "# initialize pre-rank, shovel and MineCoin scores",
     "scoreboard players set @s mr_prerank 0",
     "scoreboard players set @s mr_pickaxe_level 0",
+    "scoreboard players set @s mr_pick_mat 0",
     "scoreboard players set @s mr_pickaxe_mult 200",
     "scoreboard players set @s mr_pickaxe_price 50",
-    "scoreboard players set @s mr_block_value 10",
+    "scoreboard players set @s mr_block_value 0",
     "scoreboard players set @s mr_pick_reward 0",
+    "scoreboard players set @s mr_pick_accum 0",
+    "scoreboard players set @s mr_pick_tmp 0",
     "scoreboard players set @s mr_mnc 0",
     "scoreboard players set @s mr_blocks_terra 0",
     "scoreboard players set @s mr_blocks_areia 0",
+    "scoreboard players set @s mr_terra_pending 0",
+    "scoreboard players set @s mr_areia_pending 0",
+    "scoreboard players set @s mr_in_terra 0",
+    "scoreboard players set @s mr_in_areia 0",
+    "scoreboard players set @s mr_terra_off 0",
+    "scoreboard players set @s mr_areia_off 0",
+    "scoreboard players set @s mr_pick_mult 0",
+    ...MNC_PERMISSION_OBJECTIVES.map(
+      (objective) => `scoreboard players set @s ${objective} 0`,
+    ),
+    "# everyone starts with the wooden shovel",
+    "give @s minecraft:wooden_shovel 1",
   ];
 
-  map.do_terra_mine = [
-    "# collect a dirt block in the Terra mine — reward = value * shovel mult / 1000",
-    `execute if score @s mr_prerank matches 0 run function ${MINE_RANK_NS}:award_terra_blocks`,
-    `execute if score @s mr_prerank matches 1.. run ${tell([
-      tag(),
-      { text: "A Mina da Terra é só para o Pré-Rank Terra.", color: "red" },
-    ])}`,
+  map.collect_terra = [
+    "# the checkpoint ALWAYS moves — the delta is only what was mined since",
+    "# the last tick (the player statistics are never drained)",
+    "execute unless score @s mr_last_dirt matches 0.. run scoreboard players set @s mr_last_dirt 0",
+    "scoreboard players operation @s mr_pick_tmp = @s mr_s_dirt",
+    "scoreboard players operation @s mr_pick_tmp -= @s mr_last_dirt",
+    "scoreboard players operation @s mr_last_dirt = @s mr_s_dirt",
+    "# the session is the ONLY gate — the blocks mined outside the mine are",
+    "# LOST, never accumulated (no farming dirt outside and cashing it in",
+    "# inside later)",
+    `execute if score @s mr_prerank matches 0 if score @s mr_in_terra matches 1 run function ${MINE_RANK_NS}:terra_collect`,
+    `execute unless score @s mr_prerank matches 0 if score @s mr_in_terra matches 1 if score @s mr_pick_tmp matches 1.. run function ${MINE_RANK_NS}:terra_denied`,
+    "execute unless score @s mr_prerank matches 0 run scoreboard players set @s mr_terra_pending 0",
+    "execute unless score @s mr_in_terra matches 1 run scoreboard players set @s mr_terra_pending 0",
   ];
 
-  map.do_areia_mine = [
-    "# collect a sand block in the Areia mine — reward = value * shovel mult / 1000",
-    `execute if score @s mr_prerank matches 1 run function ${MINE_RANK_NS}:award_areia_blocks`,
-    `execute if score @s mr_prerank matches 0 run ${tell([
-      tag(),
-      { text: "Você precisa do Pré-Rank Terra para entrar na Mina da Areia.", color: "red" },
-    ])}`,
-    `execute if score @s mr_prerank matches 2.. run ${tell([
-      tag(),
-      { text: "A Mina da Areia é só para o Pré-Rank Areia.", color: "red" },
-    ])}`,
+  map.terra_collect = [
+    "# the tool is validated SERVER SIDE — the multiplier only counts with a",
+    "# shovel in the main hand, and it is the shovel the player HOLDS",
+    ...shovelToolMultSet(),
+    "execute if score @s mr_pick_mult matches 1.. run scoreboard players operation @s mr_terra_pending += @s mr_pick_tmp",
+    `execute unless score @s mr_pick_mult matches 1.. if score @s mr_pick_tmp matches 1.. run function ${MINE_RANK_NS}:terra_no_tool`,
   ];
 
-  map.award_terra_blocks = [
-    "# reward for Terra: block_value_cents * shovel_mult / 1000, capped",
-    `scoreboard players operation @s mr_block_value = ${MINE_RANK_BLOCK_VALUE_CENTS.terra}`,
-    "scoreboard players operation @s mr_pick_reward = @s mr_block_value",
-    "scoreboard players operation @s mr_pick_reward *= @s mr_pickaxe_mult",
-    `scoreboard players operation @s mr_pick_reward /= #mr_k1000`,
-    `# cap at ${MINE_RANK_MAX_BLOCK_REWARD_CENTS} cents`,
-    `execute if score @s mr_pick_reward matches ${MINE_RANK_MAX_BLOCK_REWARD_CENTS}.. run scoreboard players set @s mr_pick_reward ${MINE_RANK_MAX_BLOCK_REWARD_CENTS}`,
-    "scoreboard players operation @s mr_coins += @s mr_pick_reward",
-    "scoreboard players add @s mr_blocks_terra 1",
-    "scoreboard players set @s mr_pick_reward 0",
-  ];
-
-  map.award_areia_blocks = [
-    "# reward for Areia: block_value_cents * shovel_mult / 1000, capped",
-    `scoreboard players operation @s mr_block_value = ${MINE_RANK_BLOCK_VALUE_CENTS.areia}`,
-    "scoreboard players operation @s mr_pick_reward = @s mr_block_value",
-    "scoreboard players operation @s mr_pick_reward *= @s mr_pickaxe_mult",
-    `scoreboard players operation @s mr_pick_reward /= #mr_k1000`,
-    `# cap at ${MINE_RANK_MAX_BLOCK_REWARD_CENTS} cents`,
-    `execute if score @s mr_pick_reward matches ${MINE_RANK_MAX_BLOCK_REWARD_CENTS}.. run scoreboard players set @s mr_pick_reward ${MINE_RANK_MAX_BLOCK_REWARD_CENTS}`,
-    "scoreboard players operation @s mr_coins += @s mr_pick_reward",
-    "scoreboard players add @s mr_blocks_areia 1",
-    "scoreboard players set @s mr_pick_reward 0",
-  ];
-
-  map.do_pickaxe_upgrade_confirm = [
-    "scoreboard players remove @s mr_coins @s mr_pickaxe_price",
-    "scoreboard players add @s mr_pickaxe_level 1",
-    "scoreboard players operation @s mr_pickaxe_material = @s mr_pickaxe_level",
-    "scoreboard players operation @s mr_pickaxe_mult = #mr_shovel_mult",
-    "scoreboard players operation @s mr_pickaxe_mult *= @s mr_pickaxe_level",
+  map.terra_no_tool = [
     tell([
       tag(),
-      { text: "Pá melhorada! Multiplicador: ", color: "#22d3ee" },
-      score("mr_pickaxe_mult", "@s", "#fbbf24"),
-      { text: "/1000", color: "gray" },
+      { text: "Segure a pá na mão principal para minerar na Mina da Terra.", color: "red" },
     ]),
   ];
 
+  map.award_terra = [
+    "# the reward event was already validated when the block was collected —",
+    "# a separate `unless` line would only warn and the next line would",
+    "# still pay the reward",
+    `execute if score @s mr_terra_pending matches 1.. run function ${MINE_RANK_NS}:terra_one`,
+  ];
+
+  map.terra_denied = [
+    tell([
+      tag(),
+      { text: "A Mina da Terra só paga para quem está no Pré-Rank Terra, dentro da mina.", color: "red" },
+    ]),
+  ];
+
+  map.terra_one = [
+    "# reward = base_value_cents × shovel_mult_mille — kept in MILLI-cents, so",
+    "# nothing is lost to an integer division (1 coin = 100000 milli-cents)",
+    `scoreboard players set @s mr_pick_reward ${MINE_RANK_BLOCK_VALUE_CENTS.terra}`,
+    "scoreboard players operation @s mr_pick_reward *= @s mr_pick_mult",
+    `# cap of ${MINE_RANK_MAX_BLOCK_REWARD_CENTS} cents per block`,
+    `execute if score @s mr_pick_reward matches ${MINE_RANK_MAX_BLOCK_REWARD_CENTS * 1000}.. run scoreboard players set @s mr_pick_reward ${MINE_RANK_MAX_BLOCK_REWARD_CENTS * 1000}`,
+    "scoreboard players operation @s mr_pick_accum += @s mr_pick_reward",
+    "scoreboard players operation @s mr_pick_tmp = @s mr_pick_accum",
+    "scoreboard players operation @s mr_pick_tmp /= #mr_k100000 mr_const",
+    "scoreboard players operation @s mr_coins += @s mr_pick_tmp",
+    "scoreboard players operation @s mr_pick_accum %= #mr_k100000 mr_const",
+    "scoreboard players remove @s mr_terra_pending 1",
+    "scoreboard players add @s mr_blocks_terra 1",
+    "scoreboard players set @s mr_pick_reward 0",
+    "# the next block mined in the same tick pays exactly once too",
+    `execute if score @s mr_terra_pending matches 1.. run function ${MINE_RANK_NS}:terra_one`,
+    "# the pre-rank ladder and the mine restore",
+    `execute if score @s mr_blocks_terra matches ${MINE_RANK_PRERANK_REQUIREMENTS.terra.blocks}.. run function ${MINE_RANK_NS}:check_prerank`,
+    `execute if score @s mr_blocks_terra matches ${MINE_RANK_MINE_RESET_BLOCKS}.. run function ${MINE_RANK_NS}:restore_terra_mine`,
+  ];
+
+  map.collect_areia = [
+    "# the checkpoint ALWAYS moves — the delta is only what was mined since",
+    "# the last tick (the player statistics are never drained)",
+    "execute unless score @s mr_last_sand matches 0.. run scoreboard players set @s mr_last_sand 0",
+    "scoreboard players operation @s mr_pick_tmp = @s mr_s_sand",
+    "scoreboard players operation @s mr_pick_tmp -= @s mr_last_sand",
+    "scoreboard players operation @s mr_last_sand = @s mr_s_sand",
+    "# the session is the ONLY gate — the blocks mined outside the mine are",
+    "# LOST, never accumulated",
+    `execute if score @s mr_prerank matches 1 if score @s mr_in_areia matches 1 run function ${MINE_RANK_NS}:areia_collect`,
+    `execute unless score @s mr_prerank matches 1 if score @s mr_in_areia matches 1 if score @s mr_pick_tmp matches 1.. run function ${MINE_RANK_NS}:areia_denied`,
+    "execute unless score @s mr_prerank matches 1 run scoreboard players set @s mr_areia_pending 0",
+    "execute unless score @s mr_in_areia matches 1 run scoreboard players set @s mr_areia_pending 0",
+  ];
+
+  map.areia_collect = [
+    "# the tool is validated SERVER SIDE — the multiplier only counts with a",
+    "# shovel in the main hand, and it is the shovel the player HOLDS",
+    ...shovelToolMultSet(),
+    "execute if score @s mr_pick_mult matches 1.. run scoreboard players operation @s mr_areia_pending += @s mr_pick_tmp",
+    `execute unless score @s mr_pick_mult matches 1.. if score @s mr_pick_tmp matches 1.. run function ${MINE_RANK_NS}:areia_no_tool`,
+  ];
+
+  map.areia_no_tool = [
+    tell([
+      tag(),
+      { text: "Segure a pá na mão principal para minerar na Mina da Areia.", color: "red" },
+    ]),
+  ];
+
+  map.award_areia = [
+    "# the reward event was already validated when the block was collected",
+    `execute if score @s mr_areia_pending matches 1.. run function ${MINE_RANK_NS}:areia_one`,
+  ];
+
+  map.areia_denied = [
+    tell([
+      tag(),
+      { text: "A Mina da Areia só paga para quem está no Pré-Rank Areia, dentro da mina.", color: "red" },
+    ]),
+  ];
+
+  map.areia_one = [
+    "# reward = base_value_cents × shovel_mult_mille — kept in MILLI-cents",
+    `scoreboard players set @s mr_pick_reward ${MINE_RANK_BLOCK_VALUE_CENTS.areia}`,
+    "scoreboard players operation @s mr_pick_reward *= @s mr_pick_mult",
+    `# cap of ${MINE_RANK_MAX_BLOCK_REWARD_CENTS} cents per block`,
+    `execute if score @s mr_pick_reward matches ${MINE_RANK_MAX_BLOCK_REWARD_CENTS * 1000}.. run scoreboard players set @s mr_pick_reward ${MINE_RANK_MAX_BLOCK_REWARD_CENTS * 1000}`,
+    "scoreboard players operation @s mr_pick_accum += @s mr_pick_reward",
+    "scoreboard players operation @s mr_pick_tmp = @s mr_pick_accum",
+    "scoreboard players operation @s mr_pick_tmp /= #mr_k100000 mr_const",
+    "scoreboard players operation @s mr_coins += @s mr_pick_tmp",
+    "scoreboard players operation @s mr_pick_accum %= #mr_k100000 mr_const",
+    "scoreboard players remove @s mr_areia_pending 1",
+    "scoreboard players add @s mr_blocks_areia 1",
+    "scoreboard players set @s mr_pick_reward 0",
+    `execute if score @s mr_areia_pending matches 1.. run function ${MINE_RANK_NS}:areia_one`,
+    `execute if score @s mr_blocks_areia matches ${MINE_RANK_PRERANK_REQUIREMENTS.areia.blocks}.. run function ${MINE_RANK_NS}:check_prerank`,
+    `execute if score @s mr_blocks_areia matches ${MINE_RANK_MINE_RESET_BLOCKS}.. run function ${MINE_RANK_NS}:restore_areia_mine`,
+  ];
+
+  map.check_prerank = [
+    "# Terra -> Areia needs the blocks AND the coins; Areia -> Bronze the same",
+    `execute if score @s mr_prerank matches 0 run function ${MINE_RANK_NS}:check_prerank_terra`,
+    `execute if score @s mr_prerank matches 1 run function ${MINE_RANK_NS}:check_prerank_areia`,
+  ];
+
+  map.check_prerank_terra = [
+    `execute unless score @s mr_blocks_terra matches ${MINE_RANK_PRERANK_REQUIREMENTS.terra.blocks}.. run function ${MINE_RANK_NS}:prerank_waiting`,
+    "scoreboard players operation @s mr_pick_tmp = @s mr_coins",
+    `scoreboard players remove @s mr_pick_tmp ${MINE_RANK_PRERANK_REQUIREMENTS.terra.coins}`,
+    `execute unless score @s mr_pick_tmp matches 0.. run function ${MINE_RANK_NS}:prerank_waiting`,
+    "scoreboard players set @s mr_prerank 1",
+    "scoreboard players set @s mr_in_terra 0",
+    "scoreboard players set @s mr_in_areia 1",
+    tell([
+      tag(),
+      { text: "Você chegou ao Pré-Rank Areia! A Mina da Areia foi liberada.", color: "#fbbf24", bold: true },
+    ]),
+    "title @s title [{\"text\":\"PRÉ-RANK AREIA\",\"color\":\"#fbbf24\",\"bold\":true}]",
+    "playsound minecraft:entity.player.levelup master @s ~ ~ ~ 0.6 1.1",
+  ];
+
+  map.check_prerank_areia = [
+    `execute unless score @s mr_blocks_areia matches ${MINE_RANK_PRERANK_REQUIREMENTS.areia.blocks}.. run function ${MINE_RANK_NS}:prerank_waiting`,
+    "scoreboard players operation @s mr_pick_tmp = @s mr_coins",
+    `scoreboard players remove @s mr_pick_tmp ${MINE_RANK_PRERANK_REQUIREMENTS.areia.coins}`,
+    `execute unless score @s mr_pick_tmp matches 0.. run function ${MINE_RANK_NS}:prerank_waiting`,
+    "scoreboard players set @s mr_prerank 2",
+    "scoreboard players set @s mr_in_areia 0",
+    "# the Bronze rank opens the MineCoin — each permission separately",
+    ...MNC_PERMISSION_OBJECTIVES.map(
+      (objective) => `scoreboard players set @s ${objective} 1`,
+    ),
+    `# the mining pickaxe with the custom texture`,
+    `give @s ${MINE_RANK_PICKAXE_ITEM} 1`,
+    tell([
+      tag(),
+      { text: "Rank BRONZE alcançado! MineCoin liberada e picareta de mineração entregue.", color: "#fbbf24", bold: true },
+    ]),
+    "title @s title [{\"text\":\"RANK BRONZE\",\"color\":\"#fbbf24\",\"bold\":true}]",
+    "playsound minecraft:entity.player.levelup master @s ~ ~ ~ 0.6 1.1",
+  ];
+
+  map.prerank_waiting = [
+    tell([
+      tag(),
+      { text: "Você ainda não tem blocos E coins suficientes para o próximo pré-rank.", color: "gray" },
+    ]),
+  ];
+
+  map.restore_terra_mine = [
+    "# the mine is full again — the player is lifted to the deck first",
+    `tp @s ${MINE_RANK_TERRA_MINE.x} ${MINE_RANK_DECK_Y + 1} ${MINE_RANK_TERRA_MINE.z}`,
+    "scoreboard players set @s mr_blocks_terra 0",
+    `function ${MINE_RANK_NS}:build_terra_mine`,
+    tell([
+      tag(),
+      { text: "A Mina da Terra foi restaurada.", color: "#22d3ee" },
+    ]),
+  ];
+
+  map.restore_areia_mine = [
+    `tp @s ${MINE_RANK_AREIA_MINE.x} ${MINE_RANK_DECK_Y + 1} ${MINE_RANK_AREIA_MINE.z}`,
+    "scoreboard players set @s mr_blocks_areia 0",
+    `function ${MINE_RANK_NS}:build_areia_mine`,
+    tell([
+      tag(),
+      { text: "A Mina da Areia foi restaurada.", color: "#22d3ee" },
+    ]),
+  ];
   return map;
 }
 
@@ -2446,13 +3077,26 @@ function loadLines(): string[] {
     "scoreboard objectives add mr_tp_sent dummy \"Mine Rank — teleport sent\"",
     "scoreboard objectives add mr_prerank dummy \"Mine Rank — pre-rank\"",
     "scoreboard objectives add mr_pickaxe_level dummy \"Mine Rank — shovel level\"",
+    "scoreboard objectives add mr_pick_mat dummy \"Mine Rank — shovel material\"",
     "scoreboard objectives add mr_pickaxe_mult dummy \"Mine Rank — shovel mult\"",
     "scoreboard objectives add mr_pickaxe_price dummy \"Mine Rank — shovel price\"",
     "scoreboard objectives add mr_block_value dummy \"Mine Rank — block value cents\"",
-    "scoreboard objectives add mr_pick_reward dummy \"Mine Rank — pick reward\"",
+    "scoreboard objectives add mr_pick_reward dummy \"Mine Rank — pick reward milli-cents\"",
+    "scoreboard objectives add mr_pick_accum dummy \"Mine Rank — reward accumulator\"",
+    "scoreboard objectives add mr_pick_tmp dummy \"Mine Rank — pick temporary\"",
     "scoreboard objectives add mr_mnc dummy \"Mine Rank — MineCoin\"",
     "scoreboard objectives add mr_blocks_terra dummy \"Mine Rank — blocks in terra\"",
     "scoreboard objectives add mr_blocks_areia dummy \"Mine Rank — blocks in areia\"",
+    "scoreboard objectives add mr_terra_pending dummy \"Mine Rank — dirt pending\"",
+    "scoreboard objectives add mr_areia_pending dummy \"Mine Rank — sand pending\"",
+    "scoreboard objectives add mr_in_terra dummy \"Mine Rank — mining in terra\"",
+    "scoreboard objectives add mr_in_areia dummy \"Mine Rank — mining in areia\"",
+    "scoreboard objectives add mr_terra_off dummy \"Mine Rank — terra off dirt\"",
+    "scoreboard objectives add mr_areia_off dummy \"Mine Rank — areia off sand\"",
+    "scoreboard objectives add mr_pick_mult dummy \"Mine Rank — validated shovel mult\"",
+    ...MNC_PERMISSION_OBJECTIVES.map(
+      (objective) => `scoreboard objectives add ${objective} dummy \"Mine Rank — MineCoin permission\"`,
+    ),
     "scoreboard objectives add mr_notice dummy \"Mine Rank — notice counter\"",
     "scoreboard objectives add mr_online dummy \"Mine Rank — players online\"",
     "scoreboard objectives add mr_tot_blocks dummy \"Mine Rank — server blocks\"",
@@ -2471,10 +3115,15 @@ function loadLines(): string[] {
     ),
     "scoreboard objectives add mr_s_kills minecraft.custom:minecraft.player_kills \"Player kills\"",
     "scoreboard objectives add mr_playtime minecraft.custom:minecraft.play_time \"Play time\"",
+    "# the pre-rank mines read the REAL dirt and sand statistics",
+    "scoreboard objectives add mr_s_dirt minecraft.mined:minecraft.dirt \"Mined dirt\"",
+    "scoreboard objectives add mr_s_sand minecraft.mined:minecraft.sand \"Mined sand\"",
     "# checkpoints of the statistics",
     ...MINED_STATISTICS.map(
       (stat) => `scoreboard objectives add mr_last_${stat.key} dummy`,
     ),
+    "scoreboard objectives add mr_last_dirt dummy",
+    "scoreboard objectives add mr_last_sand dummy",
     "scoreboard objectives add mr_last_kills dummy",
     "scoreboard objectives add mr_last_pt dummy",
     "# the player commands (the only surface vanilla gives us)",
@@ -2485,9 +3134,9 @@ function loadLines(): string[] {
     "# server-side counters",
     "scoreboard players set #mr_const mr_const 1200",
     "scoreboard players set #mr_k1000 mr_const 1000",
+    "# 1 coin = 100 cents = 100000 milli-cents (the exact reward math)",
+    "scoreboard players set #mr_k100000 mr_const 100000",
     "scoreboard players set #mr_hype mr_hype 0",
-    "# shovel multiplier constant (thousandths)",
-    "scoreboard players set #mr_shovel_mult 1000",
     "scoreboard players set #mr_tot_blocks mr_tot_blocks 0",
     "scoreboard players set #mr_notice mr_notice 0",
     "scoreboard players set #mr_online mr_online 0",
@@ -2513,6 +3162,20 @@ function tickLines(): string[] {
     "# mining",
     `execute as @a at @s run function ${MINE_RANK_NS}:collect_blocks`,
     `execute as @a[scores={mr_blocks=1..}] at @s run function ${MINE_RANK_NS}:award_blocks`,
+    "# the pre-rank mines (dirt and sand): collect, pay and only then close",
+    "# the session. The close has a grace of a few ticks — it covers the",
+    "# instant between breaking the block and landing on the next layer, and",
+    "# it makes the reward impossible to leak outside the mine",
+    `execute as @a at @s run function ${MINE_RANK_NS}:collect_terra`,
+    `execute as @a at @s run function ${MINE_RANK_NS}:collect_areia`,
+    `execute as @a[scores={mr_terra_pending=1..}] at @s run function ${MINE_RANK_NS}:award_terra`,
+    `execute as @a[scores={mr_areia_pending=1..}] at @s run function ${MINE_RANK_NS}:award_areia`,
+    `execute as @a[scores={mr_in_terra=1}] at @s unless block ~ ~-1 ~ minecraft:dirt run scoreboard players add @s mr_terra_off 1`,
+    `execute as @a[scores={mr_in_terra=1}] at @s if block ~ ~-1 ~ minecraft:dirt run scoreboard players set @s mr_terra_off 0`,
+    `execute as @a[scores={mr_in_terra=1,mr_terra_off=${MINE_RANK_PRE_MINE_SESSION_GRACE}..}] run scoreboard players set @s mr_in_terra 0`,
+    `execute as @a[scores={mr_in_areia=1}] at @s unless block ~ ~-1 ~ minecraft:sand run scoreboard players add @s mr_areia_off 1`,
+    `execute as @a[scores={mr_in_areia=1}] at @s if block ~ ~-1 ~ minecraft:sand run scoreboard players set @s mr_areia_off 0`,
+    `execute as @a[scores={mr_in_areia=1,mr_areia_off=${MINE_RANK_PRE_MINE_SESSION_GRACE}..}] run scoreboard players set @s mr_in_areia 0`,
     "# kills",
     `execute as @a at @s run function ${MINE_RANK_NS}:collect_kills`,
     `execute as @a[scores={mr_kill_pending=1..}] at @s run function ${MINE_RANK_NS}:award_kill`,
@@ -2575,6 +3238,14 @@ export function generateMineRankFiles(): GeneratedFile[] {
     functionFile("load", loadLines()),
     functionFile("tick", tickLines()),
     functionFile("build_world", buildWorldLines()),
+    functionFile(
+      "build_terra_mine",
+      preMineLines(MINE_RANK_TERRA_MINE, "dirt", "Terra"),
+    ),
+    functionFile(
+      "build_areia_mine",
+      preMineLines(MINE_RANK_AREIA_MINE, "sand", "Areia"),
+    ),
   ];
 
   for (let plot = 1; plot <= MINE_RANK_PLOTS; plot += 1) {
@@ -2593,10 +3264,11 @@ export function generateMineRankFiles(): GeneratedFile[] {
   files.push(dataFile("README.md", mineRankReadme()));
 
   // ---- resource pack: custom pickaxe texture -------------------------------
-  // The datapack gives the player a shovel with CustomModelData: 1. The
-  // resource pack below maps that model to a distinct texture. The PNG is a
-  // placeholder — replace it with the real art; the model and pack.mcmeta
-  // are generated deterministically.
+  // The mining pickaxe is given with `CustomModelData: 1`. The vanilla
+  // `diamond_pickaxe` model is OVERRIDDEN for that data value only, and the
+  // override points at the Mine Rank namespace — where the own model and
+  // the own texture live. The PNG below is real art (16x16, RGBA), shipped
+  // with the pack: the owner does not have to draw anything.
   files.push(
     dataFile(
       "resource_pack/pack.mcmeta",
@@ -2614,17 +3286,17 @@ export function generateMineRankFiles(): GeneratedFile[] {
   );
   files.push(
     dataFile(
-      "resource_pack/assets/minecraft/models/item/custom_pickaxe.json",
+      "resource_pack/assets/minecraft/models/item/diamond_pickaxe.json",
       JSON.stringify(
         {
           parent: "item/handheld",
           textures: {
-            layer0: "mine_rank:item/custom_pickaxe",
+            layer0: "minecraft:item/diamond_pickaxe",
           },
           overrides: [
             {
               predicate: { custom_model_data: 1 },
-              model: "item/custom_pickaxe",
+              model: "mine_rank:item/custom_pickaxe",
             },
           ],
         },
@@ -2635,17 +3307,36 @@ export function generateMineRankFiles(): GeneratedFile[] {
   );
   files.push(
     dataFile(
-      "resource_pack/assets/minecraft/lang/pt_br.json",
+      "resource_pack/assets/mine_rank/models/item/custom_pickaxe.json",
       JSON.stringify(
         {
-          "item.minecraft.custom_pickaxe": "Picareta de Mineração (Mine Rank)",
+          parent: "minecraft:item/handheld",
+          textures: {
+            layer0: "mine_rank:item/custom_pickaxe",
+          },
         },
         null,
         2,
       ),
     ),
   );
-
+  files.push(
+    dataFile(
+      "resource_pack/assets/mine_rank/lang/pt_br.json",
+      JSON.stringify(
+        {
+          "item.mine_rank.custom_pickaxe": "Picareta de Mineração (Mine Rank)",
+        },
+        null,
+        2,
+      ),
+    ),
+  );
+  files.push({
+    path: "resource_pack/assets/mine_rank/textures/item/custom_pickaxe.png",
+    content: "",
+    base64: MINE_RANK_PICKAXE_TEXTURE_PNG_BASE64,
+  });
 
   return files;
 }

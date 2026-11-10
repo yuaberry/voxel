@@ -76,6 +76,19 @@ export async function writeProjectFile(
   await invoke("write_project_file", { basePath, rel, content });
 }
 
+/**
+ * Writes a BINARY file (a texture, a sound, an NBT file).
+ *
+ * The payload travels as base64 — the same encoding the read side uses.
+ */
+export async function writeProjectFileBase64(
+  basePath: string,
+  rel: string,
+  dataBase64: string,
+): Promise<void> {
+  await invoke("write_project_file_base64", { basePath, rel, dataBase64 });
+}
+
 export async function createProjectDirectory(
   basePath: string,
   rel: string,

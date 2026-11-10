@@ -30,7 +30,7 @@ import {
   generateMineRankFiles,
   type MineRankFamily,
 } from "@/services/servers/mineRankServer";
-import { readProjectFile, writeProjectFile } from "@/services/projects/projectsService";
+import { readProjectFile, writeProjectFile, writeProjectFileBase64 } from "@/services/projects/projectsService";
 import { sendServerCommand } from "@/services/servers/serverService";
 import type { ServerRecord } from "@/types";
 
@@ -130,7 +130,12 @@ export function MineRankPanel({ server, basePath, running }: Props) {
     try {
       const files = generateMineRankFiles();
       for (const file of files) {
-        await writeProjectFile(basePath, `servers/${slug}/${file.path}`, file.content);
+        const rel = `servers/${slug}/${file.path}`;
+        if (file.base64) {
+          await writeProjectFileBase64(basePath, rel, file.base64);
+        } else {
+          await writeProjectFile(basePath, rel, file.content);
+        }
       }
       setInstalled(true);
       toast.success("Mine Rank instalado", {

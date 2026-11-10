@@ -80,6 +80,7 @@ pub fn run() {
             commands::fs::list_project_files,
             commands::fs::read_project_file,
             commands::fs::write_project_file,
+            commands::fs::write_project_file_base64,
             commands::fs::create_project_directory,
             commands::fs::delete_project_entry,
             commands::fs::rename_project_entry,

@@ -102,6 +102,12 @@ export interface GeneratedFile {
   /** Path relative to the server root, e.g. world/datapacks/nexus_economy/... */
   path: string;
   content: string;
+  /**
+   * Binary payload (base64) — a texture, a sound, an NBT file.
+   *
+   * When it is present the file is written as bytes; `content` is ignored.
+   */
+  base64?: string;
 }
 
 export interface ModuleInstallOptions {

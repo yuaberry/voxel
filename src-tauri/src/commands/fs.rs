@@ -9,6 +9,8 @@ use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use base64::Engine as _;
+
 const MAX_TEXT_FILE_BYTES: u64 = 2 * 1024 * 1024; // 2 MB
 const IGNORED_TOP_DIRS: [&str; 4] = [".git", "build", ".gradle", "run"];
 
@@ -182,6 +184,30 @@ pub fn read_project_file(
 pub fn write_project_file(base_path: String, rel: String, content: String) -> Result<(), String> {
     let target = validated_path(&base_path, &rel, true)?;
     fs::write(&target, content).map_err(|e| format!("Failed to write file: {e}"))
+}
+
+/// Writes a BINARY file (a texture, a sound, an NBT file).
+///
+/// The payload travels as base64 — the same encoding the read side already
+/// uses — so the app never has to ship a binary over the IPC bridge as text.
+/// The path goes through the very same guard as the text write.
+#[tauri::command]
+pub fn write_project_file_base64(
+    base_path: String,
+    rel: String,
+    data_base64: String,
+) -> Result<(), String> {
+    let target = validated_path(&base_path, &rel, true)?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data_base64.trim())
+        .map_err(|e| format!("Invalid base64 payload: {e}"))?;
+    if bytes.len() as u64 > MAX_BINARY_FILE_BYTES {
+        return Err("File is too large (max 10 MB)".to_string());
+    }
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {e}"))?;
+    }
+    fs::write(&target, bytes).map_err(|e| format!("Failed to write file: {e}"))
 }
 
 #[tauri::command]

@@ -285,6 +285,62 @@ async function fireTriggerByConsole(
   return waitForTrigger(server, from, displayName, value);
 }
 
+/**
+ * Holds an item in the MAIN HAND.
+ *
+ * The client and the server have to agree on the tool: a shovel breaks
+ * stone in 7.5 seconds and the client predicts the block gone before the
+ * server accepts the break — the block stays on the server and the
+ * statistic is never awarded. The E2E therefore always equips the right
+ * tool before digging.
+ */
+async function equipItem(player: Player, name: string): Promise<boolean> {
+  const item = player.bot.inventory.items().find((entry) => entry.name === name);
+  if (!item) return false;
+  await player.bot.equip(item, "hand");
+  await sleep(800);
+  return player.bot.heldItem?.name === name;
+}
+
+/**
+ * Holds the shovel in the MAIN HAND.
+ *
+ * The server validates the tool of the reward event by itself (it reads
+ * `SelectedItem` from the player NBT), so the client really has to equip
+ * it — the datapack never trusts what the player says.
+ */
+async function equipShovel(player: Player): Promise<boolean> {
+  const shovel = player.bot.inventory
+    .items()
+    .find((item) => item.name.endsWith("_shovel"));
+  if (!shovel) return false;
+  await player.bot.equip(shovel, "hand");
+  await sleep(800);
+  return true;
+}
+
+/**
+ * Reads a scoreboard value from the SERVER LOG.
+ *
+ * The log is the source of truth: the chat is throttled by the vanilla and
+ * the score output carries the display name of the objective, so the parse
+ * is exact (a loose `/Tester has (\d+)/` would match an older line).
+ */
+async function scoreOf(
+  server: RunningServer,
+  objective: string,
+  display: string,
+): Promise<number | null> {
+  const from = server.log().length;
+  server.send(`scoreboard players get Tester ${objective}`);
+  await sleep(700);
+  const escaped = display.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`Tester has (-?\\d+) \\[${escaped}\\]`).exec(
+    server.log().slice(from),
+  );
+  return match ? Number(match[1]) : null;
+}
+
 describe.skipIf(!RUN_E2E)("Mine Rank — E2E real (vanilla 1.20.1 server)", () => {
   it(
     "plays the whole command surface with a real client and mines for real",
@@ -300,7 +356,10 @@ describe.skipIf(!RUN_E2E)("Mine Rank — E2E real (vanilla 1.20.1 server)", () =
         for (const file of generateMineRankFiles()) {
           const target = path.join(dir, file.path);
           await mkdir(path.dirname(target), { recursive: true });
-          await writeFile(target, file.content);
+          await writeFile(
+            target,
+            file.base64 ? Buffer.from(file.base64, "base64") : file.content,
+          );
         }
 
         const server = await bootServer(jar, dir);
@@ -376,19 +435,280 @@ describe.skipIf(!RUN_E2E)("Mine Rank — E2E real (vanilla 1.20.1 server)", () =
           ).toBe(true);
           await sleep(2000);
 
-          // the mining economy works for real: dig a block and earn a coin
-          const block = player.bot.blockAt(
+          // the mining economy works for real: break a block and earn a coin.
+          //
+          // The sweep above ends wherever the last teleport left the player
+          // and the server corrects the position for a few ticks — the
+          // correction ABORTS the dig of the client (mineflayer resolves
+          // the dig on `forcedMove`). So the bot goes back to the hub, waits
+          // for the position to settle and then breaks a block at its own
+          // level (the floor is not the target — the bot would fall into
+          // the hole and the dig would be interrupted again).
+          server.send("execute as Tester run tp @s 0 101 0");
+          await sleep(3000);
+          server.send("gamemode survival Tester");
+          // stone by hand takes 7.5 seconds — a pickaxe makes it instant
+          server.send("give Tester minecraft:diamond_pickaxe 1");
+          await sleep(1000);
+          expect(
+            await equipItem(player, "diamond_pickaxe"),
+            "the client could not equip the pickaxe",
+          ).toBe(true);
+
+          const stoneTarget = player.bot.entity.position.floored().offset(2, 0, 0);
+          server.send(
+            `setblock ${stoneTarget.x} ${stoneTarget.y} ${stoneTarget.z} minecraft:stone`,
+          );
+          await sleep(1000);
+
+          let broken = false;
+          let digError = "";
+          for (let attempt = 0; attempt < 4 && !broken; attempt += 1) {
+            const target = player.bot.blockAt(stoneTarget);
+            if (!target || target.name === "air") {
+              broken = true;
+              break;
+            }
+            try {
+              await player.bot.dig(target, true);
+            } catch (error) {
+              // the client refused or aborted the dig — try again
+              digError = String(error);
+            }
+            await sleep(1500);
+            broken = player.bot.blockAt(stoneTarget)?.name === "air";
+          }
+
+          // the SERVER state — the client can predict a broken block, so the
+          // only truth is what the server holds
+          const probe = server.log().length;
+          server.send("scoreboard players set #mr_probe mr_const 0");
+          server.send(
+            `execute if block ${stoneTarget.x} ${stoneTarget.y} ${stoneTarget.z} minecraft:air run scoreboard players set #mr_probe mr_const 1`,
+          );
+          server.send("scoreboard players get #mr_probe mr_const");
+          await sleep(1000);
+          const serverBroke = /#mr_probe has 1/.test(server.log().slice(probe));
+
+          expect(
+            broken && serverBroke,
+            `the client could not break the stone block — client: ${broken} · server: ${serverBroke} · ${digError} · position: ${JSON.stringify(player.bot.entity.position)} · held: ${JSON.stringify(player.bot.heldItem?.name)} · log tail:\n${server.log().slice(-3000)}`,
+          ).toBe(true);
+          await sleep(2500); // the tick that pays the reward
+
+          // the REAL vanilla statistic moved — the module reads it through a
+          // delta and never drains the player statistics
+          const mined = await scoreOf(server, "mr_s_stone", "Mined stone");
+          expect(mined ?? 0, "the vanilla mined statistic did not move").toBeGreaterThan(0);
+
+          const coins = await scoreOf(server, "mr_coins", "Mine Rank — coins");
+          expect(
+            coins ?? 0,
+            `the mining economy did not pay a coin — log:\n${server.log().slice(-1200)}`,
+          ).toBeGreaterThan(0);
+
+          // ---- the pre-rank mines (Terra) ---------------------------------
+          // The player warps to the Terra mine, digs the dirt under their
+          // feet and the EXACT reward lands: base_value_cents × shovel_mult
+          // is kept in milli-cents, so nothing is lost to a division.
+          const terra = MINE_RANK_COMMANDS.find(
+            (command) => command.id === "mina terra",
+          );
+          expect(terra).toBeDefined();
+          expect(
+            await fireTriggerByConsole(
+              server,
+              terra!.trigger,
+              terra!.description.slice(0, 32),
+              1,
+            ),
+          ).toBe(true);
+          await sleep(2000);
+
+          // the player really landed on the dirt of the Terra mine
+          const underFeet = player.bot.blockAt(
             player.bot.entity.position.offset(0, -1, 0),
           );
-          if (block && block.name !== "air") {
-            await player.bot.dig(block);
+          expect(
+            underFeet?.name,
+            "the Terra mine did not put the player on dirt",
+          ).toBe("dirt");
+
+          // the same caveat as the hub: the teleport correction aborts the
+          // dig of the client, so the position settles first
+          await sleep(3000);
+
+          // the reward only happens with a shovel in the main hand — the
+          // server validates the tool by itself
+          expect(
+            await equipShovel(player),
+            "the module did not give the player a shovel",
+          ).toBe(true);
+
+          // the block under the feet is the one that pays — its position is
+          // captured BEFORE the dig, because the player falls into the hole
+          // as soon as the dirt breaks
+          const terraTarget = player.bot.entity.position.offset(0, -1, 0);
+          let terraDug = false;
+          for (let attempt = 0; attempt < 4 && !terraDug; attempt += 1) {
+            const digTarget = player.bot.blockAt(terraTarget);
+            if (!digTarget || digTarget.name === "air") {
+              terraDug = true;
+              break;
+            }
+            try {
+              await player.bot.dig(digTarget, true);
+            } catch {
+              // the client aborted the dig — try again
+            }
             await sleep(1500);
-            server.send("scoreboard players get Tester mr_coins");
-            await sleep(1000);
-            const coins = /Tester has (\d+)/.exec(server.log());
-            expect(coins, "the mining economy did not pay a coin").not.toBeNull();
-            expect(Number(coins?.[1] ?? "0")).toBeGreaterThan(0);
+            terraDug = player.bot.blockAt(terraTarget)?.name === "air";
           }
+          expect(terraDug, "the client could not dig the dirt").toBe(true);
+          await sleep(2500); // the tick that pays the reward
+
+          const terraBlocks = await scoreOf(
+            server,
+            "mr_blocks_terra",
+            "Mine Rank — blocks in terra",
+          );
+          expect(
+            terraBlocks ?? 0,
+            "the Terra mine did not count the block",
+          ).toBeGreaterThanOrEqual(1);
+
+          // the reward accumulator holds the EXACT value: 10 cents × 0.20
+          // (the wooden shovel) = 2000 milli-cents — nothing is lost to a
+          // division, the rest is carried to the next block
+          const accum = await scoreOf(
+            server,
+            "mr_pick_accum",
+            "Mine Rank — reward accumulator",
+          );
+          if ((accum ?? 0) <= 0) {
+            // the diagnostic: every score of the reward chain
+            const from = server.log().length;
+            for (const objective of [
+              "mr_prerank",
+              "mr_in_terra",
+              "mr_terra_off",
+              "mr_terra_pending",
+              "mr_s_dirt",
+              "mr_last_dirt",
+              "mr_pick_tmp",
+              "mr_pick_reward",
+              "mr_pick_mult",
+              "mr_blocks_terra",
+              "mr_coins",
+            ]) {
+              server.send(`scoreboard players get Tester ${objective}`);
+            }
+            server.send("scoreboard players get #mr_k100000 mr_const");
+            server.send("data get entity Tester SelectedItem");
+            await sleep(1500);
+            const toolMult = await scoreOf(
+              server,
+              "mr_pick_mult",
+              "Mine Rank — validated shovel mult",
+            );
+            throw new Error(
+              `the Terra reward did not land — accum: ${accum} · validated mult: ${toolMult} · chat: ${player.messages.slice(-6).join(" | ")} · scores:\n${server.log().slice(from)} · log:\n${server.log().slice(-1500)}`,
+            );
+          }
+          expect(accum ?? 0).toBeGreaterThan(0);
+
+          // ---- the shovel upgrade ------------------------------------------
+          // the sweep above fired every trigger three times, so the shovel
+          // was already upgraded — the state is reset to make the upgrade
+          // measurable
+          server.send("scoreboard players set Tester mr_pickaxe_level 0");
+          server.send("scoreboard players set Tester mr_pickaxe_mult 200");
+          server.send("scoreboard players set Tester mr_pickaxe_price 50");
+          server.send("scoreboard players set Tester mr_coins 100");
+          await sleep(700);
+          const pickUp = MINE_RANK_COMMANDS.find(
+            (command) => command.id === "pá upgrade",
+          );
+          expect(pickUp).toBeDefined();
+          expect(
+            await fireTriggerByConsole(
+              server,
+              pickUp!.trigger,
+              pickUp!.description.slice(0, 32),
+              1,
+            ),
+          ).toBe(true);
+          await sleep(1500);
+          const mult = await scoreOf(
+            server,
+            "mr_pickaxe_mult",
+            "Mine Rank — shovel mult",
+          );
+          expect(
+            mult,
+            "the shovel upgrade did not change the multiplier",
+          ).toBe(400);
+          const afterUpgrade = await scoreOf(
+            server,
+            "mr_coins",
+            "Mine Rank — coins",
+          );
+          expect(
+            afterUpgrade,
+            "the shovel upgrade did not charge the price",
+          ).toBe(50);
+
+          // ---- the MineCoin gate --------------------------------------------
+          const mnc = MINE_RANK_COMMANDS.find((command) => command.id === "mnc");
+          expect(mnc).toBeDefined();
+          expect(
+            await fireTriggerByConsole(
+              server,
+              mnc!.trigger,
+              mnc!.description.slice(0, 32),
+              1,
+            ),
+          ).toBe(true);
+          await sleep(1200);
+          expect(
+            player.messages.some((message) =>
+              message.includes("MineCoin só é liberada no Rank Bronze"),
+            ),
+            "the MineCoin gate did not lock a player below Bronze",
+          ).toBe(true);
+
+          // at Bronze the MineCoin opens and the custom pickaxe is bought
+          server.send("scoreboard players set Tester mr_prerank 2");
+          for (const permission of [
+            "mr_p_view",
+            "mr_p_market",
+            "mr_p_recv",
+            "mr_p_send",
+            "mr_p_trade",
+            "mr_p_premium",
+          ]) {
+            server.send(`scoreboard players set Tester ${permission} 1`);
+          }
+          server.send("scoreboard players set Tester mr_mnc 30");
+          await sleep(800);
+          expect(
+            await fireTriggerByConsole(
+              server,
+              mnc!.trigger,
+              mnc!.description.slice(0, 32),
+              8,
+            ),
+          ).toBe(true);
+          await sleep(1500);
+          const customPickaxe = player.bot
+            .inventory.items()
+            .some((item) =>
+              JSON.stringify(item.nbt ?? {}).includes("CustomModelData"),
+            );
+          expect(
+            customPickaxe,
+            "the mining pickaxe with the custom model was not delivered",
+          ).toBe(true);
 
           // the final log is clean
           const log = server.log();

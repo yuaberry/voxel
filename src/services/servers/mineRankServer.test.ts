@@ -33,6 +33,156 @@ function fn(name: string): string {
   return content as string;
 }
 
+/**
+ * Every command line of every generated function.
+ *
+ * The vanilla 1.20.1 parser is the judge of the datapack — a single
+ * invalid command makes the WHOLE function fail to load, and the server
+ * logs the error on every boot.
+ */
+function everyCommandLine(): Array<{ file: string; line: string }> {
+  const out: Array<{ file: string; line: string }> = [];
+  for (const file of files) {
+    if (!file.path.endsWith(".mcfunction")) continue;
+    for (const line of file.content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      out.push({ file: file.path, line: trimmed });
+    }
+  }
+  return out;
+}
+
+/**
+ * The vanilla 1.20.1 rules this guard protects:
+ *
+ * - `matches` takes ONE range token built from integer constants
+ *   (`5`, `0..`, `..100`, `1..10`) — a score holder is a parse error.
+ * - `scoreboard players set/remove` take an INTEGER LITERAL as the value —
+ *   `remove`/`set` with a score holder does not load.
+ */
+const VALID_RANGE = /^-?\d*(\.\.-?\d*)?$/;
+const INTEGER_LITERAL = /^-?\d+$/;
+
+function vanillaSyntaxProblem(line: string): string | null {
+  const matchAt = line.indexOf(" matches ");
+  if (matchAt >= 0) {
+    const range = line.slice(matchAt + " matches ".length).split(" ")[0];
+    if (!VALID_RANGE.test(range)) {
+      return `matches with a non-literal range (${range})`;
+    }
+  }
+  const players = line.match(
+    /^scoreboard players (set|remove)\s+(\S+)\s+(\S+)\s+(\S+)/,
+  );
+  if (players && !INTEGER_LITERAL.test(players[4])) {
+    return `players ${players[1]} with a non-literal value (${players[4]})`;
+  }
+  return null;
+}
+
+describe("Mine Rank — the vanilla 1.20.1 parser is the judge", () => {
+  it("never ships an uninterpolated template placeholder", () => {
+    // A double-quoted string keeps `${…}` as literal text — the vanilla then
+    // reads "function ${MINE_RANK_NS}:x" as one argument and refuses the
+    // whole function. This is the bug the E2E caught in the first run.
+    const offenders: string[] = [];
+    for (const file of files) {
+      if (!file.path.endsWith(".mcfunction")) continue;
+      for (const line of file.content.split("\n")) {
+        if (line.includes("${")) {
+          offenders.push(`${file.path}: ${line.trim()}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("never uses a score holder where the vanilla demands a literal", () => {
+    const offenders: string[] = [];
+    for (const { file, line } of everyCommandLine()) {
+      const problem = vanillaSyntaxProblem(line);
+      if (problem) offenders.push(`${file}: ${line} (${problem})`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("never uses a `team join` (the vanilla refuses it inside a datapack)", () => {
+    for (const { file, line } of everyCommandLine()) {
+      expect(line.startsWith("team join"), `${file}: ${line}`).toBe(false);
+    }
+  });
+
+  it("puts the NBT of a `give` before the count (the 1.20.1 order)", () => {
+    for (const { file, line } of everyCommandLine()) {
+      if (!line.startsWith("give ")) continue;
+      // `give <target> <item{NBT}> <count>` — the count is always the last
+      // one (the item may carry spaces inside a quoted NBT string).
+      expect(line, `${file}: ${line}`).toMatch(/^give\s+\S+\s+.*\s+-?\d+$/);
+    }
+  });
+
+  it("keeps every objective name inside the 16-character vanilla limit", () => {
+    const names = new Set<string>();
+    for (const { line } of everyCommandLine()) {
+      const match = line.match(
+        /^scoreboard objectives add ([a-zA-Z0-9_]+) /,
+      );
+      if (match) names.add(match[1]);
+      const players = line.match(
+        /^scoreboard players (?:set|add|remove) \S+ ([a-zA-Z0-9_]+) /,
+      );
+      if (players) names.add(players[1]);
+      const operation = line.match(
+        /^scoreboard players operation \S+ ([a-zA-Z0-9_]+) /,
+      );
+      if (operation) names.add(operation[1]);
+    }
+    for (const name of names) {
+      expect(name.length, `objective too long: ${name}`).toBeLessThanOrEqual(16);
+    }
+  });
+
+  it("gives every `scoreboard players operation` a score holder as its source", () => {
+    // Proven against the vanilla 1.20.1 server:
+    //
+    //   scoreboard players operation <target> <targetObj> <op> <source> [<sourceObj>]
+    //
+    // · with SIX tokens after `operation` the command does not parse at
+    //   all and the whole function FAILS TO LOAD;
+    // · with FOUR tokens (the source objective omitted) the command
+    //   parses but is a SILENT NO-OP — the server answers
+    //   "Can't get value of <obj> for <target>; none is set" and the
+    //   target is never written;
+    // · with a LITERAL source (`= 10`, `-= 40`, …) the command also
+    //   parses and is a SILENT NO-OP — the literal is read as a score
+    //   holder with no score, so the target keeps its old value. The
+    //   vanilla commands for that are `scoreboard players set/add/remove`;
+    // · with FIVE tokens and a real score holder the operation behaves
+    //   exactly as written and composes with the previous line.
+    const offenders: string[] = [];
+    for (const { file, line } of everyCommandLine()) {
+      if (!line.startsWith("scoreboard players operation ")) continue;
+      const parts = line.trim().split(/\s+/);
+      // parts[0..2] = scoreboard · players · operation
+      const operands = parts.slice(3);
+      if (operands.length === 4 && /^-?\d+$/.test(operands[3])) {
+        offenders.push(
+          `${file}: ${line} (a literal source is a silent no-op — use scoreboard players set/add/remove)`,
+        );
+        continue;
+      }
+      if (operands.length === 5) continue;
+      offenders.push(
+        `${file}: ${line} (${operands.length} operands after "operation" — the source objective is ${
+          operands.length < 5 ? "missing (silent no-op)" : "duplicated (does not parse)"
+        })`,
+      );
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("Mine Rank — the manifest is the single source of truth", () => {
   it("ships every command of the Rankup variation with a unique trigger", () => {
     expect(MINE_RANK_COMMANDS.length).toBeGreaterThanOrEqual(30);
@@ -423,8 +573,10 @@ describe("Mine Rank — the commands really do something", () => {
       );
     expect(fn("cmd_mercador")).toBeDefined();
     expect(fn("cmd_pickaxe_upgrade")).toBeDefined();
-    expect(fn("do_pickaxe_upgrade_confirm")).toBeDefined();
-    expect(fn("menu_mnc")).toBeDefined();
+    expect(fn("pickaxe_check")).toBeDefined();
+    expect(fn("do_pickaxe_upgrade")).toBeDefined();
+    expect(fn("cmd_mnc")).toBeDefined();
+    expect(fn("mnc_route")).toBeDefined();
   });
 
   it("pre-rank and shovel scoreboard objectives exist in load", () => {
@@ -432,16 +584,31 @@ describe("Mine Rank — the commands really do something", () => {
     for (const objective of [
       "mr_prerank",
       "mr_pickaxe_level",
+      "mr_pick_mat",
       "mr_pickaxe_mult",
       "mr_pickaxe_price",
       "mr_block_value",
       "mr_pick_reward",
+      "mr_pick_accum",
       "mr_mnc",
       "mr_blocks_terra",
       "mr_blocks_areia",
+      "mr_terra_pending",
+      "mr_areia_pending",
+      "mr_in_terra",
+      "mr_in_areia",
     ]) {
       expect(load).toContain(`scoreboard objectives add ${objective} dummy`);
     }
+    // the real vanilla statistics the pre-rank mines read
+    expect(load).toContain(
+      "scoreboard objectives add mr_s_dirt minecraft.mined:minecraft.dirt",
+    );
+    expect(load).toContain(
+      "scoreboard objectives add mr_s_sand minecraft.mined:minecraft.sand",
+    );
+    // the exact-money constant (1 coin = 100000 milli-cents)
+    expect(load).toContain("scoreboard players set #mr_k100000 mr_const 100000");
   });
 
   it("shovel multiplier constants are configured", () => {

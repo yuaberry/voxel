@@ -6,7 +6,7 @@
  * security, economy, and automation.
  */
 
-import { writeProjectFile } from "@/services/projects/projectsService";
+import { writeProjectFile, writeProjectFileBase64 } from "@/services/projects/projectsService";
 import { createServerCommand } from "@/services/servers/serverService";
 import { generateSelectedModules } from "@/services/servers/serverModules";
 import type { ServerModuleId } from "@voxel/core/serverPresets";
@@ -205,8 +205,13 @@ export async function createServerStudio(options: ServerStudioOptions): Promise<
     port, ramMb, acceptEula, properties: serverProps,
   });
 
-  const write = async (file: { path: string; content: string }) => {
-    await writeProjectFile(basePath, `${serverRel}/${file.path}`, file.content);
+  const write = async (file: { path: string; content: string; base64?: string }) => {
+    const rel = `${serverRel}/${file.path}`;
+    if (file.base64) {
+      await writeProjectFileBase64(basePath, rel, file.base64);
+    } else {
+      await writeProjectFile(basePath, rel, file.content);
+    }
   };
 
   const selectedModules = preset.modules;
