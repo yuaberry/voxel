@@ -89,7 +89,15 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
           ? Promise.resolve(null)
           : copyModJar(basePath, slug, `projects/${slug}`).catch(() => null),
       ]);
-      setRuntime(status);
+      // a failed probe is a state too — never an eternal "checking…"
+      setRuntime(
+        status ?? {
+          ready: false,
+          mcVersion: project.minecraft_version,
+          loader,
+          missing: ["runtime status unavailable"],
+        },
+      );
       setAccount(stored);
       setModJar(jar);
     } finally {
