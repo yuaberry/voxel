@@ -200,6 +200,10 @@ pub(crate) struct ManifestEntry {
 struct VersionJson {
     #[serde(default)]
     assets: String,
+    /// Vanilla entry point (`net.minecraft.client.main.Main`). The Fabric
+    /// profile replaces it with the loader's own main class.
+    #[serde(default)]
+    main_class: Option<String>,
     #[serde(default)]
     asset_index: Option<AssetIndexInfo>,
     #[serde(default)]
@@ -329,6 +333,87 @@ struct AssetObject {
 }
 
 // ---------------------------------------------------------------------------
+// Loader (vanilla vs fabric)
+// ---------------------------------------------------------------------------
+
+/// Which client runtime an instance launches with.
+///
+/// * `vanilla` — the Mojang client exactly as shipped. This is what a
+///   datapack/resource-pack project needs: no loader, no mod jar, and the
+///   protocol version matches the vanilla server.
+/// * `fabric` — the Mojang client plus the Fabric loader profile.
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LaunchLoader {
+    #[default]
+    Fabric,
+    Vanilla,
+}
+
+impl LaunchLoader {
+    /// Parses the loader declared by the project record. Unknown loaders are
+    /// refused with an actionable message instead of silently launching a
+    /// different runtime than the project expects.
+    fn parse(raw: &str) -> Result<Self, String> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "" | "fabric" => Ok(LaunchLoader::Fabric),
+            "vanilla" => Ok(LaunchLoader::Vanilla),
+            "paper" => Err(
+                "Paper is a server software — the VOXEL client launches with Vanilla or Fabric"
+                    .to_string(),
+            ),
+            other => Err(format!(
+                "Loader '{other}' is not supported by the VOXEL launcher yet (Vanilla or Fabric)"
+            )),
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            LaunchLoader::Fabric => "fabric",
+            LaunchLoader::Vanilla => "vanilla",
+        }
+    }
+}
+
+/// The vanilla client entry point. Used when the version metadata does not
+/// declare one (and always for the vanilla profile).
+const VANILLA_MAIN_CLASS: &str = "net.minecraft.client.main.Main";
+
+/// Resolves the JVM entry point of the launch.
+///
+/// * fabric — the loader's own main class (`net.fabricmc.loader.impl.launch.knot.KnotClient`).
+/// * vanilla — the class declared by the version metadata
+///   (`net.minecraft.client.main.Main`).
+fn resolve_main_class(
+    loader: LaunchLoader,
+    version_main_class: Option<&str>,
+    fabric_main_class: Option<&str>,
+) -> String {
+    match loader {
+        LaunchLoader::Fabric => fabric_main_class
+            .map(|c| c.trim())
+            .filter(|c| !c.is_empty())
+            .unwrap_or(VANILLA_MAIN_CLASS)
+            .to_string(),
+        LaunchLoader::Vanilla => version_main_class
+            .map(|c| c.trim())
+            .filter(|c| !c.is_empty())
+            .unwrap_or(VANILLA_MAIN_CLASS)
+            .to_string(),
+    }
+}
+
+/// Classpath separator of the host OS (`:` on unix, `;` on windows).
+fn classpath_separator() -> char {
+    if cfg!(target_os = "windows") {
+        ';'
+    } else {
+        ':'
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Results / events
 // ---------------------------------------------------------------------------
 
@@ -371,28 +456,45 @@ fn os_arch_rule() -> &'static str {
     }
 }
 
-/// Minimal Mojang rule evaluator (os name/arch; feature-gated args stay off).
+/// Mojang rule evaluator (os name/arch + feature-gated args).
+///
+/// The official semantics (the same the vanilla launcher uses):
+/// * an arg WITHOUT rules is always included;
+/// * an arg WITH rules is included when AT LEAST ONE rule allows it;
+/// * an `allow` rule allows it when the os/arch match AND every feature it
+///   asks for is enabled (VOXEL enables none of them);
+/// * a `disallow` rule allows it when the os/arch does NOT match.
+///
+/// The previous implementation started from "allowed" and only removed an
+/// arg on a MATCHING disallow — so an `allow osx` rule still shipped
+/// `-XstartOnFirstThread` to Linux, and the JVM refused to start at all
+/// ("Unrecognized option: -XstartOnFirstThread"). That was the reason the
+/// owner's game never opened.
 fn rule_allows(rules: &[Rule]) -> bool {
-    let mut allowed = true;
-    for rule in rules {
-        let matched = match (&rule.os, &rule.features) {
-            (Some(os), None) => {
+    if rules.is_empty() {
+        return true;
+    }
+    rules.iter().any(|rule| {
+        let os_matches = rule
+            .os
+            .as_ref()
+            .map(|os| {
                 let name_ok = os.name.as_deref().map(|n| n == os_name()).unwrap_or(true);
                 let arch_ok = os.arch.as_deref().map(|a| a == os_arch_rule()).unwrap_or(true);
                 name_ok && arch_ok
-            }
-            (None, Some(_)) => false, // demo/custom-resolution args stay off
-            _ => true,
-        };
-        if rule.action == "allow" {
-            if matched {
-                allowed = true;
-            }
-        } else if rule.action == "disallow" && matched {
-            allowed = false;
+            })
+            .unwrap_or(true);
+        let features_match = rule
+            .features
+            .as_ref()
+            .map(|features| features.values().all(|enabled| !*enabled))
+            .unwrap_or(true);
+        match rule.action.as_str() {
+            "allow" => os_matches && features_match,
+            "disallow" => !os_matches,
+            _ => false,
         }
-    }
-    allowed
+    })
 }
 
 fn arg_values(arg: &Arg, out: &mut Vec<String>) {
@@ -476,10 +578,17 @@ fn elyby_javaagent_argument(path: &Path) -> String {
 // ---------------------------------------------------------------------------
 
 /// Testable core — `emit` receives (done, total, detail) progress updates.
+///
+/// `loader` decides which runtime is materialized:
+/// * `vanilla` — client jar + vanilla libraries + assets + natives. The
+///   Fabric profile is NOT fetched (a vanilla/datapack project must not
+///   depend on a mod loader).
+/// * `fabric` — everything above plus the Fabric profile and its libraries.
 pub fn prepare_core(
     base_path: &str,
     project_slug: &str,
     mc_version: &str,
+    loader: &str,
     loader_version: &str,
     emit: &(dyn Fn(u32, u32, &str) + Send + Sync),
 ) -> Result<PrepareResult, String> {
@@ -493,6 +602,7 @@ pub fn prepare_core(
     if project_slug.trim().is_empty() {
         return Err("Project slug is required".to_string());
     }
+    let loader = LaunchLoader::parse(loader)?;
     let base = std::path::PathBuf::from(&base_path)
         .canonicalize()
         .map_err(|e| format!("Storage base not accessible: {e}"))?;
@@ -520,13 +630,26 @@ pub fn prepare_core(
     )
     .map_err(|e| format!("version metadata parse: {e}"))?;
 
-    emit_progress(project_slug, 0, 1, "fetching Fabric profile…");
-    let fabric_url = fabric_profile_url(&mc_version, &loader_version);
-    let fabric_bytes = http_get_bytes(&fabric_url)?;
-    std::fs::write(version_dir.join("fabric-profile.json"), &fabric_bytes)
-        .map_err(|e| format!("{e}"))?;
-    let fabric: FabricProfile = serde_json::from_slice(&fabric_bytes)
-        .map_err(|e| format!("fabric profile parse: {e}"))?;
+    // The Fabric profile only exists for the fabric profile — a vanilla
+    // runtime must not depend on a mod loader (and a stale profile from a
+    // previous fabric run must not leak into a vanilla launch).
+    let fabric: Option<FabricProfile> = match loader {
+        LaunchLoader::Vanilla => {
+            let _ = std::fs::remove_file(version_dir.join("fabric-profile.json"));
+            None
+        }
+        LaunchLoader::Fabric => {
+            emit_progress(project_slug, 0, 1, "fetching Fabric profile…");
+            let fabric_url = fabric_profile_url(&mc_version, &loader_version);
+            let fabric_bytes = http_get_bytes(&fabric_url)?;
+            std::fs::write(version_dir.join("fabric-profile.json"), &fabric_bytes)
+                .map_err(|e| format!("{e}"))?;
+            Some(
+                serde_json::from_slice(&fabric_bytes)
+                    .map_err(|e| format!("fabric profile parse: {e}"))?,
+            )
+        }
+    };
 
     // ---- plan downloads ----
     struct Planned {
@@ -568,14 +691,16 @@ pub fn prepare_core(
     }
 
     // fabric libraries (maven.fabricmc.net)
-    for library in &fabric.libraries {
-        if let Some(path) = maven_path(&library.name) {
-            let url = format!("{}{}", library.url, path);
-            planned.push(Planned {
-                url,
-                path: mc_libraries_dir(&base).join(&path),
-                sha1: library.sha1.clone().unwrap_or_default(),
-            });
+    if let Some(fabric) = fabric.as_ref() {
+        for library in &fabric.libraries {
+            if let Some(path) = maven_path(&library.name) {
+                let url = format!("{}{}", library.url, path);
+                planned.push(Planned {
+                    url,
+                    path: mc_libraries_dir(&base).join(&path),
+                    sha1: library.sha1.clone().unwrap_or_default(),
+                });
+            }
         }
     }
 
@@ -700,11 +825,12 @@ pub async fn launcher_prepare(
     base_path: String,
     project_slug: String,
     mc_version: String,
+    loader: Option<String>,
     loader_version: String,
 ) -> Result<PrepareResult, String> {
     // downloads 718MB+ — off the main thread or the UI freezes
     let app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || launcher_prepare_impl(app, base_path, project_slug, mc_version, loader_version))
+    tauri::async_runtime::spawn_blocking(move || launcher_prepare_impl(app, base_path, project_slug, mc_version, loader, loader_version))
         .await
         .map_err(|e| format!("worker failed: {e}"))?
 }
@@ -715,6 +841,7 @@ fn launcher_prepare_impl(
     base_path: String,
     project_slug: String,
     mc_version: String,
+    loader: Option<String>,
     loader_version: String,
 ) -> Result<PrepareResult, String> {
     let app_ref = &app;
@@ -723,6 +850,7 @@ fn launcher_prepare_impl(
         &base_path,
         &project_slug,
         &mc_version,
+        loader.as_deref().unwrap_or("fabric"),
         &loader_version,
         &move |done, total, detail| {
             let (project, text) = match detail.split_once('|') {
@@ -862,6 +990,7 @@ pub async fn launcher_launch(
     base_path: String,
     project_slug: String,
     mc_version: String,
+    loader: Option<String>,
     account: Option<AccountInfo>,
     java_path: Option<String>,
     ram_mb: Option<u32>,
@@ -872,6 +1001,7 @@ pub async fn launcher_launch(
             base_path,
             project_slug,
             mc_version,
+            loader,
             account,
             java_path,
             ram_mb,
@@ -886,6 +1016,7 @@ fn launcher_launch_impl(
     base_path: String,
     project_slug: String,
     mc_version: String,
+    loader: Option<String>,
     account: Option<AccountInfo>,
     java_path: Option<String>,
     ram_mb: Option<u32>,
@@ -893,10 +1024,54 @@ fn launcher_launch_impl(
     let account = account.ok_or_else(|| {
         "No authenticated account — sign in via Settings → Launcher first".to_string()
     })?;
+    let plan = build_launch_plan(
+        &base_path,
+        &project_slug,
+        &mc_version,
+        loader.as_deref().unwrap_or("fabric"),
+        &account,
+        java_path.as_deref(),
+        ram_mb,
+    )?;
 
-    let base = std::path::PathBuf::from(&base_path);
-    let inst = instance_dir(&base, &project_slug);
-    let version_dir = mc_versions_dir(&base).join(&mc_version);
+    let mut command = std::process::Command::new(&plan.java);
+    for arg in &plan.args {
+        command.arg(arg);
+    }
+    command.current_dir(&plan.game_dir);
+
+    let key = format!("launch/{project_slug}");
+    process::spawn_monitored(app, &key, command, "launch", false)?;
+    Ok(key)
+}
+
+/// The exact process a launch runs — built without spawning it, so the
+/// arguments can be proven by tests.
+#[derive(Debug, Clone)]
+pub struct LaunchPlan {
+    pub java: String,
+    /// Every argument after the java binary (javaagent, jvm args, main
+    /// class and the game arguments).
+    pub args: Vec<String>,
+    pub main_class: String,
+    pub game_dir: PathBuf,
+}
+
+/// Builds the java command line of a launch.
+fn build_launch_plan(
+    base_path: &str,
+    project_slug: &str,
+    mc_version: &str,
+    loader: &str,
+    account: &AccountInfo,
+    java_path: Option<&str>,
+    ram_mb: Option<u32>,
+) -> Result<LaunchPlan, String> {
+    let loader = LaunchLoader::parse(loader)?;
+
+    let base = std::path::PathBuf::from(base_path);
+    let inst = instance_dir(&base, project_slug);
+    let version_dir = mc_versions_dir(&base).join(mc_version);
     let (user_type, elyby_agent) = match account.provider {
         AccountProvider::Microsoft => ("msa", None),
         AccountProvider::Elyby => {
@@ -915,9 +1090,25 @@ fn launcher_launch_impl(
     )
     .map_err(|e| format!("version.json parse: {e}"))?;
 
-    let fabric_bytes = read_json(version_dir.join("fabric-profile.json"), "fabric-profile.json")?;
-    let fabric: FabricProfile =
-        serde_json::from_slice(&fabric_bytes).map_err(|e| format!("fabric profile parse: {e}"))?;
+    // The Fabric profile is only part of a fabric launch. A vanilla launch
+    // (datapack project) must NOT require it — that was the reason the game
+    // never started for the owner.
+    let fabric: Option<FabricProfile> = match loader {
+        LaunchLoader::Vanilla => None,
+        LaunchLoader::Fabric => {
+            let bytes = read_json(version_dir.join("fabric-profile.json"), "fabric-profile.json")?;
+            Some(
+                serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("fabric profile parse: {e}"))?,
+            )
+        }
+    };
+
+    let main_class = resolve_main_class(
+        loader,
+        version.main_class.as_deref(),
+        fabric.as_ref().map(|p| p.main_class.as_str()),
+    );
 
     // ---- classpath: vanilla artifacts (non-natives) + fabric libs + client ----
     let libs_root = mc_libraries_dir(&base);
@@ -929,9 +1120,11 @@ fn launcher_launch_impl(
             }
         }
     }
-    for library in &fabric.libraries {
-        if let Some(path) = maven_path(&library.name) {
-            classpath.push(libs_root.join(&path).to_string_lossy().to_string());
+    if let Some(fabric) = fabric.as_ref() {
+        for library in &fabric.libraries {
+            if let Some(path) = maven_path(&library.name) {
+                classpath.push(libs_root.join(&path).to_string_lossy().to_string());
+            }
         }
     }
     classpath.push(version_dir.join("client.jar").to_string_lossy().to_string());
@@ -945,20 +1138,32 @@ fn launcher_launch_impl(
         .unwrap_or_else(|| version.assets.clone());
 
     let mut vars: HashMap<String, String> = HashMap::new();
-    vars.insert("auth_player_name".into(), account.username);
-    vars.insert("auth_uuid".into(), account.uuid);
-    vars.insert("auth_access_token".into(), account.access_token);
+    vars.insert("auth_player_name".into(), account.username.clone());
+    vars.insert("auth_uuid".into(), account.uuid.clone());
+    vars.insert("auth_access_token".into(), account.access_token.clone());
     vars.insert("auth_xuid".into(), String::new());
     vars.insert("clientid".into(), "voxel".into());
     vars.insert("user_type".into(), user_type.into());
     vars.insert("user_properties".into(), "{}".into());
-    vars.insert("version_name".into(), mc_version.clone());
+    vars.insert("version_name".into(), mc_version.to_string());
+    // The vanilla game args carry `--versionType ${version_type}` and the JVM
+    // args carry `${launcher_name}`/`${launcher_version}`. Without these the
+    // literal placeholders reach the game.
+    vars.insert("version_type".into(), loader.as_str().to_string());
+    vars.insert("launcher_name".into(), "voxel".into());
+    vars.insert(
+        "launcher_version".into(),
+        env!("CARGO_PKG_VERSION").to_string(),
+    );
     vars.insert("game_directory".into(), inst.to_string_lossy().to_string());
     vars.insert("assets_root".into(), assets_root.to_string_lossy().to_string());
     vars.insert("assets_index_name".into(), asset_index_name);
     vars.insert("natives_directory".into(), natives.to_string_lossy().to_string());
     vars.insert("library_directory".into(), libs_root.to_string_lossy().to_string());
-    vars.insert("classpath".into(), classpath.join(":"));
+    vars.insert(
+        "classpath".into(),
+        classpath.join(&classpath_separator().to_string()),
+    );
 
     let render = |text: &str| -> String {
         let mut out = text.to_string();
@@ -970,14 +1175,16 @@ fn launcher_launch_impl(
 
     // ---- merged arguments (vanilla + fabric) ----
     let mut merged_game: Vec<Arg> = version.arguments.game.clone();
-    merged_game.extend(fabric.arguments.game.iter().map(|s| Arg::Plain(s.clone())));
+    let mut merged_jvm: Vec<Arg> = version.arguments.jvm.clone();
+    if let Some(fabric) = fabric.as_ref() {
+        merged_game.extend(fabric.arguments.game.iter().map(|s| Arg::Plain(s.clone())));
+        merged_jvm.extend(fabric.arguments.jvm.iter().map(|s| Arg::Plain(s.clone())));
+    }
     let mut game_args: Vec<String> = Vec::new();
     for arg in &merged_game {
         arg_values(arg, &mut game_args);
     }
 
-    let mut merged_jvm: Vec<Arg> = version.arguments.jvm.clone();
-    merged_jvm.extend(fabric.arguments.jvm.iter().map(|s| Arg::Plain(s.clone())));
     let mut jvm_args: Vec<String> = Vec::new();
     for arg in &merged_jvm {
         arg_values(arg, &mut jvm_args);
@@ -989,25 +1196,28 @@ fn launcher_launch_impl(
         .filter(|p| !p.is_empty())
         .unwrap_or_else(|| "java".to_string());
 
-    let mut command = std::process::Command::new(&java);
+    let mut args: Vec<String> = Vec::new();
     if let Some(agent) = elyby_agent {
-        command.arg(agent);
+        args.push(agent);
     }
-    command.arg(format!("-Xmx{ram}M"));
-    command.arg("-Dlog4j2.formatMsgNoLookups=true");
+    args.push(format!("-Xmx{ram}M"));
+    args.push("-Dlog4j2.formatMsgNoLookups=true".to_string());
     for arg in &jvm_args {
-        command.arg(render(arg));
+        args.push(render(arg));
     }
-    command.arg("-cp").arg(render("${classpath}"));
-    command.arg(&fabric.main_class);
+    args.push("-cp".to_string());
+    args.push(render("${classpath}"));
+    args.push(main_class.clone());
     for arg in &game_args {
-        command.arg(render(arg));
+        args.push(render(arg));
     }
-    command.current_dir(&inst);
 
-    let key = format!("launch/{project_slug}");
-    process::spawn_monitored(app, &key, command, "launch", false)?;
-    Ok(key)
+    Ok(LaunchPlan {
+        java,
+        args,
+        main_class,
+        game_dir: inst,
+    })
 }
 
 #[cfg(test)]
@@ -1069,8 +1279,468 @@ mod launcher_auth_tests {
 }
 
 #[cfg(test)]
+mod launcher_loader_tests {
+    use super::*;
+
+    #[test]
+    fn vanilla_and_fabric_are_the_only_accepted_loaders() {
+        assert_eq!(LaunchLoader::parse("vanilla").unwrap(), LaunchLoader::Vanilla);
+        assert_eq!(LaunchLoader::parse("Vanilla").unwrap(), LaunchLoader::Vanilla);
+        assert_eq!(LaunchLoader::parse("fabric").unwrap(), LaunchLoader::Fabric);
+        assert_eq!(LaunchLoader::parse("").unwrap(), LaunchLoader::Fabric);
+    }
+
+    #[test]
+    fn a_server_only_loader_is_refused_with_an_explanation() {
+        let error = LaunchLoader::parse("paper").expect_err("paper is a server software");
+        assert!(error.contains("server"), "the message must explain why: {error}");
+    }
+
+    #[test]
+    fn an_unknown_loader_is_refused_instead_of_silently_launching_fabric() {
+        let error = LaunchLoader::parse("quilt").expect_err("unknown loaders must fail");
+        assert!(error.contains("quilt"), "the message must name the loader: {error}");
+    }
+
+    #[test]
+    fn a_vanilla_launch_uses_the_mojang_entry_point() {
+        assert_eq!(
+            resolve_main_class(LaunchLoader::Vanilla, Some("net.minecraft.client.main.Main"), None),
+            "net.minecraft.client.main.Main"
+        );
+        // even without the metadata declaration the vanilla entry point is known
+        assert_eq!(
+            resolve_main_class(LaunchLoader::Vanilla, None, None),
+            VANILLA_MAIN_CLASS
+        );
+    }
+
+    #[test]
+    fn a_fabric_launch_uses_the_loader_entry_point() {
+        assert_eq!(
+            resolve_main_class(
+                LaunchLoader::Fabric,
+                Some("net.minecraft.client.main.Main"),
+                Some("net.fabricmc.loader.impl.launch.knot.KnotClient"),
+            ),
+            "net.fabricmc.loader.impl.launch.knot.KnotClient"
+        );
+        // an empty loader profile must not launch an empty main class
+        assert_eq!(
+            resolve_main_class(LaunchLoader::Fabric, None, Some("  ")),
+            VANILLA_MAIN_CLASS
+        );
+    }
+
+    /// A runtime that is only HALF there must not report "ready" — this is
+    /// exactly the owner's bug (the instance folder existed, the runtime did
+    /// not, and the app skipped the download).
+    #[test]
+    fn runtime_status_reports_a_missing_runtime() {
+        let base = std::env::temp_dir().join(format!(
+            "voxel-runtime-status-missing-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+
+        let status = launcher_runtime_status_impl(
+            base.to_string_lossy().to_string(),
+            "1.20.1".to_string(),
+            Some("vanilla".to_string()),
+            Some("mine-rank".to_string()),
+        )
+        .expect("status must be computable");
+
+        assert!(!status.ready, "an empty workspace is not a ready runtime");
+        assert!(status.missing.iter().any(|m| m.contains("version metadata")));
+        assert!(status.missing.iter().any(|m| m.contains("client.jar")));
+        assert!(status.missing.iter().any(|m| m.contains("instance folder")));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// A complete vanilla runtime (no Fabric profile at all) IS ready — the
+    /// datapack project does not need a mod loader.
+    #[test]
+    fn runtime_status_is_ready_for_a_complete_vanilla_runtime() {
+        let base = std::env::temp_dir().join(format!(
+            "voxel-runtime-status-ready-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&base);
+        let version_dir = base.join("minecraft/versions/1.20.1");
+        let libs = base.join("minecraft/libraries/com/example/lib/1.0/lib-1.0.jar");
+        let asset_hash = "0123456789abcdef0123456789abcdef01234567";
+        let asset = base
+            .join("minecraft/assets/objects")
+            .join(&asset_hash[..2])
+            .join(asset_hash);
+        std::fs::create_dir_all(&version_dir).unwrap();
+        std::fs::create_dir_all(libs.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(asset.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(
+            base.join("minecraft/assets/indexes"),
+        )
+        .unwrap();
+
+        std::fs::write(
+            version_dir.join("version.json"),
+            serde_json::json!({
+                "id": "1.20.1",
+                "mainClass": "net.minecraft.client.main.Main",
+                "assetIndex": { "id": "5", "url": "https://example.invalid/5.json", "sha1": "" },
+                "downloads": { "client": { "url": "https://example.invalid/c.jar", "sha1": "" } },
+                "libraries": [{
+                    "name": "com.example:lib:1.0",
+                    "downloads": { "artifact": { "path": "com/example/lib/1.0/lib-1.0.jar", "url": "https://example.invalid/lib.jar", "sha1": "" } }
+                }]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(version_dir.join("client.jar"), b"client").unwrap();
+        std::fs::write(libs, b"lib").unwrap();
+        std::fs::write(asset, b"asset").unwrap();
+        std::fs::write(
+            base.join("minecraft/assets/indexes/5.json"),
+            serde_json::json!({ "objects": { "minecraft/sounds/x.ogg": { "hash": asset_hash } } })
+                .to_string(),
+        )
+        .unwrap();
+
+        let inst = base.join("instances/mine-rank");
+        std::fs::create_dir_all(inst.join("natives")).unwrap();
+        std::fs::write(inst.join("natives/lib.so"), b"native").unwrap();
+        std::fs::write(inst.join("options.txt"), "version:612\n").unwrap();
+
+        let status = launcher_runtime_status_impl(
+            base.to_string_lossy().to_string(),
+            "1.20.1".to_string(),
+            Some("vanilla".to_string()),
+            Some("mine-rank".to_string()),
+        )
+        .expect("status must be computable");
+
+        assert!(
+            status.ready,
+            "a complete vanilla runtime must be ready — missing: {:?}",
+            status.missing
+        );
+        assert!(status.missing.is_empty());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The Fabric profile is part of a fabric runtime — and of nothing else.
+    #[test]
+    fn runtime_status_requires_the_fabric_profile_only_for_fabric() {
+        let base = std::env::temp_dir().join(format!(
+            "voxel-runtime-status-fabric-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("minecraft/versions/1.20.1")).unwrap();
+
+        let status = launcher_runtime_status_impl(
+            base.to_string_lossy().to_string(),
+            "1.20.1".to_string(),
+            Some("fabric".to_string()),
+            None,
+        )
+        .expect("status must be computable");
+        assert!(status
+            .missing
+            .iter()
+            .any(|m| m.contains("fabric-profile.json")));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    fn rule_from_json(value: serde_json::Value) -> Rule {
+        serde_json::from_value(value).expect("the rule must parse")
+    }
+
+    /// The owner's game never started because the JVM received
+    /// `-XstartOnFirstThread` (a macOS flag) on Linux. An `allow` rule that
+    /// does NOT match must EXCLUDE the argument.
+    #[test]
+    fn an_allow_rule_for_another_os_excludes_the_argument() {
+        let other_os = if os_name() == "linux" { "osx" } else { "linux" };
+        let rules = vec![rule_from_json(serde_json::json!({
+            "action": "allow",
+            "os": { "name": other_os }
+        }))];
+        assert!(
+            !rule_allows(&rules),
+            "the macOS-only argument must not reach the JVM on this OS"
+        );
+    }
+
+    /// The real 1.20.1 metadata, verbatim: the three conditional JVM args.
+    #[test]
+    fn the_real_1201_conditional_jvm_arguments_are_filtered_by_the_os() {
+        let macos = vec![rule_from_json(serde_json::json!({
+            "action": "allow", "os": { "name": "osx" }
+        }))];
+        let windows = vec![rule_from_json(serde_json::json!({
+            "action": "allow", "os": { "name": "windows" }
+        }))];
+        let x86 = vec![rule_from_json(serde_json::json!({
+            "action": "allow", "os": { "arch": "x86" }
+        }))];
+
+        let expected = match os_name() {
+            "osx" => (true, false, false),
+            "windows" => (false, true, false),
+            _ => (false, false, false),
+        };
+        assert_eq!(
+            (
+                rule_allows(&macos),
+                rule_allows(&windows),
+                rule_allows(&x86)
+            ),
+            expected,
+            "the conditional JVM arguments must follow the running OS"
+        );
+    }
+
+    #[test]
+    fn an_argument_without_rules_is_always_allowed() {
+        assert!(rule_allows(&[]));
+    }
+
+    #[test]
+    fn a_disallow_rule_removes_the_argument_on_the_matching_os() {
+        let this_os = os_name();
+        let rules = vec![rule_from_json(serde_json::json!({
+            "action": "disallow", "os": { "name": this_os }
+        }))];
+        assert!(!rule_allows(&rules));
+    }
+
+    /// Feature-gated arguments (demo, quick play, custom resolution) stay
+    /// off — VOXEL enables none of those features.
+    #[test]
+    fn feature_gated_arguments_stay_off() {
+        let rules = vec![rule_from_json(serde_json::json!({
+            "action": "allow", "features": { "is_demo_user": true }
+        }))];
+        assert!(!rule_allows(&rules));
+    }
+
+    /// Writes a minimal but REAL version.json (the shape the Mojang metadata
+    /// has) so the launch plan can be built without the network.
+    fn write_fake_version(base: &Path) {
+        let version_dir = base.join("minecraft/versions/1.20.1");
+        std::fs::create_dir_all(&version_dir).unwrap();
+        std::fs::write(
+            version_dir.join("version.json"),
+            serde_json::json!({
+                "id": "1.20.1",
+                "mainClass": "net.minecraft.client.main.Main",
+                "assetIndex": { "id": "5", "url": "https://example.invalid/5.json", "sha1": "" },
+                "downloads": { "client": { "url": "https://example.invalid/c.jar", "sha1": "" } },
+                "libraries": [{
+                    "name": "com.example:lib:1.0",
+                    "downloads": { "artifact": { "path": "com/example/lib/1.0/lib-1.0.jar", "url": "https://example.invalid/lib.jar", "sha1": "" } }
+                }],
+                "arguments": {
+                    "game": ["--username", "${auth_player_name}", "--versionType", "${version_type}", "--uuid", "${auth_uuid}"],
+                    "jvm": ["-Djava.library.path=${natives_directory}", "-cp", "${classpath}"]
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+    }
+
+    fn fake_account() -> AccountInfo {
+        AccountInfo {
+            provider: AccountProvider::Microsoft,
+            username: "Yua".to_string(),
+            uuid: "00000000-0000-0000-0000-000000000000".to_string(),
+            access_token: "token".to_string(),
+        }
+    }
+
+    /// The owner's bug, proven in a unit test: a vanilla launch must not
+    /// need the Fabric profile, must use the Mojang entry point and must
+    /// not leak a single `${placeholder}` into the command line.
+    #[test]
+    fn a_vanilla_launch_needs_no_fabric_profile_and_leaves_no_placeholder() {
+        let base = std::env::temp_dir().join(format!(
+            "voxel-launch-plan-vanilla-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&base);
+        write_fake_version(&base);
+
+        let plan = build_launch_plan(
+            &base.to_string_lossy(),
+            "mine-rank",
+            "1.20.1",
+            "vanilla",
+            &fake_account(),
+            Some("/usr/bin/java"),
+            Some(4096),
+        )
+        .expect("the vanilla launch plan must build without a fabric profile");
+
+        assert_eq!(plan.main_class, "net.minecraft.client.main.Main");
+        assert!(plan.args.contains(&"net.minecraft.client.main.Main".to_string()));
+        // the classpath is a real path list, with the client jar at the end
+        let classpath = plan
+            .args
+            .iter()
+            .position(|a| a == "-cp")
+            .map(|i| plan.args[i + 1].clone())
+            .expect("the classpath argument must exist");
+        assert!(classpath.contains("client.jar"));
+        assert!(!classpath.contains("natives-"));
+        // the version type is resolved — no literal placeholder
+        let version_type = plan
+            .args
+            .iter()
+            .position(|a| a == "--versionType")
+            .map(|i| plan.args[i + 1].clone())
+            .expect("--versionType must exist");
+        assert_eq!(version_type, "vanilla");
+        assert!(
+            !plan.args.iter().any(|a| a.contains("${")),
+            "a placeholder reached the command line: {:?}",
+            plan.args
+        );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// A fabric launch still uses the loader's own entry point.
+    #[test]
+    fn a_fabric_launch_uses_the_knot_client() {
+        let base = std::env::temp_dir().join(format!(
+            "voxel-launch-plan-fabric-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&base);
+        write_fake_version(&base);
+        std::fs::write(
+            base.join("minecraft/versions/1.20.1/fabric-profile.json"),
+            serde_json::json!({
+                "id": "fabric-loader-1.20.1",
+                "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+                "libraries": [],
+                "arguments": { "game": [], "jvm": [] }
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let plan = build_launch_plan(
+            &base.to_string_lossy(),
+            "dark-kingdom",
+            "1.20.1",
+            "fabric",
+            &fake_account(),
+            Some("/usr/bin/java"),
+            Some(4096),
+        )
+        .expect("the fabric launch plan must build");
+
+        assert_eq!(
+            plan.main_class,
+            "net.fabricmc.loader.impl.launch.knot.KnotClient"
+        );
+        assert!(!plan.args.iter().any(|a| a.contains("${")));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}
+
+#[cfg(test)]
 mod e2e_tests {
     use super::*;
+
+    /// The owner's report, proven for real: "o jogo minecraft não inicia".
+    ///
+    /// This starts the ACTUAL vanilla client (the official 1.20.1 runtime
+    /// already in the shared cache) and waits for the game log to show the
+    /// main menu. It needs a display — the owner's desktop has one.
+    #[test]
+    #[ignore = "e2e: starts the real Minecraft client (needs a display)"]
+    fn e2e_the_vanilla_client_starts_and_reaches_the_main_menu() {
+        let home = std::env::var("HOME").expect("HOME");
+        let base = std::env::var("VOXEL_E2E_BASE")
+            .unwrap_or_else(|_| format!("{home}/Voxel"));
+        let slug = "e2e-vanilla-launch";
+
+        // 1. the instance (the runtime itself is shared and already cached)
+        prepare_core(&base, slug, "1.20.1", "vanilla", "", &|_, _, _| {})
+            .expect("prepare must succeed");
+
+        // 2. the exact command the app runs
+        let account = AccountInfo {
+            provider: AccountProvider::Microsoft,
+            username: "VOXEL_E2E".to_string(),
+            uuid: "00000000000040008000000000000000".to_string(),
+            access_token: "0".to_string(),
+        };
+        let plan = build_launch_plan(
+            &base,
+            slug,
+            "1.20.1",
+            "vanilla",
+            &account,
+            Some("java"),
+            Some(2048),
+        )
+        .expect("the launch plan must build");
+
+        let mut command = std::process::Command::new(&plan.java);
+        for arg in &plan.args {
+            command.arg(arg);
+        }
+        command.current_dir(&plan.game_dir);
+        command.env(
+            "DISPLAY",
+            std::env::var("DISPLAY").unwrap_or_else(|_| ":0".to_string()),
+        );
+        let mut child = command.spawn().expect("the game process must spawn");
+
+        // 3. the main menu: the sound engine and the resource atlases are
+        //    created only after the window is really up
+        let log = plan.game_dir.join("logs").join("latest.log");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(240);
+        let mut reached_menu = false;
+        while std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_secs(3));
+            if let Ok(text) = std::fs::read_to_string(&log) {
+                if text.contains("Sound engine started")
+                    || text.contains("Created: 256x256x4 minecraft:textures/atlas/blocks.png-atlas")
+                {
+                    reached_menu = true;
+                    break;
+                }
+                if text.contains("Failed to start the minecraft server") {
+                    break;
+                }
+            }
+            if let Ok(Some(status)) = child.try_wait() {
+                eprintln!("the game exited early with {status}");
+                eprintln!(
+                    "{}",
+                    std::fs::read_to_string(&log).unwrap_or_default()
+                );
+                break;
+            }
+        }
+
+        let _ = child.kill();
+        let _ = child.wait();
+        let log_text = std::fs::read_to_string(&log).unwrap_or_default();
+        assert!(
+            reached_menu,
+            "the client never reached the main menu — log tail:\n{}",
+            log_text.lines().rev().take(25).collect::<Vec<_>>().join("\n")
+        );
+        eprintln!("E2E VANILLA LAUNCH OK — the client reached the main menu");
+    }
 
     /// Full launcher pipeline proof: official metadata + client jar +
     /// libraries + assets + natives extraction, warming the shared cache.
@@ -1081,7 +1751,7 @@ mod e2e_tests {
         let base = format!("{home}/VOXEL");
         std::fs::create_dir_all(&base).unwrap();
 
-        let result = prepare_core(&base, "e2e-launch", "1.20.1", "0.16.9", &|done, total, detail| {
+        let result = prepare_core(&base, "e2e-launch", "1.20.1", "fabric", "0.16.9", &|done, total, detail| {
             eprintln!("[{done}/{total}] {detail}");
         })
         .expect("prepare must succeed");
@@ -1111,6 +1781,145 @@ mod e2e_tests {
         );
         let _ = std::fs::remove_dir_all(&inst);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Runtime readiness — "can the game actually start?"
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeStatus {
+    /// True when every artifact the launch needs is on disk.
+    pub ready: bool,
+    pub mc_version: String,
+    pub loader: String,
+    /// Human-readable list of what is still missing (empty when ready).
+    pub missing: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn launcher_runtime_status(
+    base_path: String,
+    mc_version: String,
+    loader: Option<String>,
+    project_slug: Option<String>,
+) -> Result<RuntimeStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        launcher_runtime_status_impl(base_path, mc_version, loader, project_slug)
+    })
+    .await
+    .map_err(|e| format!("status worker failed: {e}"))?
+}
+
+/// Sync impl (disk probing) — tests call this directly.
+pub fn launcher_runtime_status_impl(
+    base_path: String,
+    mc_version: String,
+    loader: Option<String>,
+    project_slug: Option<String>,
+) -> Result<RuntimeStatus, String> {
+    let loader = LaunchLoader::parse(loader.as_deref().unwrap_or("fabric"))?;
+    let base = std::path::PathBuf::from(&base_path)
+        .canonicalize()
+        .map_err(|e| format!("Storage base not accessible: {e}"))?;
+    let version_dir = mc_versions_dir(&base).join(&mc_version);
+    let mut missing: Vec<String> = Vec::new();
+
+    let version: Option<VersionJson> = match std::fs::read(version_dir.join("version.json")) {
+        Ok(bytes) => serde_json::from_slice(
+            bytes
+                .strip_prefix(&[0xEF, 0xBB, 0xBF][..])
+                .unwrap_or(&bytes),
+        )
+        .ok(),
+        Err(_) => None,
+    };
+    if version.is_none() {
+        missing.push(format!("version metadata ({mc_version})"));
+    }
+    if !version_dir.join("client.jar").is_file() {
+        missing.push("client.jar".to_string());
+    }
+    if loader == LaunchLoader::Fabric && !version_dir.join("fabric-profile.json").is_file() {
+        missing.push("fabric-profile.json".to_string());
+    }
+
+    if let Some(version) = version.as_ref() {
+        let mut missing_libs = 0usize;
+        for library in &version.libraries {
+            let rules = library.rules.as_deref().unwrap_or(&[]);
+            if !rules.is_empty() && !rule_allows(rules) {
+                continue;
+            }
+            if let Some(artifact) = library.downloads.as_ref().and_then(|d| d.artifact.as_ref()) {
+                if artifact.path.is_empty() {
+                    continue;
+                }
+                if !mc_libraries_dir(&base).join(&artifact.path).is_file() {
+                    missing_libs += 1;
+                }
+            }
+        }
+        if missing_libs > 0 {
+            missing.push(format!("{missing_libs} librar(ies)"));
+        }
+
+        if let Some(asset_index) = version.asset_index.as_ref() {
+            let index_path = mc_assets_dir(&base)
+                .join("indexes")
+                .join(format!("{}.json", asset_index.id));
+            if !index_path.is_file() {
+                missing.push(format!("asset index ({})", asset_index.id));
+            } else if let Ok(bytes) = std::fs::read(&index_path) {
+                if let Ok(index) = serde_json::from_slice::<AssetIndex>(&bytes) {
+                    let mut missing_assets = 0usize;
+                    for object in index.objects.values() {
+                        let path = mc_assets_dir(&base)
+                            .join("objects")
+                            .join(&object.hash[..2])
+                            .join(&object.hash);
+                        if !path.is_file() {
+                            missing_assets += 1;
+                        }
+                    }
+                    if missing_assets > 0 {
+                        missing.push(format!("{missing_assets} asset(s)"));
+                    }
+                }
+            }
+        }
+    }
+
+    // The instance itself (optional): its folder, the extracted natives and
+    // the options file are part of a runnable instance.
+    if let Some(slug) = project_slug
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        let inst = instance_dir(&base, slug);
+        if !inst.is_dir() {
+            missing.push("instance folder".to_string());
+        } else {
+            let natives_count = std::fs::read_dir(inst.join("natives"))
+                .map(|entries| entries.count())
+                .unwrap_or(0);
+            if natives_count == 0 {
+                missing.push("natives".to_string());
+            }
+            if !inst.join("options.txt").is_file() {
+                missing.push("options.txt".to_string());
+            }
+        }
+    }
+
+    Ok(RuntimeStatus {
+        ready: missing.is_empty(),
+        mc_version,
+        loader: loader.as_str().to_string(),
+        missing,
+    })
 }
 
 // ---------------------------------------------------------------------------

@@ -102,6 +102,7 @@ pub fn run() {
             commands::launcher::launcher_copy_mod_jar,
             commands::launcher::launcher_launch,
             commands::launcher::launcher_overview,
+            commands::launcher::launcher_runtime_status,
             commands::assets::generate_item_texture,
             commands::modpack::modpack_export,
             commands::modpack::modpack_exportable_assets,
