@@ -27,6 +27,7 @@ import {
   signOutProvider,
   type StoredMinecraftAccounts,
 } from "@/services/launcher/accountService";
+import { downloadProjectRuntimes } from "@/services/launcher/runtimeService";
 import { secretsBackendInfo } from "@/services/secrets/secretsService";
 import type {
   MinecraftAccount,
@@ -42,6 +43,7 @@ interface DeviceDialogInfo extends ElybyDeviceCodeInfo {
 
 export function LauncherSettings() {
   const launcher = useSettingsStore((s) => s.settings.launcher);
+  const basePath = useSettingsStore((s) => s.settings.storage.basePath);
   const update = useSettingsStore((s) => s.update);
 
   const [clientIdDraft, setClientIdDraft] = useState(launcher.clientId);
@@ -68,12 +70,63 @@ export function LauncherSettings() {
     setSecretBackend(backend.backend);
   }, []);
 
+  /**
+   * The owner's requirement: configuring an account downloads Minecraft by
+   * itself. The runtime is shared between projects, so this happens once per
+   * version — and it never blocks the sign-in itself.
+   */
+  const startAutomaticDownload = useCallback(async () => {
+    if (!basePath) return;
+    try {
+      const { listProjects } = await import(
+        "@/services/db/repositories/projectsRepository"
+      );
+      const list = await listProjects().catch(() => []);
+      if (list.length === 0) return;
+      const pending = toast.loading("Downloading Minecraft…", {
+        description: "Official Mojang files — first time only, then cached.",
+      });
+      const result = await downloadProjectRuntimes(basePath, list);
+      toast.dismiss(pending);
+      if (result.failed.length > 0) {
+        toast.warning("Some Minecraft runtimes could not be downloaded", {
+          description: result.failed
+            .map((f) => `${f.project.name} (${f.project.minecraft_version}): ${f.error}`)
+            .join(" · "),
+        });
+        return;
+      }
+      if (result.prepared.length === 0) {
+        toast.success("Minecraft is ready", {
+          description: "The runtime was already downloaded.",
+        });
+        return;
+      }
+      toast.success("Minecraft is ready to play", {
+        description: result.prepared
+          .map((p) => `${p.name} (${p.minecraft_version})`)
+          .join(" · "),
+      });
+    } catch (error) {
+      toast.error("Minecraft download failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, [basePath]);
+
   useEffect(() => {
     void Promise.resolve()
       .then(() => refreshAccounts())
       .catch(() => {});
     return () => abortRef.current?.abort();
   }, [refreshAccounts]);
+
+  // An account that is ALREADY configured but a runtime that was never
+  // downloaded: the automatic download starts here too.
+  useEffect(() => {
+    if (!activeProvider) return;
+    void startAutomaticDownload();
+  }, [activeProvider, startAutomaticDownload]);
 
   const handleSaveClientId = () => {
     if (clientIdDraft.trim() === launcher.clientId) return;
@@ -112,6 +165,8 @@ export function LauncherSettings() {
       }
       setActiveProvider(provider);
       setDeviceInfo(null);
+      // The account is configured — Minecraft downloads itself from here on.
+      void startAutomaticDownload();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       toast.error(`${provider === "elyby" ? "Ely.by" : "Microsoft"} sign-in failed`, {

@@ -20,10 +20,42 @@ export interface LaunchProgress {
   detail: string;
 }
 
+/** What the runtime status command reports about the shared cache. */
+export interface RuntimeStatus {
+  ready: boolean;
+  mcVersion: string;
+  loader: string;
+  /** Human-readable list of what is still missing. */
+  missing: string[];
+}
+
+/**
+ * The client runtime a project launches with. `vanilla` is the Mojang client
+ * as shipped (datapack projects); `fabric` adds the Fabric loader profile.
+ */
+export type RuntimeLoader = "vanilla" | "fabric";
+
+/**
+ * Normalizes a project loader into the runtime the launcher understands.
+ *
+ * - `vanilla` → the Mojang client as shipped (datapack projects).
+ * - `paper` → also vanilla: a Paper SERVER is played with the vanilla client.
+ * - everything else (fabric/forge/neoforge) → the Fabric runtime, the only
+ *   mod loader the launcher materializes today.
+ */
+export function runtimeLoaderFor(project: {
+  loader?: string | null;
+}): RuntimeLoader {
+  const loader = (project.loader ?? "").toLowerCase();
+  if (loader === "vanilla" || loader === "paper") return "vanilla";
+  return "fabric";
+}
+
 export async function prepareInstance(
   basePath: string,
   projectSlug: string,
   mcVersion: string,
+  loader: RuntimeLoader,
   loaderVersion: string,
   onProgress?: (progress: LaunchProgress) => void,
 ): Promise<PrepareResult> {
@@ -48,11 +80,33 @@ export async function prepareInstance(
       basePath,
       projectSlug,
       mcVersion,
+      loader,
       loaderVersion,
     });
   } finally {
     unlisten?.();
   }
+}
+
+/**
+ * Probes the shared runtime cache and the instance folder.
+ *
+ * The instance folder alone is NOT enough to say "ready": the owner's game
+ * never started because the folder existed while the runtime (client.jar,
+ * libraries, assets, natives) was missing.
+ */
+export async function runtimeStatus(
+  basePath: string,
+  mcVersion: string,
+  loader: RuntimeLoader,
+  projectSlug?: string,
+): Promise<RuntimeStatus> {
+  return invoke<RuntimeStatus>("launcher_runtime_status", {
+    basePath,
+    mcVersion,
+    loader,
+    projectSlug: projectSlug ?? null,
+  });
 }
 
 export async function copyModJar(
@@ -71,6 +125,7 @@ export async function launchGame(options: {
   basePath: string;
   projectSlug: string;
   mcVersion: string;
+  loader: RuntimeLoader;
   account: MinecraftAccount;
   javaPath?: string;
   ramMb?: number;
@@ -99,6 +154,7 @@ export async function launchGame(options: {
     basePath: options.basePath,
     projectSlug: options.projectSlug,
     mcVersion: options.mcVersion,
+    loader: options.loader,
     account: {
       provider: options.account.provider,
       username: options.account.username,
@@ -133,6 +189,7 @@ export interface InstanceRecordInput {
   projectId: string;
   name: string;
   mcVersion: string;
+  loader: RuntimeLoader;
   loaderVersion: string;
   path: string;
 }
@@ -152,7 +209,7 @@ export async function registerInstance(
         instance.projectId,
         instance.name,
         instance.mcVersion,
-        "fabric",
+        instance.loader,
         instance.path,
         4096,
       ],
@@ -162,8 +219,12 @@ export async function registerInstance(
   }
 }
 
-/** Resolves the Fabric loader version from the version catalog (live data). */
+/**
+ * Resolves the Fabric loader version from the version catalog (live data).
+ * A vanilla runtime has no loader version.
+ */
 export async function resolveLoaderVersion(project: ProjectRecord): Promise<string> {
+  if (project.loader === "vanilla") return "";
   try {
     const { getVersion } = await import("@/services/minecraft/versionCatalog");
     const info = await getVersion(project.minecraft_version);

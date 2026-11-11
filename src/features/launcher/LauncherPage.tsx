@@ -20,6 +20,11 @@ import { LaunchDialog } from "@/features/projects/workspace/LaunchDialog";
 import { MultiplayerListPanel } from "@/features/launcher/MultiplayerListPanel";
 import { EmptyArt } from "@/components/EmptyState";
 import { formatRelativeTime } from "@/lib/utils";
+import {
+  runtimeLoaderFor,
+  runtimeStatus,
+  type RuntimeStatus,
+} from "@/services/launcher/instanceService";
 import type { ProjectRecord } from "@/types";
 
 interface LauncherInstance {
@@ -35,6 +40,7 @@ export function LauncherPage() {
   const projects = useProjectsStore((s) => s.projects);
 
   const [instances, setInstances] = useState<LauncherInstance[]>([]);
+  const [runtime, setRuntime] = useState<Record<string, RuntimeStatus>>({});
   const [loading, setLoading] = useState(false);
   const [runProject, setRunProject] = useState<ProjectRecord | null>(null);
 
@@ -44,6 +50,26 @@ export function LauncherPage() {
     try {
       const list = await invoke<LauncherInstance[]>("launcher_overview", { basePath });
       setInstances(list);
+      // The instance folder is not the runtime — probe what the launch
+      // really needs (client.jar, libraries, assets, natives).
+      const statuses = await Promise.all(
+        list.map(async (instance) => {
+          const project = projects.find((p) => p.slug === instance.slug);
+          if (!project) return null;
+          const status = await runtimeStatus(
+            basePath,
+            project.minecraft_version,
+            runtimeLoaderFor(project),
+            instance.slug,
+          ).catch(() => null);
+          return status ? ([instance.slug, status] as const) : null;
+        }),
+      );
+      setRuntime(
+        Object.fromEntries(
+          statuses.filter((entry): entry is readonly [string, RuntimeStatus] => entry !== null),
+        ),
+      );
     } catch (error) {
       toast.error("Could not load instances", {
         description: error instanceof Error ? error.message : String(error),
@@ -51,7 +77,7 @@ export function LauncherPage() {
     } finally {
       setLoading(false);
     }
-  }, [basePath]);
+  }, [basePath, projects]);
 
   useEffect(() => {
     // microtask: refresh sets loading synchronously before its first await
@@ -126,8 +152,24 @@ export function LauncherPage() {
                     )}
                     {instance.lastBuildJar ? (
                       <Badge variant="success">✓ {instance.lastBuildJar}</Badge>
+                    ) : project && project.loader === "vanilla" ? (
+                      <Badge variant="outline">datapack — no jar</Badge>
                     ) : (
                       <Badge variant="outline">never built</Badge>
+                    )}
+                    {runtime[instance.slug] && (
+                      <Badge
+                        variant={runtime[instance.slug].ready ? "success" : "outline"}
+                        title={
+                          runtime[instance.slug].ready
+                            ? "The official runtime is on disk — the game starts"
+                            : `Missing: ${runtime[instance.slug].missing.join(", ")}`
+                        }
+                      >
+                        {runtime[instance.slug].ready
+                          ? "runtime ready"
+                          : "runtime missing"}
+                      </Badge>
                     )}
                   </div>
 
@@ -138,6 +180,8 @@ export function LauncherPage() {
                         <span className="font-mono leading-relaxed">
                           mods: {instance.mods.join(", ")}
                         </span>
+                      ) : project?.loader === "vanilla" ? (
+                        <span>datapack project — no mods needed</span>
                       ) : (
                         <span>no mods installed yet</span>
                       )}

@@ -570,6 +570,10 @@ function loaderAvailable(
       // paper is a SERVER software, not a mod template — never offered in
       // the mod wizard (the server wizard handles it instead)
       return false;
+    case "vanilla":
+      // the Mojang client exists for every released version — a vanilla
+      // project (datapack/resource pack) has no loader to install
+      return true;
   }
 }
 

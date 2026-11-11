@@ -73,19 +73,24 @@ export function BuildDrawer({ project, open, onToggle, buildStatus }: Props) {
     return () => clearInterval(id);
   }, [building]);
 
-  const [isJavaMod, setIsJavaMod] = useState<boolean | null>(null);
+  const [javaModProbe, setJavaModProbe] = useState<boolean | null>(null);
   // Check once on mount whether this project can be built with Gradle.
   // Datapack-only projects (e.g. Mine Rank server modules) have no build.gradle.
+  // A vanilla project is never a Java mod — even if an old template folder
+  // is still lying around in the workspace.
+  const isJavaModProject = project.loader !== "vanilla";
+  const isJavaMod = isJavaModProject ? javaModProbe : false;
   useEffect(() => {
+    if (!isJavaModProject) return;
     let cancelled = false;
     (async () => {
       const pre = await preflightBuild(project, basePath);
-      if (!cancelled) setIsJavaMod(pre.ok);
+      if (!cancelled) setJavaModProbe(pre.ok);
     })();
     return () => {
       cancelled = true;
     };
-  }, [basePath, project]);
+  }, [basePath, project, isJavaModProject]);
 
   const [autoFix, setAutoFix] = useState<AutoFixState | null>(null);
   const abortRef = useRef(false);

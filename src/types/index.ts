@@ -99,8 +99,20 @@ export interface AppSettings {
   github: GithubSettings;
 }
 
-export type ProjectType = "mod";
-export type ProjectLoader = "fabric" | "forge" | "neoforge" | "paper";
+export type ProjectType = "mod" | "datapack";
+/**
+ * The client runtime a project launches with.
+ * - `vanilla`: the Mojang client as shipped — datapack/resource-pack projects
+ *   (no mod loader, no jar).
+ * - `fabric` / `forge` / `neoforge`: mod projects.
+ * - `paper`: server software — the client still launches with vanilla/fabric.
+ */
+export type ProjectLoader =
+  | "fabric"
+  | "forge"
+  | "neoforge"
+  | "paper"
+  | "vanilla";
 
 export interface ProjectRecord {
   id: string;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Download, Loader2, Play, ShieldCheck, Square, TriangleAlert } from "lucide-react";
+import { Download, Loader2, Play, ShieldCheck, Square } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -16,13 +16,16 @@ import type { ProjectRecord } from "@/types";
 import { useSettingsStore } from "@/stores/settingsStore";
 import {
   copyModJar,
-  instanceExists,
   launchGame,
   prepareInstance,
   registerInstance,
   resolveLoaderVersion,
+  runtimeLoaderFor,
+  runtimeStatus,
   stopGame,
   type LaunchProgress,
+  type PrepareResult,
+  type RuntimeStatus,
 } from "@/services/launcher/instanceService";
 import {
   getLaunchAccount,
@@ -40,7 +43,13 @@ type Phase = "idle" | "checking" | "downloading" | "running";
 
 /**
  * Run dialog — prepares the isolated instance (official downloads with
- * progress), deploys the compiled mod jar and launches Minecraft.
+ * progress), deploys the compiled mod jar (when the project HAS one) and
+ * launches Minecraft.
+ *
+ * Two rules learned from the owner's report:
+ * 1. The instance folder existing does NOT mean the game can start — the
+ *    runtime (client.jar, libraries, assets, natives) is probed for real.
+ * 2. A datapack project has NO mod jar — that is correct, not an error.
  */
 export function LaunchDialog({ project, open, onOpenChange }: Props) {
   const navigate = useNavigate();
@@ -51,32 +60,42 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<LaunchProgress | null>(null);
-  const [instanceReady, setInstanceReady] = useState<boolean | null>(null);
+  const [runtime, setRuntime] = useState<RuntimeStatus | null>(null);
   const [modJar, setModJar] = useState<string | null>(null);
   const [account, setAccount] = useState<MinecraftAccount | null>(null);
   const [gameLog, setGameLog] = useState<string[]>([]);
   const runningRef = useRef(false);
 
   const slug = project.slug;
+  const loader = runtimeLoaderFor(project);
+  const isVanilla = loader === "vanilla";
   const busy = phase === "checking" || phase === "downloading";
   const accountProvider = account?.provider === "elyby" ? "Ely.by" : "Microsoft";
+  const runtimeReady = runtime?.ready === true;
 
   const refreshStatus = useCallback(async () => {
     if (!basePath) return;
     setPhase("checking");
     try {
-      const [exists, jar, stored] = await Promise.all([
-        instanceExists(basePath, slug),
-        copyModJar(basePath, slug, `projects/${slug}`).catch(() => null),
+      const status = await runtimeStatus(
+        basePath,
+        project.minecraft_version,
+        loader,
+        slug,
+      ).catch(() => null);
+      const [stored, jar] = await Promise.all([
         getStoredAccount().catch(() => null),
+        isVanilla
+          ? Promise.resolve(null)
+          : copyModJar(basePath, slug, `projects/${slug}`).catch(() => null),
       ]);
-      setInstanceReady(exists);
-      setModJar(jar);
+      setRuntime(status);
       setAccount(stored);
+      setModJar(jar);
     } finally {
       setPhase((current) => (current === "checking" ? "idle" : current));
     }
-  }, [basePath, slug]);
+  }, [basePath, slug, project.minecraft_version, loader, isVanilla]);
 
   useEffect(() => {
     if (!open) return;
@@ -84,32 +103,55 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
     void Promise.resolve().then(() => refreshStatus());
   }, [open, refreshStatus]);
 
+  /** Downloads the official runtime when it is missing. */
+  const ensureRuntime = async (): Promise<PrepareResult> => {
+    const loaderVersion = await resolveLoaderVersion(project);
+    const result = await prepareInstance(
+      basePath,
+      slug,
+      project.minecraft_version,
+      loader,
+      loaderVersion,
+      (p) => setProgress(p),
+    );
+    await registerInstance({
+      id: crypto.randomUUID(),
+      projectId: project.id,
+      name: `${project.name} — instance`,
+      mcVersion: project.minecraft_version,
+      loader,
+      loaderVersion,
+      path: result.instanceDir,
+    }).catch(() => {});
+    const status = await runtimeStatus(
+      basePath,
+      project.minecraft_version,
+      loader,
+      slug,
+    ).catch(() => null);
+    setRuntime(status);
+    return result;
+  };
+
   const handlePrepare = async () => {
     if (!basePath) return;
     setPhase("downloading");
     setProgress(null);
     try {
-      const loaderVersion = await resolveLoaderVersion(project);
-      const result = await prepareInstance(basePath, slug, project.minecraft_version, loaderVersion, (p) =>
-        setProgress(p),
-      );
-      await registerInstance({
-        id: crypto.randomUUID(),
-        projectId: project.id,
-        name: `${project.name} — instance`,
-        mcVersion: project.minecraft_version,
-        loaderVersion,
-        path: result.instanceDir,
-      }).catch(() => {});
-      setInstanceReady(true);
-      const jar = await copyModJar(basePath, slug, `projects/${slug}`).catch(() => null);
-      setModJar(jar);
+      const result = await ensureRuntime();
+      if (!isVanilla) {
+        const jar = await copyModJar(basePath, slug, `projects/${slug}`).catch(() => null);
+        setModJar(jar);
+      }
       const total = result.downloaded + result.skipped;
-      toast.success("Instance ready", {
-        description: total > 0 ? `Downloaded ${result.downloaded} files (cache shared across projects).` : "Everything was already in the shared cache.",
+      toast.success("Minecraft is ready", {
+        description:
+          total > 0
+            ? `Downloaded ${result.downloaded} official files (the cache is shared between projects).`
+            : "Everything was already in the shared cache.",
       });
     } catch (error) {
-      toast.error("Instance preparation failed", {
+      toast.error("Minecraft download failed", {
         description: error instanceof Error ? error.message : String(error),
       });
     } finally {
@@ -142,17 +184,29 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
       if (!launchAccount) {
         throw new Error("The selected account is no longer available. Sign in again.");
       }
-      const loaderVersion = await resolveLoaderVersion(project);
-      if (!instanceReady) {
-        await prepareInstance(basePath, slug, project.minecraft_version, loaderVersion);
+      // The runtime is probed for real — a folder that exists is not a game
+      // that starts. When something is missing, VOXEL downloads it now.
+      const status = await runtimeStatus(
+        basePath,
+        project.minecraft_version,
+        loader,
+        slug,
+      ).catch(() => null);
+      if (!status?.ready) {
+        setPhase("downloading");
+        setProgress(null);
+        await ensureRuntime();
       }
-      const jar = await copyModJar(basePath, slug, `projects/${slug}`).catch(() => null);
-      setModJar(jar);
+      if (!isVanilla) {
+        const jar = await copyModJar(basePath, slug, `projects/${slug}`).catch(() => null);
+        setModJar(jar);
+      }
 
       await launchGame({
         basePath,
         projectSlug: slug,
         mcVersion: project.minecraft_version,
+        loader,
         account: launchAccount,
         javaPath,
         ramMb,
@@ -195,28 +249,44 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
             Run {project.name}
           </DialogTitle>
           <DialogDescription>
-            Isolated instance · Minecraft {project.minecraft_version} · Fabric —
-            official Mojang files, downloaded locally at runtime.
+            Isolated instance · Minecraft {project.minecraft_version} ·{" "}
+            {isVanilla ? "Vanilla" : "Fabric"} — official Mojang files,
+            downloaded locally at runtime.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2.5">
           <StatusRow
-            ok={instanceReady === true}
-            pending={instanceReady === null}
-            label="Isolated instance"
+            ok={runtimeReady}
+            pending={runtime === null}
+            label="Minecraft runtime"
             okText="ready"
             pendingText="checking…"
-            badText="not prepared yet"
+            badText={
+              runtime && runtime.missing.length > 0
+                ? `missing: ${runtime.missing.join(", ")}`
+                : "not downloaded yet"
+            }
           />
-          <StatusRow
-            ok={modJar !== null}
-            pending={false}
-            label="Mod jar"
-            okText={modJar?.split("/").pop() ?? ""}
-            pendingText=""
-            badText="build the project first (Build panel)"
-          />
+          {isVanilla ? (
+            <StatusRow
+              ok
+              pending={false}
+              label="Content"
+              okText="datapack — no mod jar needed"
+              pendingText=""
+              badText=""
+            />
+          ) : (
+            <StatusRow
+              ok={modJar !== null}
+              pending={false}
+              label="Mod jar"
+              okText={modJar?.split("/").pop() ?? ""}
+              pendingText=""
+              badText="not built yet — the client still starts"
+            />
+          )}
           <StatusRow
             ok={account !== null}
             pending={false}
@@ -255,7 +325,8 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
           <div className="space-y-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3">
             <p className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-400">
               <ShieldCheck className="h-3 w-3" />
-              Minecraft is running with your mod installed
+              Minecraft is running
+              {isVanilla ? " — join your server from the Multiplayer list" : " with your mod installed"}
             </p>
             {gameLog.length > 0 && (
               <pre className="max-h-24 overflow-auto font-mono text-[9px] leading-relaxed text-muted-foreground">
@@ -265,24 +336,17 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
           </div>
         )}
 
-        {modJar === null && phase === "idle" && (
-          <p className="flex items-start gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5 text-[10px] leading-relaxed text-amber-200/80">
-            <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" />
-            No compiled mod jar found — run Build first so the game loads your changes.
-          </p>
-        )}
-
         <DialogFooter className="sm:justify-between">
           <Button
             variant="outline"
             size="sm"
-            disabled={busy || phase === "running" || instanceReady === true}
+            disabled={busy || phase === "running" || runtimeReady}
             onClick={() => void handlePrepare()}
           >
             {phase === "downloading" ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : null}
-            {instanceReady === true ? "Instance ready" : "Prepare instance"}
+            {runtimeReady ? "Minecraft ready" : "Download Minecraft"}
           </Button>
           {phase === "running" ? (
             <Button variant="destructive" size="sm" onClick={() => void handleStop()}>
