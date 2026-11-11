@@ -83,11 +83,19 @@ export function LauncherSettings() {
       );
       const list = await listProjects().catch(() => []);
       if (list.length === 0) return;
-      const pending = toast.loading("Downloading Minecraft…", {
+      const toastId = "voxel-runtime-download";
+      toast.loading("Downloading Minecraft…", {
+        id: toastId,
         description: "Official Mojang files — first time only, then cached.",
       });
-      const result = await downloadProjectRuntimes(basePath, list);
-      toast.dismiss(pending);
+      const result = await downloadProjectRuntimes(basePath, list, (progress) => {
+        // the same toast, updated: the download is never a black box
+        toast.loading("Downloading Minecraft…", {
+          id: toastId,
+          description: `${progress.project.name} · ${progress.done}/${progress.total} — ${progress.detail.slice(0, 48)}`,
+        });
+      });
+      toast.dismiss(toastId);
       if (result.failed.length > 0) {
         toast.warning("Some Minecraft runtimes could not be downloaded", {
           description: result.failed
@@ -108,6 +116,7 @@ export function LauncherSettings() {
           .join(" · "),
       });
     } catch (error) {
+      toast.dismiss("voxel-runtime-download");
       toast.error("Minecraft download failed", {
         description: error instanceof Error ? error.message : String(error),
       });
