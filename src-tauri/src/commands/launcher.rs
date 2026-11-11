@@ -1668,10 +1668,13 @@ mod e2e_tests {
         let home = std::env::var("HOME").expect("HOME");
         let base = std::env::var("VOXEL_E2E_BASE")
             .unwrap_or_else(|_| format!("{home}/Voxel"));
-        let slug = "e2e-vanilla-launch";
+        // the owner's real instance can be proven too:
+        // VOXEL_E2E_SLUG=mine-rank cargo test --lib ... -- --ignored
+        let slug = std::env::var("VOXEL_E2E_SLUG")
+            .unwrap_or_else(|_| "e2e-vanilla-launch".to_string());
 
         // 1. the instance (the runtime itself is shared and already cached)
-        prepare_core(&base, slug, "1.20.1", "vanilla", "", &|_, _, _| {})
+        prepare_core(&base, &slug, "1.20.1", "vanilla", "", &|_, _, _| {})
             .expect("prepare must succeed");
 
         // 2. the exact command the app runs
@@ -1683,7 +1686,7 @@ mod e2e_tests {
         };
         let plan = build_launch_plan(
             &base,
-            slug,
+            &slug,
             "1.20.1",
             "vanilla",
             &account,
