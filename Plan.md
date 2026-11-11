@@ -1204,3 +1204,72 @@ O **device flow Ely.by ao vivo** continua bloqueado pelo `client_id` do Desktop 
 ### Pendência honesta (depende do dono)
 
 O **device flow Ely.by ao vivo** continua bloqueado pelo `client_id` — inalterado pela S78. A textura PNG da picareta precisa ser adicionada pelo dono em `resource_pack/assets/minecraft/textures/item/custom_pickaxe.png` (o SVG de especificação já está gerado).
+
+---
+
+## 79. Sessão 79 — Gramática vanilla provada, servidor restaurado e a lista de servidores (multiplayer)
+
+**Pedido do dono**: fechar a atualização do Mine Rank (pré-ranks Terra/Areia, pás com multiplicador exato, MineCoin no Bronze, minas funcionando, textura da picareta), **publicar** (commit + tag + release), **adicionar a lista de servidores** e **verificar o modelo de IA**.
+
+### A. A gramática do `scoreboard players operation` (provada no servidor vanilla 1.20.1)
+
+A economia do Mine Rank não pagava: o bloco era contado, o multiplicador era validado (200), mas a recompensa era **zero**. A causa não era o datapack em si — era a **gramática do comando de scoreboard do vanilla**, provada com sondas dedicated contra o jar oficial 1.20.1 (cada forma em sua própria função, para o erro de parse não matar as demais):
+
+| Forma | Resultado real |
+|---|---|
+| `operation <alvo> <obj> = 10` (literal) | **no-op silencioso** — o literal é lido como um score holder sem score; o alvo nunca é escrito |
+| `operation <alvo> <obj> -= 40` (literal) | **no-op silencioso** (idem `+=`, `*=`, `/=`, `%=`) |
+| `operation <alvo> <obj> <op> <fonte>` (4 operandos, sem objetivo da fonte) | **no-op silencioso** — o servidor responde `Can't get value of <obj> for <alvo>; none is set` |
+| `operation <alvo> <obj> <op> <fonte> <objFonte>` (5 operandos) | **funciona** e compõe com a linha anterior |
+| 6 operandos | **não parseia** — a função inteira falha ao carregar |
+
+Regra final: a forma correta tem **exatamente 5 operandos** depois de `operation`, e o **objetivo da fonte é obrigatório**. Para valor literal, o comando do vanilla é `scoreboard players set/add/remove` — nunca `operation`.
+
+**Correção aplicada**: as 8 operações com literal do gerador viraram `scoreboard players set` / `scoreboard players remove`; as 6 operações com objetivo duplicado (6 operandos) foram corrigidas para 5. Um **guarda de unidade** (`mineRankServer.test.ts`) impede a regressão: toda linha `scoreboard players operation` precisa ter 5 operandos e nunca uma fonte literal.
+
+**E2E real** (`VOXEL_E2E=1`): o datapack carrega sem erro, a estatística vanilla de mineração se move, a mina da Terra conta o bloco, o acumulador exato em mili-centos cai, o upgrade de pá cobra 50 coins e multiplica 400, o gate de MineCoin segura abaixo do Bronze e entrega a picareta custom no Bronze. **1 passed**.
+
+### B. Incidente de deployment (reportado ao dono, sem escondimento)
+
+O script de deploy (`/tmp/opencode/deploy.mjs`) executou `rm -rf` no **raiz do servidor** (`~/Voxel/servers/mine-rank`) em vez da pasta do datapack e **apagou o servidor vivo** (`server.jar`, `world/`, `level.dat`, `server.properties`, `console.log`, crash reports, os packs `nexus_rank` e `nexus_marketplace`).
+
+- **Restaurado**: `server.jar` (SHA-1 `84194a2f286ef7c14ed7ce0090dba59902951553`, 47.791.053 bytes — **byte a byte o jar oficial da Mojang** 1.20.1, conferido contra `piston-meta`), `server.properties` verbatim (`online-mode=false`, `server-ip=127.0.0.1`, `server-port=25565`, motd "Mine Rank — mine, rank up, earn MRT"), `eula.txt`, `ops/banned/whitelist/usercache` vazios, `voxel-server.json` e um **mundo novo**, reconstruído proceduralmente pelo próprio datapack.
+- **A causa do crash antigo** não era o datapack: era um mapa importado com arquivos de região inconsistentes no host de 6 GB (watchdog kill). O mundo novo elimina esse modo de falha.
+- **PERDIDO DE VERDADE (sem fonte em lugar nenhum)**: o datapack `nexus_marketplace` (19 arquivos) e o `.voxel/marketplace.json` do servidor. Busca exaustiva: 237 commits do git (nenhum arquivo), `git stash`/`reflog`, snapshot `voxel-workspace-20261103-200010.zip`, backups de `~/Voxel/backups/servers/` (só `server.properties` + `eula.txt`) e varredura do disco inteiro — **nada**. Eram arquivos feitos à mão, fora do repositório. O dono precisa recriá-los (ou aceitar que não existam).
+
+**Regra que fica**: o deploy **nunca** apaga o alvo. A partir de agora o datapack é copiado arquivo a arquivo dentro de `world/datapacks/nexus_rank`, e o servidor vivo nunca é recriado por script.
+
+### C. Servidor vivo restaurado e verificado
+
+- Boot limpo: **zero** erros de datapack, zero "Can't keep up", `Found new data pack file/nexus_rank, loading it automatically`.
+- Estruturas conferidas **no servidor rodando** (comando `execute if block …`): hub (lanterna + base + spawn), Terra (terra y=100, camada profunda y=98, piso de pedra y=97), Areia (areia y=100 e y=98), terreno 1 (lã branca) e terreno 8 (lã cinza-claro), arena (piso + grades de ferro), lago (água) e `#mr_k100000 = 100000`.
+- O servidor está em `~/Voxel/servers/mine-rank` (porta 25565, offline-mode, ligado ao loopback).
+
+### D. A lista de servidores (multiplayer) — `servers.dat` de verdade
+
+Novo sistema: a lista que o cliente mostra na tela **Multiplayer** é o arquivo vanilla `servers.dat` — NBT gzipado, lista `servers`, entrada com `name`, `ip`, `address`, `port`, `hidden`.
+
+- **Rust (perímetro de segurança)**: `src-tauri/src/commands/multiplayer.rs`
+  - `multiplayer_write_servers_dat(base_path, instance_slug, servers)` → escreve em `<base>/instances/<slug>/servers.dat`.
+  - Guarda de caminho: o slug é um **nome de pasta** (nunca um caminho; `..`, `/` e `\` recusados) e a pasta da instância é resolvida por `validated_path`.
+  - **SRV-aware**: sem porta explícita, o registro `_minecraft._tcp.<host>` decide o alvo real (o mesmo `resolve_srv` que o ping usa) — para o NerdZone isso resolve `jogar.nerdzone.gg:30000`; sem registro, cai em 25565.
+  - Bytes escritos: `name` + `ip` (`host:port`, o campo que o 1.20.1 lê) + `address` + `port` (os campos que os clientes novos leem) + `hidden` (byte) — o cliente ignora o campo que não conhece.
+- **NBT compartilhado**: `src-tauri/src/commands/nbt.rs` — os primitivos que estavam privados em `structures.rs` foram extraídos para um módulo só (sem duplicação); os testes de estrutura continuam verdes.
+- **Frontend**: `src/services/servers/multiplayerService.ts` (monta a lista: servidores locais em `127.0.0.1:<porta real>` + referências públicas escolhidas) e `src/features/launcher/MultiplayerListPanel.tsx` (painel na aba **Launcher**: escolhe a instância, liga/desliga cada referência, escreve o arquivo e mostra **o que realmente ficou lá** — endereço, porta e se veio do SRV).
+- **Arquivo real do dono**: `~/Voxel/instances/mine-rank/servers.dat` → `Mine Rank → 127.0.0.1:25565` e `NerdZone.gg → jogar.nerdzone.gg:30000` (verificado por um **parser NBT independente**, escrito do zero em Python, não pelo código Rust).
+
+### E. Modelo de IA verificado
+
+O catálogo **ao vivo** do NVIDIA NIM (`https://integrate.api.nvidia.com/v1/models`) confirma `nvidia/nemotron-3.5-super-vl-120b-a12b` — o modelo de visão da família Nemotron 3.5 Super VL está disponível para a conta do dono.
+
+### F. Verificação da sessão
+
+- **typecheck** ✓ · **lint** ✓ (0 avisos) · **Vitest 339 passed + 1 skipped** (43 arquivos) · **Rust 120 passed + 13 ignored** · **E2E Mine Rank real** ✓ · `pnpm build` ✓ · site do Mine Rank ✓.
+- E2E novo (Rust, `#[ignore]`): `e2e_the_owner_instance_gets_the_multiplayer_list` escreve no workspace real e prova o SRV do NerdZone.
+
+### G. Pendências honestas (dependem do dono)
+
+1. **Ely.by ao vivo**: o endpoint de device code aceita o `client_id` configurado, mas o **clique de aprovação é do dono** (`https://account.ely.by/code?user_code=…`, expira em 10 min) — e o `client_id` público de Desktop Application segue sendo a decisão do dono em `https://account.ely.by/dev/applications/new`.
+2. **`nexus_marketplace` + `.voxel/marketplace.json`**: perdidos sem fonte (ver §B) — precisam ser recriados à mão.
+3. **Arte final da picareta**: a textura PNG real já é gerada e embarcada (16×16 RGBA, base64 no gerador); a aprovação final da arte é do dono.
+4. A sessão do desktop estava **bloqueada** quando o app foi aberto — o VOXEL está rodando e aparece assim que o dono desbloquear.

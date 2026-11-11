@@ -37,8 +37,9 @@ vanilla 1.20.1 real) — tudo verde, na CI e local.
 | VOXEL Agent — sandbox Rust, auditoria em `ai_tool_calls`, auto-snapshot, task force multi-agente (Architect→Developer→Reviewer) e tools de arte (texturas/blocos/estruturas .nbt/dimensões) | ✅ |
 | Build System — `./gradlew build` ao vivo, Error Center, Auto-Fix ≤5 tentativas | ✅ |
 | Launcher — instâncias isoladas, downloads oficiais SHA-1 (718MB provados), Microsoft + Ely.by OAuth device flow, authlib-injector SHA-256 para Ely.by | ✅ |
+| **Lista de servidores (multiplayer)** — o `servers.dat` vanilla de verdade (NBT gzipado) escrito na instância: seus servidores em `127.0.0.1:<porta>` + referências públicas, **SRV-aware** (o NerdZone resolve para `jogar.nerdzone.gg:30000`), com o painel no Launcher mostrando o que realmente ficou no arquivo | ✅ |
 | Server Studio — vanilla/Paper oficiais, console stdin, backups/restore, properties | ✅ |
-| Server Modules misturáveis — 9 sistemas: Economy/Prison/Token Chain, SkyBlock Islands, Factions War, BedWars Lite, Monuments (.nbt reais com /place), Custom Realm (dimensão real) e **Mine Rank** (Rankup completo: 47 comandos, pré-ranks Terra/Areia, sistema de pás com multiplicadores, MineCoin, 8 tiers, prestígio, 8 minas privadas, 4 moedas, clans, pesca e arena) — cada um com comandos documentados no README do servidor | ✅ |
+| Server Modules misturáveis — 9 sistemas: Economy/Prison/Token Chain, SkyBlock Islands, Factions War, BedWars Lite, Monuments (.nbt reais com /place), Custom Realm (dimensão real) e **Mine Rank** (Rankup completo: 47 comandos, pré-ranks Terra/Areia, sistema de pás com multiplicadores inteiros validados **pelo servidor**, MineCoin no Bronze, 8 tiers, prestígio, 8 minas privadas, 4 moedas, clans, pesca, arena e a **textura própria da picareta** — PNG 16×16 RGBA real, embarcado no gerador) — cada um com comandos documentados no README do servidor | ✅ |
 | Token Chain — ledger SHA-256 real (mint/transfer/burn/verify, tamper-evidente) | ✅ Wave 1 |
 | Túnel público grátis — playit.gg (servidor acessível de qualquer lugar) | ✅ Wave 1 |
 | Shader Studio — 32 looks icônicos como presets → shaderpacks GLSL originais; Asset Studio — sprites pixel-art (estáticos E animados com .mcmeta), faces de bloco, estruturas .nbt com preview isométrico e dimensões custom | ✅ |inais Iris/OptiFire-compat, preview WebGL vivo, editor Monaco, install na instância | ✅ Wave 2 |
@@ -52,7 +53,7 @@ vanilla 1.20.1 real) — tudo verde, na CI e local.
 | Dark Kingdom — projeto-exemplo criado automaticamente (espada, receita, advancement) | ✅ |
 | Release multi-OS + site oficial no GitHub Pages | ✅ |
 | **Site do Mine Rank** (`apps/mine-rank-site`) — React 18 + Vite + Tailwind, deploy no GitHub Pages; renderiza o **mesmo manifesto** que gera o datapack (uma fonte de verdade), com busca de comandos, mapa do mundo em SVG e a dedicatória ao NerdZone.gg | ✅ |
-| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), **433 testes verdes** (110 Rust + 323 Vitest); toda ação fora da main thread (async + spawn_blocking — congelamento extinto como classe) | ✅ |
+| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), **459 testes verdes** (120 Rust + 339 Vitest); toda ação fora da main thread (async + spawn_blocking — congelamento extinto como classe) | ✅ |
 
 ## 🚀 Como rodar (desenvolvimento)
 
@@ -76,6 +77,8 @@ Para **jogadores de servidor**: aba **Servers** → wizard (vanilla/Paper, vers�
 Para **servidor estilo Rankup**: aba **Servers** → console do servidor → aba **Mine Rank** → *Instalar* (escreve o datapack `nexus_rank` no mundo: hub, 8 terrenos com mina privada de 8 camadas, lago e arena, tudo compacto para não travar o vanilla). Pré-ranks Terra e Areia com sistema de pás e multiplicadores; Rank Bronze libera MineCoin. A seção **Mapa do mundo** importa um ZIP de mapa de terceiros com **atribuição e licença gravadas dentro do próprio mundo** (`VOXEL_MAP_CREDITS.md`) — o app nunca baixa mapa de site nenhum por conta própria.
 
 Para **publicar**: workspace → **Publish** → commit + repo GitHub + push.
+
+Para a **lista de servidores do seu cliente**: aba **Launcher** → **Multiplayer list** → escolha a instância → ligue/desligue cada referência → **Write servers.dat**. O VOXEL escreve o `servers.dat` vanilla (NBT gzipado) no diretório de jogo da instância: os seus servidores entram como `127.0.0.1:<porta real>` e as referências públicas com o endereço que elas publicam — com resolução **SRV** quando existe (o NerdZone.gg resolve para `jogar.nerdzone.gg:30000`). O painel mostra, depois da escrita, o endereço e a porta que ficaram no arquivo.
 
 ## Arquitetura em uma página
 
@@ -108,10 +111,10 @@ Decisões-chave no [`docs/architecture.md`](docs/architecture.md) (AD-1..AD-11 +
 
 | Suíte | Escopo |
 |---|---|
-| `cargo test` | 110 unit (templates ×6 eras, ledger+tamper, shaderpacks, SLP+SRV, bridge multimodal, modpacks, snapshots, deploy, structures NBT, assets animados, launcher Ely.by/authlib-injector, allowlist de HTTP/URL) |
-| `cargo test -- --ignored` | 12 E2E: **compilação REAL de 6 templates** (fabric/forge/neoforge ×4 eras até 26.3), launcher 718MB SHA-1, **authlib-injector oficial com SHA-256**, server ciclo, SLP de servidores públicos (hypixel/nerdzone…), Modrinth com checksum |
-| `pnpm test:unit` | 323 Vitest em 41 arquivos (shaders + gerador GLSL, error parser, 9 módulos de servidor com comandos, **Mine Rank** — manifesto, datapack gerado, layout do mundo e render do painel, **site do Mine Rank renderizado em jsdom**, inferência de estilo, task force, model routing, i18n pt-BR, manifestos, parser de MOTD, **device flow Microsoft + Ely.by**, coordinator de sessão OAuth, HTTP com timeout/abort e seleção de provider) |
-| `VOXEL_E2E=1 pnpm vitest run src/services/servers/mineRankServer.e2e.test.ts` | **E2E real do Mine Rank**: jar vanilla 1.20.1 oficial (SHA-1 do piston-meta), cliente **mineflayer** de verdade, os 39 comandos do manifesto × 3 valores (117 triggers) + mineração real que paga coin + nenhum stall de tick |
+| `cargo test` | 120 unit (templates ×6 eras, ledger+tamper, shaderpacks, SLP+SRV, bridge multimodal, modpacks, snapshots, deploy, structures NBT, NBT compartilhado, lista multiplayer `servers.dat`, assets animados, launcher Ely.by/authlib-injector, allowlist de HTTP/URL) |
+| `cargo test -- --ignored` | 13 E2E: **compilação REAL de 6 templates** (fabric/forge/neoforge ×4 eras até 26.3), launcher 718MB SHA-1, **authlib-injector oficial com SHA-256**, server ciclo, SLP de servidores públicos (hypixel/nerdzone…), Modrinth com checksum, **lista multiplayer no workspace real (com SRV)** |
+| `pnpm test:unit` | 339 Vitest em 43 arquivos (shaders + gerador GLSL, error parser, 9 módulos de servidor com comandos, **Mine Rank** — manifesto, datapack gerado, layout do mundo, **gramática do scoreboard do vanilla** e render do painel, **lista multiplayer**, **site do Mine Rank renderizado em jsdom**, inferência de estilo, task force, model routing, i18n pt-BR, manifestos, parser de MOTD, **device flow Microsoft + Ely.by**, coordinator de sessão OAuth, HTTP com timeout/abort e seleção de provider) |
+| `VOXEL_E2E=1 pnpm vitest run src/services/servers/mineRankServer.e2e.test.ts` | **E2E real do Mine Rank**: jar vanilla 1.20.1 oficial (SHA-1 do piston-meta), cliente **mineflayer** de verdade, os 47 comandos do manifesto (47 triggers únicos) + mineração real que paga coin + nenhum stall de tick |
 | CI (`.github/workflows/ci.yml`) | typecheck + lint + vitest + vite build + cargo test |
 | Release (`.github/workflows/release.yml`) | tag `v*` → .exe/.msi/.deb/.AppImage/.dmg (Windows, Linux, macOS arm64+x64) |
 
