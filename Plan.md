@@ -202,10 +202,11 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 - **Backend** (`shaders.rs`): create com allowlist de extensões (vsh/fsh/glsl/properties/json), caps 64 arquivos/256KB, path guard compartilhado; list via manifest; install copia para `instances/<slug>/shaderpacks/` (instância preparada = `options.txt` do launcher; `copy_tree` recusa symlinks); delete guardado. Editor de packs usa `read/write_project_file` com rel `shaderpacks/<slug>/...` (zero command novo).
 - **UI** (`ShadersPage`): grid com swatch de céu por estilo + filtros de categoria; painel sticky com preview vivo + params + create; seção "Your shaderpacks" (Install→instância via Select, Edit files→Monaco com abas e Ctrl+S, Reveal, Delete com confirm). Rota `/shaders`, sidebar Palette, Topbar, Ctrl+K.
 
-## 5. Histórico de sessões (72+ sessões)
+## 5. Histórico de sessões (80+ sessões)
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
+| **80** | **Launcher: o jogo que não inicia** | **Launcher loader-aware** (vanilla + fabric, `paper`/desconhecidos recusados) · **regras do Mojang corrigidas** (a flag de macOS `-XstartOnFirstThread` matava o JVM no Linux) · **`launcher_runtime_status`** (runtime real: client.jar, libs, 3.600 assets, natives) · **download automático** ao configurar conta Microsoft/Ely.by · aviso do jar **removido** · projeto Mine Rank migrado para `datapack` 1.20.1 vanilla · **E2E real: o cliente chega ao menu principal** · v0.35.0 | `allow` que não casava com o SO era lido como "permitir" (JVM não subia); `instanceExists()` pulava o download; `${version_type}` literal no `--versionType`; classpath com `:` no Windows |
 | 1 | Planejamento | Briefing 61 seções → 11 ADs, riscos, 8 fases, critérios | — |
 | 2 | Fase 0 | Shell + SQLite 18 tabelas + Settings + keyring + palette + ícones | — |
 | 3 | Fase 1 + .env | Template embedded + Monaco + FS sandbox + snapshots + wizard | plugin-http inexistente |
@@ -340,13 +341,13 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **`/trigger` do console é recusado** — *"A player is required to run this command here"* (o objetivo nem é resolvido) | probe no vanilla 1.20.1 | o E2E usa **cliente real** (mineflayer); a varredura completa usa `execute as <jogador> run trigger …` pelo console (mesma semântica, sem throttle de chat) |
 | **Chat do vanilla tem throttle** (~20 msgs/10s) — o sweep de 39+78 mensagens perdia o feedback e o comando era engolido | E2E real (comando 39 sem resposta) | E2E confirma pelo **log do servidor** (fonte de verdade) e usa pacing + retry; o sweep completo vai pelo console |
 
-## 8. Estado atual (verificado — Sessão 77, v0.32.0 publicada + Mine Rank entregue + site do Mine Rank no ar)
+## 8. Estado atual (verificado — Sessão 80, v0.35.0 — Mine Rank entregue, site no ar, o jogo inicia)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (110 + 12 ignored) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge, **launcher Ely.by/authlib-injector**, allowlist de HTTP/URL, **import de mundo com atribuição de mapa** |
-| Vitest (323 em 41 arquivos) | ✅ inclui Player Management, Moderation Assistant, dialogs render-smoke, **Mine Rank (manifesto + datapack + layout do mundo + render do painel)**, Performance Lab, Accessibility, Deployment SSH, Session Auto-Refresh e **device flow Ely.by/Microsoft + coordinator de sessão + HTTP com timeout/abort + seleção de provider** |
+| Rust unit (135 + 14 ignored) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge, **launcher Ely.by/authlib-injector**, **launcher loader-aware (vanilla/fabric) + regras do Mojang + status de runtime + plano de launch**, allowlist de HTTP/URL, **import de mundo com atribuição de mapa** |
+| Vitest (349 em 45 arquivos) | ✅ inclui Player Management, Moderation Assistant, dialogs render-smoke, **Mine Rank (manifesto + datapack + layout do mundo + render do painel)**, Performance Lab, Accessibility, Deployment SSH, Session Auto-Refresh e **device flow Ely.by/Microsoft + coordinator de sessão + HTTP com timeout/abort + seleção de provider**, **download automático do runtime** + **render do Run dialog (o aviso do jar sumiu)** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -1273,3 +1274,70 @@ O catálogo **ao vivo** do NVIDIA NIM (`https://integrate.api.nvidia.com/v1/mode
 2. **`nexus_marketplace` + `.voxel/marketplace.json`**: perdidos sem fonte (ver §B) — precisam ser recriados à mão.
 3. **Arte final da picareta**: a textura PNG real já é gerada e embarcada (16×16 RGBA, base64 no gerador); a aprovação final da arte é do dono.
 4. A sessão do desktop estava **bloqueada** quando o app foi aberto — o VOXEL está rodando e aparece assim que o dono desbloquear.
+
+---
+
+## 80. Sessão 80 — O jogo que não inicia: três defeitos reais, um E2E que prova a correção
+
+**Pedido do dono**: (1) o aviso *"No compiled mod jar found — run Build first"* ao apertar Play no Mine Rank; (2) **o Minecraft não inicia**; (3) **download automático do Minecraft** quando a conta Microsoft/Ely.by for configurada; (4) manter o servidor no ar; (5) futuro: domínio + host próprio.
+
+### A. O aviso e o projeto que mentia sobre si mesmo
+
+O aviso vinha de `LaunchDialog.tsx`: o `copyModJar` devolvia `null` (o projeto **não tem** `build/libs/*.jar`) e a UI pintava isso como erro. Mas o Mine Rank **não é um mod Java** — é o módulo de servidor (datapack) que roda em `~/Voxel/servers/mine-rank`. A pasta `projects/mine-rank/` era só o template Fabric que o wizard criou em 2026-10-15 e nunca foi usado.
+
+A linha do banco dizia `minecraft_version='1.21'`, `loader='fabric'`, `type='mod'` — **três informações erradas** (o servidor é vanilla **1.20.1**). Com `1.21`, o launcher procurava `minecraft/versions/1.21/` (não existe) e morria com *"version.json missing: run Prepare first"*. **Esse era o motivo do jogo não iniciar.**
+
+### B. O defeito que impedia o jogo de abrir em QUALQUER máquina Linux
+
+O E2E novo (`e2e_the_vanilla_client_starts_and_reaches_the_main_menu`, Rust `#[ignore]`) **iniciou o cliente de verdade** e o JVM respondeu:
+
+```
+Unrecognized option: -XstartOnFirstThread
+Error: Could not create the Java Virtual Machine.
+```
+
+O avaliador de regras do Mojang estava **errado**: uma regra `allow` que **não** casava com o SO era tratada como "permitir". O resultado: a flag de macOS `-XstartOnFirstThread` ia para o Linux e o JVM se recusava a iniciar. A semântica oficial (a mesma do launcher vanilla) é:
+
+- argumento **sem** regras → sempre incluído;
+- argumento **com** regras → incluído quando **pelo menos uma** regra permite;
+- `allow` → permite quando SO/arch casam **e** todas as features pedidas estão ligadas (o VOXEL não liga nenhuma);
+- `disallow` → permite quando o SO/arch **não** casa.
+
+As regras reais do 1.20.1 (`-XstartOnFirstThread` só em `osx`, heap dump só em `windows`, `-Xss1M` só em `x86`) estão agora em teste unitário.
+
+### C. O launcher virou loader-aware (vanilla + fabric)
+
+- **`LaunchLoader`** (`vanilla` | `fabric`) no Rust: `vanilla` **não** busca `fabric-profile.json` (e apaga um perfil velho), usa a main class `net.minecraft.client.main.Main` e não exige mod loader; `fabric` mantém o KnotClient. `paper` (software de servidor) e loaders desconhecidos são **recusados com mensagem**, nunca disfarçados de fabric.
+- **`launcher_runtime_status`** (comando novo): sonda o **runtime real** — `version.json`, `client.jar`, perfil do loader, bibliotecas, índice + 3.600 assets e (por instância) natives e `options.txt`. O `instanceExists()` (que só olhava a pasta) era a razão do app pular o download.
+- **`${version_type}`, `${launcher_name}`, `${launcher_version}`** agora são resolvidos (o `--versionType` literal ia para o jogo).
+- **Separador de classpath por SO** (`:` unix, `;` windows) — o Windows nunca teria iniciado.
+- `build_launch_plan()` separa a **construção** do comando do seu spawn: os argumentos viram testáveis e o E2E roda o mesmo comando do app.
+
+### D. Download automático do Minecraft
+
+`src/services/launcher/runtimeService.ts`: quando a conta Microsoft **ou** Ely.by é configurada, o VOXEL sonda o runtime de cada projeto e **baixa o que falta** (cache compartilhado: a 2ª instância da mesma versão sai de graça). Roda também quando a página de Settings abre com uma conta já ativa (o caso do dono). Falha por projeto é **relatada**, nunca derruba as outras nem o login.
+
+O `LaunchDialog` passou a mostrar o estado real (**"Minecraft runtime"**: pronto / faltando `client.jar` / baixando) e baixa **na hora do Play** se faltar algo. O aviso âmbar do jar **saiu**: para um projeto vanilla a linha é *"datapack — no mod jar needed"*; para um projeto mod sem jar é *"not built yet — the client still starts"* (neutro, nunca bloqueia).
+
+### E. Dados do dono migrados (com backup)
+
+`~/.config/dev.yuadevs.nexuscraft-studio/nexuscraft.db` → backup em `/tmp/opencode/nexuscraft.db.backup-20261111-154505`:
+
+| projeto | antes | depois |
+|---|---|---|
+| Mine Rank | `mod` · 1.21 · fabric · build `failed` | **`datapack` · 1.20.1 · vanilla** · sem build |
+| Dark Kingdom | `mod` · 26.3 · fabric | (inalterado) |
+
+O runtime 1.20.1 do dono foi verificado arquivo a arquivo: `client.jar` ✓ · 103 bibliotecas ✓ · 3.600 assets ✓ · natives ✓ · `options.txt` ✓ · `servers.dat` ✓ → **pronto para o Play**.
+
+### F. Provas
+
+- **E2E real** (`cargo test --lib e2e_the_vanilla_client_starts_and_reaches_the_main_menu -- --ignored`): o cliente vanilla 1.20.1 **chegou ao menu principal** (*"Sound engine started"*, *"Created: … blocks.png-atlas"*) — 113 s, **1 passed**.
+- **Rust 135 passed + 14 ignored** (+15 unit, +1 E2E) · **Vitest 349 passed + 1 skipped** (+10, em 45 arquivos) · **typecheck ✓** · **lint ✓ (0 avisos)**.
+- Servidor **no ar** (18h+ de uptime, porta 25565, ~20 TPS medido pelo `gametime`: 196 ticks em ~9,8 s) — os avisos "Can't keep up" são picos de autosave/disco, não queda de tick.
+
+### G. Pendências honestas
+
+1. A pasta `projects/mine-rank/` ainda contém o **template Fabric antigo** (o build aparece como "Java mod only" desabilitado para projetos vanilla). Substituí-la pelo datapack gerado é decisão do dono.
+2. **Domínio + host próprio**: o app já tem deploy SSH e túnel playit.gg (§70); migrar o Mine Rank para um VPS com domínio é o próximo passo natural — **não** foi implementado agora (decisão do dono).
+3. **Ely.by ao vivo** e **`nexus_marketplace`** continuam pendentes do dono (§79.G).
