@@ -9,76 +9,12 @@
 //! is exactly the bytes you get.
 
 use crate::commands::fs::validated_path;
+use crate::commands::nbt::{
+    gzip_bytes, nbt_compound, nbt_compound_list, nbt_int, nbt_int_list, nbt_string, nbt_root,
+    write_named, TAG_COMPOUND, TAG_INT, TAG_LIST, TAG_STRING,
+};
 use base64::Engine as _;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
-
-// ---------------------------------------------------------------------------
-// NBT (the minimal subset the structure format needs)
-// ---------------------------------------------------------------------------
-
-const TAG_INT: u8 = 3;
-const TAG_STRING: u8 = 8;
-const TAG_LIST: u8 = 9;
-const TAG_COMPOUND: u8 = 10;
-
-fn write_named<W: Write>(out: &mut W, tag: u8, name: &str, value: &[u8]) -> Result<(), String> {
-    let _ = tag;
-    let mut head = Vec::new();
-    head.push(tag);
-    let name_bytes = name.as_bytes();
-    head.extend_from_slice(&(name_bytes.len() as u16).to_be_bytes());
-    head.extend_from_slice(name_bytes);
-    out.write_all(&head).map_err(|e| format!("nbt head: {e}"))?;
-    out.write_all(value).map_err(|e| format!("nbt body: {e}"))?;
-    Ok(())
-}
-
-fn nbt_string(s: &str) -> Vec<u8> {
-    let b = s.as_bytes();
-    let mut out = Vec::with_capacity(2 + b.len());
-    out.extend_from_slice(&(b.len() as u16).to_be_bytes());
-    out.extend_from_slice(b);
-    out
-}
-
-fn nbt_int(v: i32) -> Vec<u8> {
-    v.to_be_bytes().to_vec()
-}
-
-fn nbt_int_list(values: &[i32]) -> Vec<u8> {
-    let mut out = Vec::new();
-    out.push(TAG_INT);
-    out.extend_from_slice(&(values.len() as i32).to_be_bytes());
-    for v in values {
-        out.extend_from_slice(&v.to_be_bytes());
-    }
-    out
-}
-
-/// A generic compound list: each entry is a Vec<(name, tag, value_bytes)>.
-fn nbt_compound_list(entries: &[Vec<(String, u8, Vec<u8>)>]) -> Vec<u8> {
-    let mut out = Vec::new();
-    out.push(TAG_COMPOUND);
-    out.extend_from_slice(&(entries.len() as i32).to_be_bytes());
-    for entry in entries {
-        for (name, tag, value) in entry {
-            write_named(&mut out, *tag, name, value).map_err(|_| ()).ok();
-        }
-        // TAG_End
-        out.push(0u8);
-    }
-    out
-}
-
-fn nbt_compound(entries: Vec<(String, u8, Vec<u8>)>) -> Vec<u8> {
-    let mut out = Vec::new();
-    for (name, tag, value) in entries {
-        let _ = write_named(&mut out, tag, &name, &value);
-    }
-    out.push(0u8); // TAG_End
-    out
-}
 
 // ---------------------------------------------------------------------------
 // Structure model
@@ -764,15 +700,10 @@ pub fn structure_nbt_bytes(structure: &GeneratedStructure, mc_version: &str) -> 
     ]);
 
     // Root: TAG_Compound named "" — the vanilla structure convention
-    let mut nbt = Vec::new();
-    nbt.push(TAG_COMPOUND);
-    nbt.extend_from_slice(&0u16.to_be_bytes()); // empty root name
-    nbt.extend_from_slice(&root_body);
+    let nbt = nbt_root(root_body);
 
     // gzip (vanilla expects gzip'd NBT)
-    let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
-    gz.write_all(&nbt).map_err(|e| format!("gzip: {e}"))?;
-    gz.finish().map_err(|e| format!("gzip finish: {e}"))
+    gzip_bytes(&nbt)
 }
 
 // ---------------------------------------------------------------------------

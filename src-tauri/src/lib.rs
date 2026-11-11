@@ -165,6 +165,7 @@ pub fn run() {
             commands::shaders::shaders_install_pack,
             commands::shaders::shaders_list_instances,
             commands::serverping::server_ping,
+            commands::multiplayer::multiplayer_write_servers_dat,
             commands::bridge::bridge_start,
             commands::bridge::bridge_stop,
             commands::bridge::bridge_status,

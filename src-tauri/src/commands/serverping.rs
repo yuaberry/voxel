@@ -19,7 +19,7 @@ const IO_TIMEOUT: Duration = Duration::from_secs(10);
 /// falling back to `<host>:25565`. DDoS shields/proxies often only accept
 /// connections on the SRV target — without this, importing such servers
 /// pings a black hole (verified live: minemen.club).
-fn resolve_srv(host: &str) -> Option<(String, u16)> {
+pub(crate) fn resolve_srv(host: &str) -> Option<(String, u16)> {
     if host.parse::<std::net::IpAddr>().is_ok() {
         return None; // raw IP — nothing to resolve
     }

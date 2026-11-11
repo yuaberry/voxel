@@ -17,6 +17,7 @@ import { useProjectsStore } from "@/stores/projectsStore";
 import { openInFileManager } from "@/services/storage/storageService";
 import { invoke } from "@tauri-apps/api/core";
 import { LaunchDialog } from "@/features/projects/workspace/LaunchDialog";
+import { MultiplayerListPanel } from "@/features/launcher/MultiplayerListPanel";
 import { EmptyArt } from "@/components/EmptyState";
 import { formatRelativeTime } from "@/lib/utils";
 import type { ProjectRecord } from "@/types";
@@ -190,6 +191,8 @@ export function LauncherPage() {
           })}
         </div>
       )}
+
+      <MultiplayerListPanel instances={instances} />
 
       {runProject && (
         <LaunchDialog

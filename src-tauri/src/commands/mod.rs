@@ -11,6 +11,8 @@ pub mod git;
 pub mod launcher;
 pub mod modpack;
 pub mod modrinth;
+pub mod multiplayer;
+pub mod nbt;
 pub mod process;
 pub mod projects;
 pub mod ledger;
