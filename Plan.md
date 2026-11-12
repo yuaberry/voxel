@@ -1434,7 +1434,9 @@ Três crashes hoje (*"A single server tick took 95.91 seconds"* → *"Considerin
 | **Leitor oficial do cliente** | lê o arquivo do VOXEL: `Mine Rank → 127.0.0.1:25565` · `NerdZone.gg → jogar.nerdzone.gg:30000` (o gzip antigo faz o mesmo leitor **lançar**) |
 | **E2E do ping** (`e2e_ping_the_local_mine_rank_server`) | `127.0.0.1:25565 → 0 players v1.20.1 [Mine Rank — mine, rank up, earn MRT]` (o SLP do próprio app) |
 | **E2E da lista em todas as instâncias** | `the multiplayer list landed in 3 instance(s)` |
-| **Tick medido no servidor vivo** | `gametime` 1661672 → 1661912 em ~12 s ⇒ **20 TPS** |
+| **Tick medido no servidor vivo** | `gametime` 1803316 → 1803576 em ~13 s ⇒ **20 TPS** |
+| **Servidor após um reboot da máquina** | o systemd **traz o servidor de volta sozinho** (`Started … 00:17:03`, `Linger=yes`) — a durabilidade pedida pelo dono, provada no caso real |
+| **Mundo revalidado depois de tudo** | **2289 chunks, 0 corrompidos** (o mundo cresceu de 1007 para 2289 chunks com o jogo do dono — e continua íntegro) |
 | **Rust** | **136 passed + 16 ignored** |
 | **Vitest** | **351 passed + 1 skipped** (45 arquivos) |
 | **typecheck / lint / `pnpm build`** | ✅ |
