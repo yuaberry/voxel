@@ -10,6 +10,17 @@ WorkingDirectory=/home/llinux/Voxel/servers/mine-rank
 ExecStart=/home/llinux/Voxel/servers/mine-rank/start-server.sh
 Restart=always
 RestartSec=10
+
+# --- memory: the server must NEVER swap ---
+# With a shared machine (launcher, client, browser) the JVM was pushed
+# into swap and the G1 collector paused for SECONDS every time it
+# touched a swapped page ("Can't keep up! Running 2228ms" on an idle
+# server). These limits keep the whole server in RAM, so a GC pause is
+# tens of milliseconds, not seconds.
+# The heap is right-sized for this world (14 MB, ~2300 chunks, max 20
+# players): 1 GB is plenty and it is what keeps it out of swap.
+MemoryMax=1536M
+MemorySwapMax=0
 # the world must be saved on a stop, not killed
 KillSignal=SIGTERM
 TimeoutStopSec=90

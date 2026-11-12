@@ -25,4 +25,4 @@ if command -v ss >/dev/null 2>&1 && ss -ltn | grep -q ':25565 '; then
 fi
 
 exec 3<> "$FIFO"
-exec java -Xms512M -Xmx2G -jar server.jar nogui <&3
+exec java -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -jar server.jar nogui <&3
