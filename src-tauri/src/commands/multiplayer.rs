@@ -1,10 +1,19 @@
 //! Multiplayer server list (`servers.dat`) — the REAL vanilla file the
 //! Minecraft client reads on the Multiplayer screen.
 //!
-//! The format is the vanilla one: a gzip-compressed NBT compound with a
-//! `servers` list; each entry carries the display name, the address and
-//! the port. The client shows exactly what the file says — nothing is
-//! faked and nothing is scraped.
+//! The format is the vanilla one: an NBT compound with a `servers` list;
+//! each entry carries the display name, the address and the port. The
+//! client shows exactly what the file says — nothing is faked and nothing
+//! is scraped.
+//!
+//! **The NBT is NOT compressed.** The official 1.20.1 client reads this
+//! file with `FileInputStream` + `DataInputStream` (the class `rb` in the
+//! official `client.jar`: `rb.b(File)` → `rb.b(CompoundTag, File)`) —
+//! there is no gzip stream anywhere in that path. A gzipped file is
+//! discarded by the client in silence ("Couldn't load server list"), and
+//! the Multiplayer screen comes up EMPTY: the owner sees no server at all
+//! and concludes that he cannot join. The bytes below are the exact
+//! layout the client writes itself: `name`, `ip` and `hidden` per entry.
 //!
 //! The address resolution follows the vanilla client: when the entry has
 //! no explicit port, the `_minecraft._tcp.<host>` SRV record decides the
@@ -13,8 +22,8 @@
 
 use crate::commands::fs::validated_path;
 use crate::commands::nbt::{
-    gzip_bytes, nbt_byte, nbt_compound, nbt_compound_list, nbt_int, nbt_root, nbt_string, TAG_BYTE,
-    TAG_INT, TAG_LIST, TAG_STRING,
+    nbt_byte, nbt_compound, nbt_compound_list, nbt_int, nbt_root, nbt_string, TAG_BYTE, TAG_INT,
+    TAG_LIST, TAG_STRING,
 };
 use crate::commands::serverping::resolve_srv;
 use serde::{Deserialize, Serialize};
@@ -165,7 +174,11 @@ pub fn build_servers_dat(servers: &[MultiplayerServer]) -> Result<(Vec<u8>, Vec<
         TAG_LIST,
         nbt_compound_list(&entries),
     )]));
-    Ok((gzip_bytes(&root)?, written))
+    // RAW NBT — the vanilla client does NOT decompress this file. Writing
+    // it gzipped made the client throw the list away in silence and the
+    // Multiplayer screen came up empty (the owner's report: "I cannot
+    // join any server").
+    Ok((root, written))
 }
 
 /// Writes the multiplayer list into `<base>/instances/<slug>/servers.dat`.
@@ -225,8 +238,6 @@ pub async fn multiplayer_write_servers_dat(
 #[cfg(test)]
 mod multiplayer_tests {
     use super::*;
-    use flate2::read::GzDecoder;
-    use std::io::Read;
 
     fn server(name: &str, address: &str, port: Option<u16>) -> MultiplayerServer {
         MultiplayerServer {
@@ -239,10 +250,12 @@ mod multiplayer_tests {
 
     /// Reads the NBT back with an independent parser — the same bytes the
     /// vanilla client gets, decoded from scratch.
+    ///
+    /// The bytes are RAW: the official client reads `servers.dat` with a
+    /// plain `DataInputStream` (no gzip), so the decoder here does the
+    /// same.
     fn decode(bytes: &[u8]) -> Vec<(String, String, i32, u8)> {
-        let mut decoder = GzDecoder::new(&bytes[..]);
-        let mut raw = Vec::new();
-        decoder.read_to_end(&mut raw).expect("gzip must decode");
+        let raw = bytes;
         assert_eq!(raw[0], 10, "the root must be a compound");
         assert_eq!(&raw[1..3], &0u16.to_be_bytes(), "the root name is empty");
 
@@ -323,15 +336,28 @@ mod multiplayer_tests {
 
     const TAG_COMPOUND_TAG: u8 = 10;
 
+    /// The owner's bug, pinned: the official client reads `servers.dat`
+    /// with a plain `DataInputStream` — the file is RAW NBT. A gzipped
+    /// file is thrown away by the client in silence and the Multiplayer
+    /// screen comes up empty.
     #[test]
-    fn the_file_is_the_real_gzipped_nbt_the_client_reads() {
+    fn the_file_is_the_raw_nbt_the_client_reads() {
         let (bytes, written) = build_servers_dat(&[server(
             "Mine Rank",
             "127.0.0.1",
             Some(25565),
         )])
         .expect("the list must build");
-        assert_eq!(&bytes[0..2], &[0x1f, 0x8b], "the file must be gzip");
+        assert_ne!(
+            &bytes[0..2],
+            &[0x1f, 0x8b],
+            "the file must NOT be gzip — the vanilla client reads raw NBT"
+        );
+        assert_eq!(
+            &bytes[0..2],
+            &[0x0a, 0x00],
+            "the raw NBT root must be a compound with an empty name"
+        );
 
         let decoded = decode(&bytes);
         assert_eq!(decoded.len(), 1);
@@ -345,6 +371,21 @@ mod multiplayer_tests {
         assert_eq!(written[0].address, "127.0.0.1");
         assert_eq!(written[0].port, 25565);
         assert!(!written[0].srv);
+    }
+
+    /// The bytes the client writes itself (the owner's own file, captured
+    /// from the running 1.20.1 client) start with the compound tag — the
+    /// exact prefix the VOXEL file must have.
+    #[test]
+    fn the_first_bytes_are_the_vanilla_compound_prefix() {
+        let (bytes, _) = build_servers_dat(&[server("Mine Rank", "127.0.0.1", Some(25565))])
+            .expect("the list must build");
+        assert_eq!(bytes[0], TAG_COMPOUND_TAG);
+        assert_eq!(&bytes[1..3], &0u16.to_be_bytes());
+        // the "servers" list follows, exactly like the client's own file
+        assert_eq!(bytes[3], TAG_LIST);
+        assert_eq!(&bytes[4..6], &7u16.to_be_bytes());
+        assert_eq!(&bytes[6..13], b"servers");
     }
 
     #[test]
@@ -370,7 +411,8 @@ mod multiplayer_tests {
     #[test]
     fn an_empty_list_is_still_a_valid_file() {
         let (bytes, written) = build_servers_dat(&[]).expect("the list must build");
-        assert_eq!(&bytes[0..2], &[0x1f, 0x8b]);
+        assert_eq!(bytes[0], TAG_COMPOUND_TAG);
+        assert_ne!(&bytes[0..2], &[0x1f, 0x8b], "raw NBT, never gzip");
         assert!(written.is_empty());
         assert!(decode(&bytes).is_empty());
     }
@@ -426,38 +468,54 @@ mod multiplayer_tests {
     fn e2e_the_owner_instance_gets_the_multiplayer_list() {
         let home = std::env::var("HOME").expect("HOME");
         let base = format!("{home}/Voxel");
-        let instance = PathBuf::from(&base).join("instances").join("mine-rank");
-        if !instance.is_dir() {
-            panic!("the owner instance must exist: {}", instance.display());
+        let instances_dir = PathBuf::from(&base).join("instances");
+        if !instances_dir.is_dir() {
+            panic!("the owner workspace must exist: {}", instances_dir.display());
         }
 
-        let result = write_servers_dat_impl(
-            &base,
-            "mine-rank",
-            vec![
-                server("Mine Rank", "127.0.0.1", Some(25565)),
-                server("NerdZone.gg", "nerdzone.gg", None),
-            ],
-        )
-        .expect("the multiplayer list must be written");
+        let servers = vec![
+            server("Mine Rank", "127.0.0.1", Some(25565)),
+            server("NerdZone.gg", "nerdzone.gg", None),
+        ];
 
-        assert_eq!(result.written, 2);
-        let bytes = std::fs::read(&result.path).expect("the file must exist");
-        assert_eq!(&bytes[0..2], &[0x1f, 0x8b], "the file must be gzip");
-        let decoded = decode(&bytes);
-        assert_eq!(decoded.len(), 2);
-        assert_eq!(decoded[0].0, "Mine Rank");
-        assert_eq!(decoded[0].1, "127.0.0.1:25565");
-        assert_eq!(decoded[1].0, "NerdZone.gg");
-        // NerdZone publishes an SRV record — the file must carry the
-        // target the record points at, never the default port
-        let nerd = &result.entries[1];
-        println!(
-            "NerdZone → {}:{} (srv: {})",
-            nerd.address, nerd.port, nerd.srv
-        );
-        assert!(nerd.srv, "the SRV record must decide the port");
-        assert_ne!(nerd.port, DEFAULT_PORT);
-        assert_eq!(decoded[1].1, format!("{}:{}", nerd.address, nerd.port));
+        // EVERY instance gets the list — the file lives in the game folder
+        // of the instance, so a list written into one of them is invisible
+        // to the others (the owner's report: "I cannot join any server").
+        let mut written = 0usize;
+        for entry in std::fs::read_dir(&instances_dir).expect("the instances folder") {
+            let entry = entry.expect("the instance entry");
+            if !entry.path().is_dir() {
+                continue;
+            }
+            let slug = entry.file_name().to_string_lossy().to_string();
+            let result = write_servers_dat_impl(&base, &slug, servers.clone())
+                .unwrap_or_else(|e| panic!("the list must be written for {slug}: {e}"));
+            written += 1;
+
+            let bytes = std::fs::read(&result.path).expect("the file must exist");
+            assert_ne!(
+                &bytes[0..2],
+                &[0x1f, 0x8b],
+                "the file must be raw NBT — the client reads it without gzip"
+            );
+            assert_eq!(bytes[0], TAG_COMPOUND_TAG);
+            let decoded = decode(&bytes);
+            assert_eq!(decoded.len(), 2);
+            assert_eq!(decoded[0].0, "Mine Rank");
+            assert_eq!(decoded[0].1, "127.0.0.1:25565");
+            assert_eq!(decoded[1].0, "NerdZone.gg");
+            // NerdZone publishes an SRV record — the file must carry the
+            // target the record points at, never the default port
+            let nerd = &result.entries[1];
+            println!(
+                "NerdZone → {}:{} (srv: {})",
+                nerd.address, nerd.port, nerd.srv
+            );
+            assert!(nerd.srv, "the SRV record must decide the port");
+            assert_ne!(nerd.port, DEFAULT_PORT);
+            assert_eq!(decoded[1].1, format!("{}:{}", nerd.address, nerd.port));
+        }
+        assert!(written > 0, "at least one instance must exist");
+        println!("the multiplayer list landed in {written} instance(s)");
     }
 }

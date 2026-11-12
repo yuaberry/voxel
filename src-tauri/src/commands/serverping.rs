@@ -376,6 +376,24 @@ mod tests {
         assert!(parse_status("x", 1, 5, b"not json").is_err());
     }
 
+    /// The owner's local server must answer the REAL protocol ping — a
+    /// server that accepts TCP but never answers the status is a server
+    /// no client can join ("pinging…" forever).
+    #[ignore = "e2e: pings the owner's local Mine Rank server"]
+    #[test]
+    fn e2e_ping_the_local_mine_rank_server() {
+        let ping = server_ping_impl("127.0.0.1".into(), Some(25565))
+            .unwrap_or_else(|e| panic!("the local server did not answer: {e}"));
+        println!(
+            "127.0.0.1:25565 → {} players v{} [{}]",
+            ping.players_online, ping.version, ping.motd
+        );
+        assert!(
+            !ping.version.is_empty(),
+            "the server must report its version"
+        );
+    }
+
     #[ignore = "e2e: pings real public servers (network)"]
     #[test]
     fn e2e_ping_public_server() {
