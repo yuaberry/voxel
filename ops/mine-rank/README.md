@@ -50,6 +50,39 @@ não tem `tps` — o TPS se mede com `time query gametime`).
 | Memória | `-Xms512M -Xmx2G` |
 | Reinício | `Restart=always`, `RestartSec=10` |
 | Encerramento | `SIGTERM` + 90 s para o mundo ser salvo |
+| Tick | `max-tick-time=120000` · `sync-chunk-writes=false` (ver abaixo) |
+
+## O watchdog e os "Can't keep up"
+
+O vanilla 1.20.1 tem um watchdog: se um **único tick** passa de
+`max-tick-time`, ele mata o servidor (*"A single server tick took 95.91
+seconds"* → *"Considering it to be crashed"*). Com o valor default
+(60 s) e a máquina do dono compartilhada com o **launcher, o cliente do
+Minecraft e as compilações do VOXEL** (cargo + vitest), um pico de I/O
+deixava o tick sem CPU por mais de um minuto — e o servidor morria
+**no meio do jogo do dono**.
+
+Duas properties resolvem isso, e as duas são padrão do vanilla:
+
+| Property | Antes | Agora | Por quê |
+|---|---|---|---|
+| `max-tick-time` | `60000` | `120000` | um tick lento **não** vira morte do servidor |
+| `sync-chunk-writes` | `true` | `false` | o autosave deixa de segurar o thread do servidor (é a origem dos picos de *"Can't keep up"*) |
+
+**Custo honesto da escolha**: com `120000`, um tick realmente travado
+leva até 2 minutos para ser morto pelo watchdog. A escolha é
+deliberada — um servidor morto custa mais ao dono (perde o mundo em
+jogo) do que um servidor lento que ainda responde. E como o
+`Restart=always` está ativo, ele volta sozinho em ~10 s mesmo assim.
+
+> **Diagnóstico do mundo (2026-11-11)**: os erros `"stream is truncated"`
+> no log **não** significam corrupção. Os *region files* foram
+> validados com o formato vanilla correto (**offset em setores de 4096
+> bytes**; o `length` do header **inclui** o byte de compressão):
+> **1007 chunks, 0 corrompidos**. Erros de leitura assim aparecem
+> quando o chunk está sendo reescrito no meio de um autosave.
+
+## Estado
 
 > **Nota para o futuro domínio/host próprio**: `server-ip=127.0.0.1` e a
 > porta local servem para o jogo na mesma máquina. Num VPS com domínio, o

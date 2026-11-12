@@ -206,6 +206,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
+| **81** | **Multiplayer: o `servers.dat` que o cliente não lia** | **`servers.dat` em NBT cru** (o cliente 1.20.1 lê com `DataInputStream`, **sem gzip** — o arquivo gzipado era descartado em silêncio e a tela Multiplayer vinha vazia) · **prova com o código oficial do cliente** (`rb.b(File)` do `client.jar` oficial) · a lista escrita em **todas** as instâncias + **sync antes de cada Run** · referências públicas **persistidas** (`launcher.publicServerIds`) · **servidor local como serviço systemd do usuário** (`Restart=always` + linger + console FIFO + guarda de porta ocupada) · **E2E do join real** (cliente vanilla entra no servidor local) · E2E do ping SLP local · **mundo provado íntegro** (1007 chunks, 0 corrompidos) e watchdog mitigado (`max-tick-time=120000`, `sync-chunk-writes=false`) · v0.35.2 | `servers.dat` gravado **gzipado** (o cliente vanilla nunca lê gzip — lista descartada em silêncio); lista escrita em **uma** instância só (invisível nas outras); servidor local morto (runner ad-hoc em `/tmp` limpo pelo sistema); **dois scripts meus de validação de region file errados** (byte offset em vez de setores de 4096; `length` inclui o byte de compressão) — falsaram um "mundo corrompido" que não existia; watchdog matando o servidor por **contenção de recursos** das minhas próprias compilações |
 | **80** | **Launcher: o jogo que não inicia** | **Launcher loader-aware** (vanilla + fabric, `paper`/desconhecidos recusados) · **regras do Mojang corrigidas** (a flag de macOS `-XstartOnFirstThread` matava o JVM no Linux) · **`launcher_runtime_status`** (runtime real: client.jar, libs, 3.600 assets, natives) · **download automático** ao configurar conta Microsoft/Ely.by · aviso do jar **removido** · projeto Mine Rank migrado para `datapack` 1.20.1 vanilla · **E2E real: o cliente chega ao menu principal** · v0.35.0 | `allow` que não casava com o SO era lido como "permitir" (JVM não subia); `instanceExists()` pulava o download; `${version_type}` literal no `--versionType`; classpath com `:` no Windows |
 | 1 | Planejamento | Briefing 61 seções → 11 ADs, riscos, 8 fases, critérios | — |
 | 2 | Fase 0 | Shell + SQLite 18 tabelas + Settings + keyring + palette + ícones | — |
@@ -341,13 +342,13 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 | **`/trigger` do console é recusado** — *"A player is required to run this command here"* (o objetivo nem é resolvido) | probe no vanilla 1.20.1 | o E2E usa **cliente real** (mineflayer); a varredura completa usa `execute as <jogador> run trigger …` pelo console (mesma semântica, sem throttle de chat) |
 | **Chat do vanilla tem throttle** (~20 msgs/10s) — o sweep de 39+78 mensagens perdia o feedback e o comando era engolido | E2E real (comando 39 sem resposta) | E2E confirma pelo **log do servidor** (fonte de verdade) e usa pacing + retry; o sweep completo vai pelo console |
 
-## 8. Estado atual (verificado — Sessão 80, v0.35.0 — Mine Rank entregue, site no ar, o jogo inicia)
+## 8. Estado atual (verificado — Sessão 81, v0.35.2 — a lista multiplayer é lida pelo cliente e o servidor local é um serviço)
 
 ### Testes (TODOS verdes)
 | Suíte | Resultado |
 |---|---|
-| Rust unit (135 + 14 ignored) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge, **launcher Ely.by/authlib-injector**, **launcher loader-aware (vanilla/fabric) + regras do Mojang + status de runtime + plano de launch**, allowlist de HTTP/URL, **import de mundo com atribuição de mapa** |
-| Vitest (349 em 45 arquivos) | ✅ inclui Player Management, Moderation Assistant, dialogs render-smoke, **Mine Rank (manifesto + datapack + layout do mundo + render do painel)**, Performance Lab, Accessibility, Deployment SSH, Session Auto-Refresh e **device flow Ely.by/Microsoft + coordinator de sessão + HTTP com timeout/abort + seleção de provider**, **download automático do runtime** + **render do Run dialog (o aviso do jar sumiu)** |
+| Rust unit (136 + 16 ignored) | ✅ template×3 loaders (render+consistência), ledger+tamper, shaderpack, SLP parse, **bridge multimodal/PWA/dialects**, server presets merge, **launcher Ely.by/authlib-injector**, **launcher loader-aware (vanilla/fabric) + regras do Mojang + status de runtime + plano de launch**, allowlist de HTTP/URL, **import de mundo com atribuição de mapa** |
+| Vitest (351 em 45 arquivos) | ✅ inclui Player Management, Moderation Assistant, dialogs render-smoke, **Mine Rank (manifesto + datapack + layout do mundo + render do painel)**, Performance Lab, Accessibility, Deployment SSH, Session Auto-Refresh e **device flow Ely.by/Microsoft + coordinator de sessão + HTTP com timeout/abort + seleção de provider**, **download automático do runtime** + **render do Run dialog (o aviso do jar sumiu)** |
 | E2E gradle | ✅ jar compilado (Sessão 12) |
 | E2E launcher | ✅ 3.695 arquivos SHA-1 (Sessão 12) |
 | E2E server | ✅ boot→stop→backup→restore (Sessão 12) |
@@ -1341,3 +1342,113 @@ O runtime 1.20.1 do dono foi verificado arquivo a arquivo: `client.jar` ✓ · 1
 1. A pasta `projects/mine-rank/` ainda contém o **template Fabric antigo** (o build aparece como "Java mod only" desabilitado para projetos vanilla). Substituí-la pelo datapack gerado é decisão do dono.
 2. **Domínio + host próprio**: o app já tem deploy SSH e túnel playit.gg (§70); migrar o Mine Rank para um VPS com domínio é o próximo passo natural — **não** foi implementado agora (decisão do dono).
 3. **Ely.by ao vivo** e **`nexus_marketplace`** continuam pendentes do dono (§79.G).
+
+---
+
+## 81. Sessão 81 — "Não consigo entrar em nenhum servidor": o `servers.dat` gzipado e o servidor morto
+
+**Pedido do dono**: *"agora eu consigo entrar no jogo com a minha conta, mas não consigo entrar em nenhum servidor, por favor corija isso. e rode o meu servidor local também para eu ver como está ficando."*
+
+O sintoma tinha **duas causas independentes**, e só as duas juntas explicavam o que o dono viu.
+
+### A. Causa raiz nº 1 — o `servers.dat` era gravado **gzipado**, e o cliente vanilla **não lê gzip**
+
+O VOXEL escrevia a lista multiplayer com `gzip_bytes(...)`. O cliente oficial 1.20.1 lê esse arquivo com `FileInputStream` + `DataInputStream` — **sem nenhuma stream gzip no caminho**. Provado no bytecode do `client.jar` oficial (jar totalmente ofuscado, classes na raiz):
+
+| Classe | Papel | Evidência |
+|---|---|---|
+| `ffe` | `ServerDataList` — a lista da tela Multiplayer | lê `name`, `ip`, `hidden`; grava `servers.dat` / `servers.dat_old` |
+| `rb.b(File)` | o **leitor** | `new FileInputStream` → `new DataInputStream` → `rb.a(qr, DataInput)` — **zero gzip** |
+| `rb.b(qr, File)` | o **escritor** | `new FileOutputStream` → `new DataOutputStream` — **zero gzip** |
+
+Um arquivo gzipado é **descartado pelo cliente em silêncio** (*"Couldn't load server list"*) e a tela Multiplayer abre **VAZIA**. O dono via "nenhum servidor" e concluía que não conseguia entrar em nada.
+
+**Prova com o código oficial do cliente** (`/tmp/opencode/voxel/proof/ReadVanillaServers.java` — reflexão sobre `rb`/`qr`/`qx` do `client.jar` oficial, com o classpath de `version.json`):
+
+```
+/home/llinux/Voxel/instances/mine-rank/servers.dat → the official client reads 2 server(s):
+   - Mine Rank → 127.0.0.1:25565
+   - NerdZone.gg → jogar.nerdzone.gg:30000
+```
+
+E o **contraste** com o formato antigo (o mesmo arquivo comprimido):
+
+```
+=== formato ANTIGO (gzip, o que o VOXEL escrevia) ===
+Caused by: java.lang.IllegalStateException: Game version not set
+```
+
+**Correção**: `build_servers_dat` devolve **NBT cru** — exatamente o layout que o cliente escreve sozinho (`name`, `ip` = `host:porta`, `hidden`; `address`/`port` extras mantidos para clientes mais novos). `gzip_bytes` continua existindo no crate porque **os `.nbt` de estrutura SÃO gzipados no vanilla** (`structures.rs`) — a confusão entre os dois formatos era a origem do bug.
+
+### B. Causa raiz nº 2 — a lista ia para **uma** instância só, e o servidor local estava **morto**
+
+- O `servers.dat` vive na **pasta de jogo da instância**. Uma lista escrita em uma instância é **invisível** nas outras: o dono lançava outro projeto e a tela Multiplayer vinha vazia. Agora o painel escreve em **todas** as instâncias (e reporta cada uma, com as falhas), e o **Run reescreve a lista da instância antes de abrir o jogo**.
+- As referências públicas agora são **persistidas** (`launcher.publicServerIds`, default `["nerdzone"]`) — antes eram um estado do React que sumia com a página.
+- O servidor local tinha morrido: o runner ad-hoc vivia em `/tmp/opencode` (limpo pelo sistema) e o `console.log` do cliente de 6/nov registra a prova histórica do sintoma — *"Connecting to 127.0.0.1, 25565"* → *"Conexão recusada: localhost/127.0.0.1:25565"*.
+
+### C. O servidor local agora é um **serviço systemd do usuário** (durável)
+
+`ops/mine-rank/` (versionado no repo) + `~/.config/systemd/user/voxel-mine-rank.service`:
+
+| Item | Valor |
+|---|---|
+| Tipo | `systemd --user` · `Restart=always` · `RestartSec=10` |
+| Sobrevivência | `loginctl enable-linger` → sobe **sem ninguém logado** e **sobe no boot** |
+| Console vivo | `cmd.fifo` é o **stdin** do servidor (aberto read-write com `exec 3<>`; aberto só-leitura travaria o boot) |
+| Guarda | o script **recusa** arrancar se a porta 25565 já estiver ocupada — **dois servidores nunca escrevem o mesmo mundo** |
+| Encerramento | `SIGTERM` + `TimeoutStopSec=90` → o mundo é salvo antes de morrer |
+
+```bash
+systemctl --user status voxel-mine-rank.service
+echo "say olá" > ~/Voxel/servers/mine-rank/cmd.fifo
+```
+
+### D. O watchdog matava o servidor — e **a causa era a contenção de recursos, não corrupção do mundo**
+
+Três crashes hoje (*"A single server tick took 95.91 seconds"* → *"Considering it to be crashed"*). O caminho de investigação e o resultado honesto:
+
+1. **Suspeita inicial**: corrupção dos `region files` (erros *"stream is truncated"*, *"Declared size … is negative"*). **FALSA** — dois scripts meus de validação estavam errados (usei **byte offset** em vez de **setores de 4096 bytes**; e o `length` do formato vanilla **inclui** o byte de compressão, então o payload tem `length-1` bytes). Validação com o formato correto:
+   ```
+   r.-1.-1.mca: 232 em uso | ok=232 | ruins=0
+   r.-1.0.mca:   349 em uso | ok=349 | ruins=0
+   r.0.-1.mca:   182 em uso | ok=182 | ruins=0
+   r.0.0.mca:    244 em uso | ok=244 | ruins=0
+   TOTAL: 1007 chunks íntegros, 0 corrompidos
+   ```
+   **O mundo está íntegro** — nenhuma surgery foi feita (e nenhuma era necessária).
+2. **Causa real**: os avisos *"Can't keep up"* (15,9 s → 68,2 s) coincidem **exatamente** com as minhas compilações `cargo test` / `vitest` rodando em paralelo na mesma máquina (load average 5,33 · IO pressure avg10 23%). O tick vanilla ficou **sem CPU** por mais de 60 s e o watchdog matou o servidor. **Não é bug do datapack nem do mundo** — é contenção de recursos da própria sessão de desenvolvimento.
+3. **Mitigação honesta** (em `server.properties`, com backup `server.properties.bak-221446`):
+   - `max-tick-time=60000 → 120000` — um tick lento **não** vira morte do servidor do dono;
+   - `sync-chunk-writes=true → false` — o autosave deixa de segurar o thread do servidor (é exatamente o que produz os picos de *"Can't keep up"*).
+
+   O servidor **não** fica mais vulnerável: o `Restart=always` já provou que ele volta sozinho (21:36:24 → 21:36:34; 21:46:40 → 21:46:50).
+
+### E. Provas de execução (não afirmações)
+
+| Prova | Resultado |
+|---|---|
+| **E2E do join real** (`e2e_the_client_joins_the_local_server`) | o cliente vanilla **real** subiu com `--quickPlayMultiplayer 127.0.0.1:25565`; log do **servidor**: `VOXEL_E2E[/127.0.0.1:59864] logged in with entity id 153` + `VOXEL_E2E joined the game` — **1 passed** |
+| **Leitor oficial do cliente** | lê o arquivo do VOXEL: `Mine Rank → 127.0.0.1:25565` · `NerdZone.gg → jogar.nerdzone.gg:30000` (o gzip antigo faz o mesmo leitor **lançar**) |
+| **E2E do ping** (`e2e_ping_the_local_mine_rank_server`) | `127.0.0.1:25565 → 0 players v1.20.1 [Mine Rank — mine, rank up, earn MRT]` (o SLP do próprio app) |
+| **E2E da lista em todas as instâncias** | `the multiplayer list landed in 3 instance(s)` |
+| **Tick medido no servidor vivo** | `gametime` 1661672 → 1661912 em ~12 s ⇒ **20 TPS** |
+| **Rust** | **136 passed + 16 ignored** |
+| **Vitest** | **351 passed + 1 skipped** (45 arquivos) |
+| **typecheck / lint / `pnpm build`** | ✅ |
+
+### F. Commits desta sessão
+
+| Commit | O quê |
+|---|---|
+| `61e908e` | `fix(multiplayer)`: o `servers.dat` vira NBT cru (o cliente consegue ler) |
+| `5163000` | `feat(launcher)`: a lista chega a **toda** instância + referências persistidas + sync antes do Run |
+| `b8df98f` | `test(launcher)`: E2E do **join real** + `ops/mine-rank/` (servidor como serviço) |
+| `chore(release)` | bump **v0.35.2** + esta §81 + README |
+
+### G. Pendências honestas (dependem do dono)
+
+1. **Verificação na tela**: o arquivo já está correto no disco (as 3 instâncias), mas a sessão desktop está **travada** — os cliques automatizados batem no greeter, não no app. O dono precisa abrir o jogo e ver **"Mine Rank → 127.0.0.1:25565"** na tela Multiplayer (o app em execução é a v0.35.1, mas o arquivo em disco já é o certo — a correção é do **dado**, não do app).
+2. **NerdZone.gg (`jogar.nerdzone.gg:30000`)**: a **resolução SRV funciona** (`srv: true`), mas o host está **inalcançável desta máquina** (porta filtrada / timeout). Honestidade: a entrada está na lista, mas **não dá para entrar** enquanto o host não responder.
+3. **Ely.by ao vivo** e **`nexus_marketplace`** continuam pendentes do dono (§79.G).
+4. **Domínio + host próprio**: decisão do dono; o `ops/mine-rank/README.md` já documenta o que muda (`server-ip` vazio para escutar em todas as interfaces).
+5. **Custo da mitigação**: `max-tick-time=120000` deixa um tick realmente travado levar até 2 min para ser morto pelo watchdog — escolha deliberada, porque um servidor morto custa mais ao dono (perde o mundo em jogo) do que um servidor lento que ainda responde.

@@ -9,18 +9,18 @@
 
 **[🌐 Site oficial](https://yuaberry.github.io/voxel/)** ·
 **[⛏️ Mine Rank](https://yuaberry.github.io/voxel/mine-rank/)** (site do módulo de Rankup) ·
-**[⬇️ Downloads (v0.35.0)](https://github.com/yuaberry/voxel/releases/latest)** —
+**[⬇️ Downloads (v0.35.2)](https://github.com/yuaberry/voxel/releases/latest)** —
 Windows `.exe`/`.msi` · Linux `.deb`/`.AppImage` · macOS `.dmg` (Apple Silicon + Intel)
 
 VOXEL é uma plataforma desktop de criação assistida por IA para Minecraft Java Edition. **O MVP está completo e provado de ponta a ponta**: descreva um mod em linguagem natural, compile-o de verdade com Gradle, corrija erros com um agente sandboxado, rode o Minecraft com o seu jar instalado, monte servidores com economia própria e publique o projeto no GitHub.
 
 ```
 NO FAKE DATA — cada tela mostra apenas o que funciona.
-Prova real: 135 testes unitários Rust + 349 Vitest + 14 E2E executados
+Prova real: 136 testes unitários Rust + 351 Vitest + 16 E2E executados
 (mod compilado, launcher de 718MB oficiais com SHA-1, authlib-injector
 oficial com SHA-256, servidor boot/stop/backup, Mine Rank em servidor
-vanilla 1.20.1 real, o cliente de Minecraft abrindo de verdade) — tudo
-verde, na CI e local.
+vanilla 1.20.1 real, o cliente de Minecraft abrindo de verdade e
+ENTRANDO no servidor local) — tudo verde, na CI e local.
 ```
 
 ---
@@ -39,7 +39,7 @@ verde, na CI e local.
 | Build System — `./gradlew build` ao vivo, Error Center, Auto-Fix ≤5 tentativas | ✅ |
 | Launcher — instâncias isoladas, downloads oficiais SHA-1 (718MB provados), **client vanilla + Fabric (o jogo realmente abre — provado por E2E)**, Microsoft + Ely.by OAuth device flow, authlib-injector SHA-256 para Ely.by | ✅ |
 | **Download automático do Minecraft** — ao configurar a conta Microsoft/Ely.by o VOXEL baixa o runtime oficial que falta (cache compartilhado) e o Run mostra o estado real do runtime (`client.jar`, libs, 3.600 assets, natives) — nada de "prepare first" | ✅ |
-| **Lista de servidores (multiplayer)** — o `servers.dat` vanilla de verdade (NBT gzipado) escrito na instância: seus servidores em `127.0.0.1:<porta>` + referências públicas, **SRV-aware** (o NerdZone resolve para `jogar.nerdzone.gg:30000`), com o painel no Launcher mostrando o que realmente ficou no arquivo | ✅ |
+| **Lista de servidores (multiplayer)** — o `servers.dat` vanilla de verdade (**NBT cru**, o formato exato que o cliente 1.20.1 lê) escrito em **todas** as instâncias: seus servidores em `127.0.0.1:<porta>` + referências públicas, **SRV-aware** (o NerdZone resolve para `jogar.nerdzone.gg:30000`), com o painel no Launcher mostrando o que realmente ficou no arquivo — **provado com o código oficial do cliente** | ✅ |
 | Server Studio — vanilla/Paper oficiais, console stdin, backups/restore, properties | ✅ |
 | Server Modules misturáveis — 9 sistemas: Economy/Prison/Token Chain, SkyBlock Islands, Factions War, BedWars Lite, Monuments (.nbt reais com /place), Custom Realm (dimensão real) e **Mine Rank** (Rankup completo: 47 comandos, pré-ranks Terra/Areia, sistema de pás com multiplicadores inteiros validados **pelo servidor**, MineCoin no Bronze, 8 tiers, prestígio, 8 minas privadas, 4 moedas, clans, pesca, arena e a **textura própria da picareta** — PNG 16×16 RGBA real, embarcado no gerador) — cada um com comandos documentados no README do servidor | ✅ |
 | Token Chain — ledger SHA-256 real (mint/transfer/burn/verify, tamper-evidente) | ✅ Wave 1 |
@@ -55,7 +55,7 @@ verde, na CI e local.
 | Dark Kingdom — projeto-exemplo criado automaticamente (espada, receita, advancement) | ✅ |
 | Release multi-OS + site oficial no GitHub Pages | ✅ |
 | **Site do Mine Rank** (`apps/mine-rank-site`) — React 18 + Vite + Tailwind, deploy no GitHub Pages; renderiza o **mesmo manifesto** que gera o datapack (uma fonte de verdade), com busca de comandos, mapa do mundo em SVG e a dedicatória ao NerdZone.gg | ✅ |
-| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), **484 testes verdes** (135 Rust + 349 Vitest); toda ação fora da main thread (async + spawn_blocking — congelamento extinto como classe) | ✅ |
+| Qualidade — ErrorBoundary, ESLint, Vitest, CI (GitHub Actions), **487 testes verdes** (136 Rust + 351 Vitest); toda ação fora da main thread (async + spawn_blocking — congelamento extinto como classe) | ✅ |
 
 ## 🚀 Como rodar (desenvolvimento)
 
@@ -80,7 +80,7 @@ Para **servidor estilo Rankup**: aba **Servers** → console do servidor → aba
 
 Para **publicar**: workspace → **Publish** → commit + repo GitHub + push.
 
-Para a **lista de servidores do seu cliente**: aba **Launcher** → **Multiplayer list** → escolha a instância → ligue/desligue cada referência → **Write servers.dat**. O VOXEL escreve o `servers.dat` vanilla (NBT gzipado) no diretório de jogo da instância: os seus servidores entram como `127.0.0.1:<porta real>` e as referências públicas com o endereço que elas publicam — com resolução **SRV** quando existe (o NerdZone.gg resolve para `jogar.nerdzone.gg:30000`). O painel mostra, depois da escrita, o endereço e a porta que ficaram no arquivo.
+Para a **lista de servidores do seu cliente**: aba **Launcher** → **Multiplayer list** → ligue/desligue cada referência → **Write servers.dat**. O VOXEL escreve o `servers.dat` vanilla (**NBT cru** — o cliente 1.20.1 lê com `DataInputStream`, sem gzip: um arquivo comprimido é descartado em silêncio e a tela Multiplayer fica vazia) no diretório de jogo de **todas** as instâncias do workspace: os seus servidores entram como `127.0.0.1:<porta real>` e as referências públicas com o endereço que elas publicam — com resolução **SRV** quando existe (o NerdZone.gg resolve para `jogar.nerdzone.gg:30000`). O botão **Run** reescreve a lista da instância antes de abrir o jogo, então a tela Multiplayer nunca fica vazia por causa de um arquivo velho. O painel mostra, depois da escrita, o que ficou em cada instância.
 
 ## Arquitetura em uma página
 
@@ -113,9 +113,9 @@ Decisões-chave no [`docs/architecture.md`](docs/architecture.md) (AD-1..AD-11 +
 
 | Suíte | Escopo |
 |---|---|
-| `cargo test` | 135 unit (templates ×6 eras, ledger+tamper, shaderpacks, SLP+SRV, bridge multimodal, modpacks, snapshots, deploy, structures NBT, NBT compartilhado, lista multiplayer `servers.dat`, assets animados, launcher Ely.by/authlib-injector, **launcher vanilla/fabric + regras do Mojang + status de runtime + plano de launch**, allowlist de HTTP/URL) |
-| `cargo test -- --ignored` | 14 E2E: **compilação REAL de 6 templates** (fabric/forge/neoforge ×4 eras até 26.3), launcher 718MB SHA-1, **authlib-injector oficial com SHA-256**, server ciclo, SLP de servidores públicos (hypixel/nerdzone…), Modrinth com checksum, **lista multiplayer no workspace real (com SRV)**, **o cliente de Minecraft abrindo de verdade e chegando ao menu principal** |
-| `pnpm test:unit` | 349 Vitest em 45 arquivos (shaders + gerador GLSL, error parser, 9 módulos de servidor com comandos, **Mine Rank** — manifesto, datapack gerado, layout do mundo, **gramática do scoreboard do vanilla** e render do painel, **lista multiplayer**, **download automático do runtime**, **render do Run dialog**, **site do Mine Rank renderizado em jsdom**, inferência de estilo, task force, model routing, i18n pt-BR, manifestos, parser de MOTD, **device flow Microsoft + Ely.by**, coordinator de sessão OAuth, HTTP com timeout/abort e seleção de provider) |
+| `cargo test` | 136 unit (templates ×6 eras, ledger+tamper, shaderpacks, SLP+SRV, bridge multimodal, modpacks, snapshots, deploy, structures NBT, NBT compartilhado, lista multiplayer `servers.dat`, assets animados, launcher Ely.by/authlib-injector, **launcher vanilla/fabric + regras do Mojang + status de runtime + plano de launch**, allowlist de HTTP/URL) |
+| `cargo test -- --ignored` | 16 E2E: **compilação REAL de 6 templates** (fabric/forge/neoforge ×4 eras até 26.3), launcher 718MB SHA-1, **authlib-injector oficial com SHA-256**, server ciclo, SLP de servidores públicos (hypixel/nerdzone…), Modrinth com checksum, **lista multiplayer no workspace real (com SRV)**, **o cliente de Minecraft abrindo de verdade e chegando ao menu principal**, **o cliente vanilla ENTRANDO no servidor local** (`--quickPlayMultiplayer`) e **o ping SLP do servidor local** |
+| `pnpm test:unit` | 351 Vitest em 45 arquivos (shaders + gerador GLSL, error parser, 9 módulos de servidor com comandos, **Mine Rank** — manifesto, datapack gerado, layout do mundo, **gramática do scoreboard do vanilla** e render do painel, **lista multiplayer**, **download automático do runtime**, **render do Run dialog**, **site do Mine Rank renderizado em jsdom**, inferência de estilo, task force, model routing, i18n pt-BR, manifestos, parser de MOTD, **device flow Microsoft + Ely.by**, coordinator de sessão OAuth, HTTP com timeout/abort e seleção de provider) |
 | `VOXEL_E2E=1 pnpm vitest run src/services/servers/mineRankServer.e2e.test.ts` | **E2E real do Mine Rank**: jar vanilla 1.20.1 oficial (SHA-1 do piston-meta), cliente **mineflayer** de verdade, os 47 comandos do manifesto (47 triggers únicos) + mineração real que paga coin + nenhum stall de tick |
 | CI (`.github/workflows/ci.yml`) | typecheck + lint + vitest + vite build + cargo test |
 | Release (`.github/workflows/release.yml`) | tag `v*` → .exe/.msi/.deb/.AppImage/.dmg (Windows, Linux, macOS arm64+x64) |
