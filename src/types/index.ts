@@ -76,6 +76,13 @@ export interface LauncherSettings {
   /** Ely.by desktop application client id — required for Ely.by device flow. */
   elyClientId: string;
   ramMb: number;
+  /**
+   * The public server references the owner wants in the client's
+   * Multiplayer list (ids of `PUBLIC_SERVER_REFS`). Persisted so the
+   * list the game shows is the same one the owner configured — in every
+   * instance, and after a restart.
+   */
+  publicServerIds: string[];
 }
 
 export type MinecraftAuthProvider = "microsoft" | "elyby";

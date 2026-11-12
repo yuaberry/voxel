@@ -10,8 +10,9 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { listServersReconciled } from "@/services/db/repositories/serversRepository";
+import { PUBLIC_SERVER_REFS } from "@voxel/core/publicServers";
 import type { ServerRecord } from "@/types";
-
 export interface MultiplayerServerEntry {
   /** the name the client shows in the list */
   name: string;
@@ -78,6 +79,22 @@ export function buildMultiplayerEntries(
   ];
 }
 
+/**
+ * The list of THIS workspace: the local servers (through the loopback, on
+ * the port they really listen on) plus the public references the owner
+ * kept enabled.
+ */
+export async function buildWorkspaceServerEntries(
+  basePath: string,
+  publicServerIds: readonly string[],
+): Promise<MultiplayerServerEntry[]> {
+  const servers = await listServersReconciled(basePath).catch(() => []);
+  const references = PUBLIC_SERVER_REFS.filter((reference) =>
+    publicServerIds.includes(reference.id),
+  );
+  return buildMultiplayerEntries(servers, references);
+}
+
 /** Writes the list into the game directory of an instance. */
 export async function writeInstanceServerList(
   basePath: string,
@@ -94,4 +111,45 @@ export async function writeInstanceServerList(
       hidden: server.hidden ?? false,
     })),
   });
+}
+
+/** What happened to the list of every instance. */
+export interface MultiplayerSyncResult {
+  /** the instances whose list was written */
+  written: { slug: string; path: string; servers: number }[];
+  /** the instances that could not be written (with the reason) */
+  failed: { slug: string; error: string }[];
+}
+
+/**
+ * Writes the multiplayer list into EVERY instance of the workspace.
+ *
+ * The list lives in the game directory of the instance — the folder the
+ * client uses when it launches. A list written into one instance is
+ * invisible to the others: the owner launches another project and the
+ * Multiplayer screen is EMPTY ("I cannot join any server"). Every
+ * instance gets the same list.
+ */
+export async function writeServerListToAllInstances(
+  basePath: string,
+  instanceSlugs: string[],
+  servers: MultiplayerServerEntry[],
+): Promise<MultiplayerSyncResult> {
+  const result: MultiplayerSyncResult = { written: [], failed: [] };
+  for (const slug of instanceSlugs) {
+    try {
+      const written = await writeInstanceServerList(basePath, slug, servers);
+      result.written.push({
+        slug,
+        path: written.path,
+        servers: written.written,
+      });
+    } catch (error) {
+      result.failed.push({
+        slug,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return result;
 }

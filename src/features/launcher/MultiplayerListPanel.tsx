@@ -16,21 +16,14 @@ import { List, Loader2, Radio, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { listServersReconciled } from "@/services/db/repositories/serversRepository";
 import {
   buildMultiplayerEntries,
-  writeInstanceServerList,
+  writeServerListToAllInstances,
   type MultiplayerServerEntry,
-  type ServersDatResult,
+  type MultiplayerSyncResult,
 } from "@/services/servers/multiplayerService";
 import { PUBLIC_SERVER_REFS } from "@voxel/core/publicServers";
 import type { ServerRecord } from "@/types";
@@ -42,13 +35,15 @@ export interface MultiplayerListPanelProps {
 
 export function MultiplayerListPanel({ instances }: MultiplayerListPanelProps) {
   const basePath = useSettingsStore((s) => s.settings.storage.basePath);
+  const updateSettings = useSettingsStore((s) => s.update);
+  // the enabled references live in the settings — the list the game shows
+  // must be the same in every instance and after every restart
+  const publicServerIds = useSettingsStore(
+    (s) => s.settings.launcher.publicServerIds ?? [],
+  );
   const [servers, setServers] = useState<ServerRecord[]>([]);
-  const [instance, setInstance] = useState<string>("");
-  const [enabled, setEnabled] = useState<Record<string, boolean>>({
-    nerdzone: true,
-  });
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<ServersDatResult | null>(null);
+  const [result, setResult] = useState<MultiplayerSyncResult | null>(null);
 
   useEffect(() => {
     if (!basePath) return;
@@ -67,12 +62,9 @@ export function MultiplayerListPanel({ instances }: MultiplayerListPanelProps) {
     };
   }, [basePath]);
 
-  // the first instance is the default target — the owner can pick another
-  const selected = instance || instances[0]?.slug || "";
-
   const references = useMemo(
-    () => PUBLIC_SERVER_REFS.filter((ref) => enabled[ref.id]),
-    [enabled],
+    () => PUBLIC_SERVER_REFS.filter((ref) => publicServerIds.includes(ref.id)),
+    [publicServerIds],
   );
 
   const entries: MultiplayerServerEntry[] = useMemo(
@@ -80,14 +72,39 @@ export function MultiplayerListPanel({ instances }: MultiplayerListPanelProps) {
     [servers, references],
   );
 
+  const toggleReference = useCallback(
+    (id: string, checked: boolean) => {
+      const next = checked
+        ? [...publicServerIds, id]
+        : publicServerIds.filter((current) => current !== id);
+      void updateSettings("launcher", { publicServerIds: next }).catch(() => {});
+    },
+    [publicServerIds, updateSettings],
+  );
+
   const write = useCallback(async () => {
-    if (!basePath || !selected) return;
+    if (!basePath || instances.length === 0) return;
     setBusy(true);
     try {
-      const written = await writeInstanceServerList(basePath, selected, entries);
+      // EVERY instance gets the list — the file lives in the game
+      // directory of the instance, so a list written into one of them is
+      // invisible to the others.
+      const written = await writeServerListToAllInstances(
+        basePath,
+        instances.map((item) => item.slug),
+        entries,
+      );
       setResult(written);
+      if (written.failed.length > 0) {
+        toast.error("Some instances could not receive the list", {
+          description: written.failed
+            .map((failure) => `${failure.slug}: ${failure.error}`)
+            .join(" · "),
+        });
+        return;
+      }
       toast.success("Multiplayer list written", {
-        description: `${written.written} server(s) in ${selected}/servers.dat`,
+        description: `${entries.length} server(s) in ${written.written.length} instance(s)`,
       });
     } catch (error) {
       toast.error("Could not write the multiplayer list", {
@@ -96,7 +113,7 @@ export function MultiplayerListPanel({ instances }: MultiplayerListPanelProps) {
     } finally {
       setBusy(false);
     }
-  }, [basePath, selected, entries]);
+  }, [basePath, instances, entries]);
 
   if (instances.length === 0) return null;
 
@@ -114,24 +131,26 @@ export function MultiplayerListPanel({ instances }: MultiplayerListPanelProps) {
         <CardContent className="space-y-4 p-5">
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-[180px] flex-1">
-              <p className="mb-1.5 text-[11px] text-muted-foreground">Instance</p>
-              <Select value={selected} onValueChange={setInstance}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pick an instance" />
-                </SelectTrigger>
-                <SelectContent>
-                  {instances.map((item) => (
-                    <SelectItem key={item.slug} value={item.slug}>
-                      {item.slug}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <p className="mb-1.5 text-[11px] text-muted-foreground">
+                Instances receiving the list
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {instances.map((item) => (
+                  <Badge key={item.slug} variant="outline" className="font-mono text-[10px]">
+                    {item.slug}
+                  </Badge>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[10px] text-muted-foreground/70">
+                the list lives in the game folder of each instance — every
+                project you launch shows the same servers
+              </p>
             </div>
             <Button
               variant="gradient"
               onClick={() => void write()}
-              disabled={busy || !selected || entries.length === 0}
+              disabled={busy || entries.length === 0}
+              title="Writes the list into every instance of this workspace"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -184,13 +203,8 @@ export function MultiplayerListPanel({ instances }: MultiplayerListPanelProps) {
                         {ref.address}
                       </span>
                       <Switch
-                        checked={Boolean(enabled[ref.id])}
-                        onCheckedChange={(checked) =>
-                          setEnabled((current) => ({
-                            ...current,
-                            [ref.id]: checked,
-                          }))
-                        }
+                        checked={publicServerIds.includes(ref.id)}
+                        onCheckedChange={(checked) => toggleReference(ref.id, checked)}
                         aria-label={`Include ${ref.name}`}
                       />
                     </div>
@@ -204,19 +218,29 @@ export function MultiplayerListPanel({ instances }: MultiplayerListPanelProps) {
             <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
               <p className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-400">
                 <Radio className="h-3 w-3" />
-                {result.written} server(s) written to {result.path}
+                {entries.length} server(s) written to {result.written.length}{" "}
+                instance(s)
+                {result.failed.length > 0
+                  ? ` · ${result.failed.length} failed`
+                  : ""}
               </p>
               <ul className="mt-2 space-y-1">
-                {result.entries.map((entry) => (
+                {result.written.map((item) => (
                   <li
-                    key={`${entry.name}-${entry.address}`}
+                    key={item.slug}
                     className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"
                   >
-                    <span className="truncate">{entry.name}</span>
-                    <span className="font-mono">
-                      {entry.address}:{entry.port}
-                      {entry.srv ? " · SRV" : ""}
-                    </span>
+                    <span className="truncate">{item.slug}</span>
+                    <span className="font-mono">{item.servers} server(s)</span>
+                  </li>
+                ))}
+                {result.failed.map((item) => (
+                  <li
+                    key={`failed-${item.slug}`}
+                    className="flex items-center justify-between gap-2 text-[11px] text-red-400"
+                  >
+                    <span className="truncate">{item.slug}</span>
+                    <span className="truncate font-mono">{item.error}</span>
                   </li>
                 ))}
               </ul>

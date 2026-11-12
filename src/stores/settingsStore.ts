@@ -44,6 +44,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     clientId: "",
     elyClientId: "",
     ramMb: 4096,
+    // the public references the owner keeps in the Multiplayer list
+    publicServerIds: ["nerdzone"],
   },
   github: {
     clientId: "",

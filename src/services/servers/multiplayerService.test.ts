@@ -1,10 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildLocalServerEntries,
   buildMultiplayerEntries,
   buildReferenceServerEntries,
+  writeServerListToAllInstances,
 } from "./multiplayerService";
 import type { ServerRecord } from "@/types";
+
+const invokeMock = vi.fn();
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => invokeMock(...args),
+}));
+vi.mock("@/services/db/repositories/serversRepository", () => ({
+  listServersReconciled: vi.fn(async () => []),
+}));
+vi.mock("@voxel/core/publicServers", () => ({
+  PUBLIC_SERVER_REFS: [
+    { id: "nerdzone", name: "NerdZone.gg", address: "nerdzone.gg" },
+  ],
+}));
 
 function server(name: string, port: number): ServerRecord {
   return {
@@ -56,5 +70,58 @@ describe("multiplayerService — the list the client will show", () => {
   it("never invents a port for a local server", () => {
     const entries = buildLocalServerEntries([server("Mine Rank", 25566)]);
     expect(entries[0].port).toBe(25566);
+  });
+});
+
+describe("multiplayerService — the list reaches EVERY instance", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("writes the list into every instance of the workspace", async () => {
+    invokeMock.mockResolvedValue({
+      path: "/workspace/instances/mine-rank/servers.dat",
+      written: 2,
+      entries: [],
+    });
+
+    const result = await writeServerListToAllInstances(
+      "/workspace",
+      ["mine-rank", "dark-kingdom"],
+      [{ name: "Mine Rank", address: "127.0.0.1", port: 25565 }],
+    );
+
+    expect(invokeMock).toHaveBeenCalledTimes(2);
+    expect(invokeMock.mock.calls[0][1]).toMatchObject({
+      basePath: "/workspace",
+      instanceSlug: "mine-rank",
+    });
+    expect(invokeMock.mock.calls[1][1]).toMatchObject({
+      instanceSlug: "dark-kingdom",
+    });
+    expect(result.written).toHaveLength(2);
+    expect(result.failed).toHaveLength(0);
+  });
+
+  it("reports a broken instance without losing the others", async () => {
+    invokeMock
+      .mockRejectedValueOnce(new Error("Instance not found: broken"))
+      .mockResolvedValueOnce({
+        path: "/workspace/instances/working/servers.dat",
+        written: 1,
+        entries: [],
+      });
+
+    const result = await writeServerListToAllInstances(
+      "/workspace",
+      ["broken", "working"],
+      [{ name: "Mine Rank", address: "127.0.0.1", port: 25565 }],
+    );
+
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0].slug).toBe("broken");
+    expect(result.failed[0].error).toContain("not found");
+    expect(result.written).toHaveLength(1);
+    expect(result.written[0].slug).toBe("working");
   });
 });

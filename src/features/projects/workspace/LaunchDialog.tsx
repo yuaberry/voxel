@@ -31,6 +31,10 @@ import {
   getLaunchAccount,
   getStoredAccount,
 } from "@/services/launcher/accountService";
+import {
+  buildWorkspaceServerEntries,
+  writeInstanceServerList,
+} from "@/services/servers/multiplayerService";
 import type { MinecraftAccount } from "@/types";
 
 interface Props {
@@ -57,6 +61,9 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
   const ramMb = useSettingsStore((s) => s.settings.launcher.ramMb);
   const javaPath = useSettingsStore((s) => s.settings.java.customJavaPath);
   const elyClientId = useSettingsStore((s) => s.settings.launcher.elyClientId);
+  const publicServerIds = useSettingsStore(
+    (s) => s.settings.launcher.publicServerIds ?? [],
+  );
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<LaunchProgress | null>(null);
@@ -167,6 +174,27 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
     }
   };
 
+  /**
+   * Keeps the Multiplayer list of this instance current.
+   *
+   * The list lives in the game folder of the instance (`servers.dat`).
+   * If it is missing or stale, the client opens the Multiplayer screen
+   * with NOTHING in it and the owner concludes that he cannot join any
+   * server. The write is a tiny local file — it never blocks the launch
+   * and never breaks it.
+   */
+  const ensureMultiplayerList = async () => {
+    if (!basePath) return;
+    try {
+      const entries = await buildWorkspaceServerEntries(basePath, publicServerIds);
+      if (entries.length === 0) return;
+      await writeInstanceServerList(basePath, slug, entries);
+    } catch {
+      // the launch must not depend on the list — the owner can always
+      // connect by typing the address
+    }
+  };
+
   const handleLaunch = async () => {
     if (!basePath) return;
     if (!account) {
@@ -209,6 +237,9 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
         const jar = await copyModJar(basePath, slug, `projects/${slug}`).catch(() => null);
         setModJar(jar);
       }
+
+      // the Multiplayer list must be there BEFORE the client opens
+      await ensureMultiplayerList();
 
       await launchGame({
         basePath,
