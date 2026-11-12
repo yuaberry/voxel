@@ -1745,6 +1745,109 @@ mod e2e_tests {
         eprintln!("E2E VANILLA LAUNCH OK — the client reached the main menu");
     }
 
+    /// The owner's report, proven for real: "I cannot join any server".
+    ///
+    /// This starts the ACTUAL vanilla client with `--quickPlayMultiplayer`
+    /// pointing at the local Mine Rank server and waits for the SERVER to
+    /// register the join in its own console log. It proves the whole
+    /// chain at once: the client starts, the socket opens, the handshake
+    /// happens and the player appears in the world.
+    ///
+    /// Needs a display and a running server (the systemd user service
+    /// `voxel-mine-rank.service`).
+    #[test]
+    #[ignore = "e2e: the real client joins the local server (needs a display + the server running)"]
+    fn e2e_the_client_joins_the_local_server() {
+        let home = std::env::var("HOME").expect("HOME");
+        let base = std::env::var("VOXEL_E2E_BASE")
+            .unwrap_or_else(|_| format!("{home}/Voxel"));
+        let slug = std::env::var("VOXEL_E2E_SLUG")
+            .unwrap_or_else(|_| "e2e-vanilla-launch".to_string());
+        let server_log = std::env::var("VOXEL_E2E_SERVER_LOG").unwrap_or_else(|_| {
+            format!("{home}/Voxel/servers/mine-rank/console.log")
+        });
+        let address = std::env::var("VOXEL_E2E_SERVER")
+            .unwrap_or_else(|_| "127.0.0.1:25565".to_string());
+
+        prepare_core(&base, &slug, "1.20.1", "vanilla", "", &|_, _, _| {})
+            .expect("prepare must succeed");
+
+        let account = AccountInfo {
+            provider: AccountProvider::Microsoft,
+            username: "VOXEL_E2E".to_string(),
+            uuid: "00000000000040008000000000000000".to_string(),
+            access_token: "0".to_string(),
+        };
+        let mut plan = build_launch_plan(
+            &base,
+            &slug,
+            "1.20.1",
+            "vanilla",
+            &account,
+            Some("java"),
+            Some(2048),
+        )
+        .expect("the launch plan must build");
+
+        // the game connects to the server by itself — the same argument
+        // the official launcher uses
+        plan.args.push("--quickPlayMultiplayer".to_string());
+        plan.args.push(address.clone());
+
+        // only the lines written from now on count
+        let before = std::fs::read_to_string(&server_log)
+            .unwrap_or_default()
+            .lines()
+            .count();
+
+        let mut command = std::process::Command::new(&plan.java);
+        for arg in &plan.args {
+            command.arg(arg);
+        }
+        command.current_dir(&plan.game_dir);
+        command.env(
+            "DISPLAY",
+            std::env::var("DISPLAY").unwrap_or_else(|_| ":0".to_string()),
+        );
+        let mut child = command.spawn().expect("the game process must spawn");
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(240);
+        let mut joined = false;
+        while std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_secs(3));
+            if let Ok(text) = std::fs::read_to_string(&server_log) {
+                let fresh: String = text
+                    .lines()
+                    .skip(before)
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                if fresh.contains("joined the game") || fresh.contains("logged in with entity id")
+                {
+                    joined = true;
+                    break;
+                }
+            }
+            if let Ok(Some(status)) = child.try_wait() {
+                eprintln!("the game exited early with {status}");
+                break;
+            }
+        }
+
+        let _ = child.kill();
+        let _ = child.wait();
+        let fresh: String = std::fs::read_to_string(&server_log)
+            .unwrap_or_default()
+            .lines()
+            .skip(before)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            joined,
+            "the client never joined {address} — the server said:\n{fresh}"
+        );
+        eprintln!("E2E CLIENT JOIN OK — the client joined {address}");
+    }
+
     /// Full launcher pipeline proof: official metadata + client jar +
     /// libraries + assets + natives extraction, warming the shared cache.
     #[test]

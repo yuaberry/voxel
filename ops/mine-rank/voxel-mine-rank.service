@@ -1,0 +1,20 @@
+[Unit]
+Description=VOXEL — Mine Rank (Minecraft vanilla 1.20.1)
+Documentation=https://github.com/yuaberry/voxel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/llinux/Voxel/servers/mine-rank
+ExecStart=/home/llinux/Voxel/servers/mine-rank/start-server.sh
+Restart=always
+RestartSec=10
+# the world must be saved on a stop, not killed
+KillSignal=SIGTERM
+TimeoutStopSec=90
+StandardOutput=append:/home/llinux/Voxel/servers/mine-rank/console.log
+StandardError=append:/home/llinux/Voxel/servers/mine-rank/console.log
+
+[Install]
+WantedBy=default.target
