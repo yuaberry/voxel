@@ -50,7 +50,7 @@ não tem `tps` — o TPS se mede com `time query gametime`).
 | Memória | `-Xms512M -Xmx2G` |
 | Reinício | `Restart=always`, `RestartSec=10` |
 | Encerramento | `SIGTERM` + 90 s para o mundo ser salvo |
-| Tick | `max-tick-time=120000` · `sync-chunk-writes=false` (ver abaixo) |
+| Tick | `max-tick-time=0` (watchdog **desligado**) · `sync-chunk-writes=false` (ver abaixo) |
 
 ## O watchdog e os "Can't keep up"
 
@@ -66,14 +66,39 @@ Duas properties resolvem isso, e as duas são padrão do vanilla:
 
 | Property | Antes | Agora | Por quê |
 |---|---|---|---|
-| `max-tick-time` | `60000` | `120000` | um tick lento **não** vira morte do servidor |
+| `max-tick-time` | `60000` | `0` | **desliga o watchdog** — um tick lento não vira morte do servidor |
 | `sync-chunk-writes` | `true` | `false` | o autosave deixa de segurar o thread do servidor (é a origem dos picos de *"Can't keep up"*) |
 
-**Custo honesto da escolha**: com `120000`, um tick realmente travado
-leva até 2 minutos para ser morto pelo watchdog. A escolha é
-deliberada — um servidor morto custa mais ao dono (perde o mundo em
-jogo) do que um servidor lento que ainda responde. E como o
-`Restart=always` está ativo, ele volta sozinho em ~10 s mesmo assim.
+**Por que `0` e não um valor alto?** Porque o problema **não** era o
+tempo do tick: era o **watchdog medindo errado**. A prova está no
+crash report de 21:46 — o Server thread estava em `TIMED_WAITING`,
+que é o estado **normal** entre ticks (parcado, esperando o
+próximo):
+
+```
+"Server thread" prio=5 Id=36 TIMED_WAITING on java.lang.String@49d113c8
+	at java.base@21.0.12.1/jdk.internal.misc.Unsafe.park(Native Method)
+	at bcn.bq(SourceFile:151)
+```
+
+Ou seja: o servidor estava **saudável**; quem não pôde medir foi a
+**própria thread do watchdog**, que não ganhou CPU. Qualquer valor
+alto só adia a morte (o servidor morreu de novo com `120000`, aos
+120 s). Desligar o watchdog é o que resolve — e é comportamento
+**vanilla**, não gambiarra: no bytecode oficial, a thread do watchdog
+só é criada quando o valor lido de `max-tick-time` é **maior que
+zero** (`bj()` → `ahf.C:J` → `if (bj() <= 0)` pula a criação).
+
+**O que substitui o watchdog?** O `Restart=always` do systemd, que já
+foi provado: 21:36:24 → 21:36:34, 21:46:40 → 21:46:50. E, se o
+processo travar de verdade, o `systemctl --user restart` resolve.
+
+**Custo honesto da escolha**: com o watchdog desligado, um tick
+**realmente travado** (loop infinito num comando do datapack) não
+mata o servidor sozinho — ele fica lento até alguém reiniciar. É uma
+troca consciente: nesta máquina, o servidor do dono **nunca** deve
+morrer por causa de uma compilação paralela, e um travamento real é
+raro num datapack sem loopsiving.
 
 > **Diagnóstico do mundo (2026-11-11)**: os erros `"stream is truncated"`
 > no log **não** significam corrupção. Os *region files* foram
