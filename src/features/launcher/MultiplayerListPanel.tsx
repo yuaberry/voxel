@@ -38,9 +38,7 @@ export function MultiplayerListPanel({ instances }: MultiplayerListPanelProps) {
   const updateSettings = useSettingsStore((s) => s.update);
   // the enabled references live in the settings — the list the game shows
   // must be the same in every instance and after every restart
-  const publicServerIds = useSettingsStore(
-    (s) => s.settings.launcher.publicServerIds ?? [],
-  );
+  const publicServerIds = useSettingsStore((s) => s.settings.launcher.publicServerIds);
   const [servers, setServers] = useState<ServerRecord[]>([]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<MultiplayerSyncResult | null>(null);
@@ -149,7 +147,7 @@ export function MultiplayerListPanel({ instances }: MultiplayerListPanelProps) {
             <Button
               variant="gradient"
               onClick={() => void write()}
-              disabled={busy || entries.length === 0}
+              disabled={busy || !basePath}
               title="Writes the list into every instance of this workspace"
             >
               {busy ? (

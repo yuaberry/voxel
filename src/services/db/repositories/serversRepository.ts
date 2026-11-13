@@ -97,7 +97,48 @@ interface DiskServerInfo {
  *
  * Facts for adoption come from voxel-server.json, written by server_create.
  */
+/**
+ * The single owner of the reconciliation WRITES.
+ *
+ * `listServersReconciled` is called from five places (the multiplayer
+ * panel, the Run dialog, the servers page poll, backup and automation
+ * schedulers) — sometimes at the same moment (React StrictMode mounts
+ * twice, and a launch can overlap a 5 s poll). Two callers saw the same
+ * folder with no row, both generated a different `crypto.randomUUID()`,
+ * and one of the two hit the UNIQUE(slug) constraint — its `catch` only
+ * logged, so THAT caller returned the list WITHOUT the local server. The
+ * owner opened the Launcher, saw "No local server yet", and the
+ * `servers.dat` he just wrote was missing the Mine Rank — which is
+ * precisely the bug this session is chasing.
+ *
+ * The first caller performs the writes; everybody else awaits the same
+ * result and can never race against it.
+ */
+let reconcileInFlight: Promise<ServerRecord[]> | null = null;
+
+/** Adopts the folders on disk into the DB and retires the ghost rows. */
 export async function listServersReconciled(
+  basePath: string,
+): Promise<ServerRecord[]> {
+  if (reconcileInFlight) return reconcileInFlight;
+
+  reconcileInFlight = reconcileServersOnce(basePath)
+    // the failure is kept for this caller and cleared for the next one:
+    // a retry must be able to succeed, so the shared promise is always
+    // a fresh one
+    .catch((error) => {
+      reconcileInFlight = null;
+      throw error;
+    })
+    .then((rows) => {
+      reconcileInFlight = null;
+      return rows;
+    });
+
+  return reconcileInFlight;
+}
+
+async function reconcileServersOnce(
   basePath: string,
 ): Promise<ServerRecord[]> {
   const [rows, disk] = await Promise.all([
@@ -109,7 +150,6 @@ export async function listServersReconciled(
 
   const bySlug = new Map(rows.map((r) => [r.slug, r]));
   const now = new Date().toISOString();
-  const adopted: ServerRecord[] = [];
 
   for (const folder of disk) {
     const existing = bySlug.get(folder.slug);
@@ -129,10 +169,19 @@ export async function listServersReconciled(
       };
       try {
         await insertServer(record);
-        adopted.push(record);
         rows.unshift(record);
-      } catch (error) {
-        console.warn("server adoption failed:", error);
+        bySlug.set(folder.slug, record);
+      } catch {
+        // Another caller adopted the same folder first (UNIQUE(slug)) — or
+        // the row is simply already there. Refusing to give up because of
+        // a lost race: re-read the row that WON and return it, so the
+        // local server never disappears from the list.
+        const fresh = await listServers().catch(() => []);
+        const winner = fresh.find((r) => r.slug === folder.slug);
+        if (winner) {
+          rows.unshift(winner);
+          bySlug.set(folder.slug, winner);
+        }
       }
     } else {
       // keep db row but correct drift in the basics

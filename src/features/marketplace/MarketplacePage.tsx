@@ -352,13 +352,15 @@ export function MarketplacePage() {
 
       {loading && <p className="mt-6 text-center text-xs text-muted-foreground">loading your assets…</p>}
 
-      <LaunchDialog
-        project={runProject ?? projects[0]}
-        open={runProject !== null}
-        onOpenChange={(open) => {
-          if (!open) setRunProject(null);
-        }}
-      />
+      {projects.length > 0 && (
+        <LaunchDialog
+          project={runProject ?? projects[0]}
+          open={runProject !== null}
+          onOpenChange={(open) => {
+            if (!open) setRunProject(null);
+          }}
+        />
+      )}
     </div>
   );
 }

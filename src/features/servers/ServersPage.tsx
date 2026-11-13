@@ -51,7 +51,16 @@ export function ServersPage() {
       );
       setRunningSet(new Set(list.filter((_, i) => states[i]).map((server) => server.slug)));
     } catch (error) {
-      toast.error("Could not load servers", { description: String(error) });
+      // An empty list is an HONEST state. A skeleton that never stops is
+      // not: with `setLoaded(true)` only on the happy path, a single
+      // failure (locked database, unreachable workspace) left the page
+      // flickering forever and the owner concluded the app had frozen.
+      setServers([]);
+      setRunningSet(new Set());
+      setLoaded(true);
+      toast.error("Could not load servers", {
+        description: error instanceof Error ? error.message : String(error),
+      });
     }
   }, [basePath]);
 

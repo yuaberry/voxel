@@ -133,6 +133,11 @@ export async function launchGame(options: {
   onExit?: (success: boolean) => void;
 }): Promise<string> {
   const key = `launch/${options.projectSlug}`;
+  // The listeners are REMOVED when the game exits. Without that, every
+  // launch (and the Run dialog remounts each time it is opened) left two
+  // permanent listeners behind, all keyed `launch/<slug>` — so the log of
+  // a previous launch kept arriving in the current one, and N launches
+  // meant 2N handlers calling setState on components that no longer exist.
   const unlistenLog = await listen<{ project: string; line: string; stream: string }>(
     "launch:log",
     (event) => {
@@ -144,11 +149,12 @@ export async function launchGame(options: {
     "launch:exit",
     (event) => {
       if (event.payload.project !== key) return;
+      // the listeners die with the process they describe
+      void unlistenLog();
+      void unlistenExit();
       options.onExit?.(event.payload.success);
     },
   );
-  void unlistenLog;
-  void unlistenExit;
 
   return invoke<string>("launcher_launch", {
     basePath: options.basePath,

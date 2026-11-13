@@ -61,9 +61,7 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
   const ramMb = useSettingsStore((s) => s.settings.launcher.ramMb);
   const javaPath = useSettingsStore((s) => s.settings.java.customJavaPath);
   const elyClientId = useSettingsStore((s) => s.settings.launcher.elyClientId);
-  const publicServerIds = useSettingsStore(
-    (s) => s.settings.launcher.publicServerIds ?? [],
-  );
+  const publicServerIds = useSettingsStore((s) => s.settings.launcher.publicServerIds);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<LaunchProgress | null>(null);
@@ -182,16 +180,24 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
    * with NOTHING in it and the owner concludes that he cannot join any
    * server. The write is a tiny local file — it never blocks the launch
    * and never breaks it.
+   *
+   * A failure is REPORTED, never swallowed: a silent failure here is the
+   * exact bug this session is hunting (game opens, list empty, no clue
+   * why). The launch still proceeds — the owner can type the address —
+   * but he is told.
    */
   const ensureMultiplayerList = async () => {
     if (!basePath) return;
     try {
       const entries = await buildWorkspaceServerEntries(basePath, publicServerIds);
-      if (entries.length === 0) return;
       await writeInstanceServerList(basePath, slug, entries);
-    } catch {
-      // the launch must not depend on the list — the owner can always
-      // connect by typing the address
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.warn("[launcher] the multiplayer list could not be written:", reason);
+      toast.warning("A lista de servidores não pôde ser atualizada", {
+        description:
+          "O jogo vai abrir — você ainda pode conectar digitando o endereço. " + reason,
+      });
     }
   };
 
