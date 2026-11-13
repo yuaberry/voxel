@@ -394,6 +394,25 @@ mod tests {
         );
     }
 
+    #[ignore = "e2e: pings the owner's reference server (network)"]
+    #[test]
+    fn e2e_ping_nerdzone_reference() {
+        for (host, port) in [("nerdzone.gg", None), ("jogar.nerdzone.gg", Some(30000u16))] {
+            let ping = server_ping_impl(host.into(), port)
+                .unwrap_or_else(|e| panic!("{host} failed: {e}"));
+            println!(
+                "{} → {} players v{} proto={} [{}] mods={}",
+                host,
+                ping.players_online,
+                ping.version,
+                ping.protocol,
+                ping.motd,
+                ping.mods_json.is_some()
+            );
+            assert!(!ping.version.is_empty(), "{host} must report its version");
+        }
+    }
+
     #[ignore = "e2e: pings real public servers (network)"]
     #[test]
     fn e2e_ping_public_server() {

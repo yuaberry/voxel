@@ -672,12 +672,16 @@ pub fn structure_nbt_bytes(structure: &GeneratedStructure, mc_version: &str) -> 
             Some((n, rest)) => (n.to_string(), rest.trim_end_matches(']').to_string()),
             None => (key.clone(), String::new()),
         };
-        let mut entry = vec![("Name".to_string(), TAG_STRING, nbt_string(&name))];
+        let mut entry = vec![(
+            "Name".to_string(),
+            TAG_STRING,
+            nbt_string(&name)?,
+        )];
         if !props_str.is_empty() {
             let mut props_body = Vec::new();
             for pair in props_str.split(',') {
                 let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
-                let _ = write_named(&mut props_body, TAG_STRING, k, &nbt_string(v));
+                let _ = write_named(&mut props_body, TAG_STRING, k, &nbt_string(v)?);
             }
             props_body.push(0u8);
             entry.push(("Properties".to_string(), TAG_COMPOUND, props_body));

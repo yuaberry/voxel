@@ -67,6 +67,20 @@ pub struct ServersDatResult {
     /// how many entries the list holds
     pub written: usize,
     pub entries: Vec<WrittenServer>,
+    /// the entries that could NOT be used, with the reason — never hidden
+    /// from the owner (a silently dropped server is the bug, not the
+    /// remedy)
+    pub skipped: Vec<SkippedServer>,
+}
+
+/// An entry that was refused, with WHY. The list is still written — a
+/// broken entry must not delete the servers that work.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkippedServer {
+    pub index: usize,
+    pub name: String,
+    pub reason: String,
 }
 
 /// Splits `host`, `host:port` or `[v6]:port` into the host and the port.
@@ -91,6 +105,15 @@ fn split_address(raw: &str) -> Result<(String, Option<u16>), String> {
             None => None,
         };
         return Ok((host.to_lowercase(), port));
+    }
+    if text.matches(':').count() > 1 {
+        // `2001:db8::1` would split as host `2001:db8:` + port 1 — the
+        // client then gets an address nothing can connect to. The client
+        // itself refuses an unbracketed IPv6, so refuse it here too and
+        // say how to write it.
+        return Err(format!(
+            "IPv6 addresses must be bracketed: [{text}] — or [{text}]:<port>"
+        ));
     }
     match text.rsplit_once(':') {
         Some((host, port_raw)) if port_raw.chars().all(|c| c.is_ascii_digit()) => {
@@ -136,23 +159,55 @@ fn resolve_target(server: &MultiplayerServer) -> Result<(String, u16, bool), Str
 }
 
 /// Builds the vanilla `servers.dat` bytes for the given entries.
-pub fn build_servers_dat(servers: &[MultiplayerServer]) -> Result<(Vec<u8>, Vec<WrittenServer>), String> {
+pub fn build_servers_dat(
+    servers: &[MultiplayerServer],
+) -> Result<(Vec<u8>, Vec<WrittenServer>, Vec<SkippedServer>), String> {
     let mut entries: Vec<Vec<(String, u8, Vec<u8>)>> = Vec::new();
     let mut written: Vec<WrittenServer> = Vec::new();
+    // A bad entry must not take the WHOLE list down with it: one invalid
+    // name or address used to abort the build, every instance failed with
+    // the same message, and the owner's Multiplayer screen came back with
+    // the servers that DID work GONE. Now the good ones are written and
+    // the broken ones are reported so the owner can see WHY.
+    let mut skipped: Vec<SkippedServer> = Vec::new();
 
-    for server in servers {
+    for (index, server) in servers.into_iter().enumerate() {
         let name = server.name.trim();
         if name.is_empty() {
-            return Err("Every server needs a name".to_string());
+            skipped.push(SkippedServer {
+                index,
+                name: server.name.clone(),
+                reason: "this server has no name".to_string(),
+            });
+            continue;
         }
-        let (address, port, srv) = resolve_target(server)?;
+        let target = match resolve_target(&server) {
+            Ok(target) => target,
+            Err(reason) => {
+                skipped.push(SkippedServer {
+                    index,
+                    name: name.to_string(),
+                    reason,
+                });
+                continue;
+            }
+        };
+        let (address, port, srv) = target;
         // `ip` is the field the 1.20.1 client reads (host:port); `address`
         // + `port` are the fields the newer clients read. Both are real —
         // the client ignores the one it does not know.
         entries.push(vec![
-            ("name".to_string(), TAG_STRING, nbt_string(name)),
-            ("ip".to_string(), TAG_STRING, nbt_string(&format!("{address}:{port}"))),
-            ("address".to_string(), TAG_STRING, nbt_string(&address)),
+            ("name".to_string(), TAG_STRING, nbt_string(name)?),
+            (
+                "ip".to_string(),
+                TAG_STRING,
+                nbt_string(&format!("{address}:{port}"))?,
+            ),
+            (
+                "address".to_string(),
+                TAG_STRING,
+                nbt_string(&address)?,
+            ),
             ("port".to_string(), TAG_INT, nbt_int(port as i32)),
             (
                 "hidden".to_string(),
@@ -178,7 +233,7 @@ pub fn build_servers_dat(servers: &[MultiplayerServer]) -> Result<(Vec<u8>, Vec<
     // it gzipped made the client throw the list away in silence and the
     // Multiplayer screen came up empty (the owner's report: "I cannot
     // join any server").
-    Ok((root, written))
+    Ok((root, written, skipped))
 }
 
 /// Writes the multiplayer list into `<base>/instances/<slug>/servers.dat`.
@@ -211,7 +266,7 @@ pub fn write_servers_dat_impl(
         return Err(format!("Instance not found: {slug}"));
     }
 
-    let (bytes, entries) = build_servers_dat(&servers)?;
+    let (bytes, entries, skipped) = build_servers_dat(&servers)?;
     let path = instance.join("servers.dat");
     std::fs::write(&path, &bytes).map_err(|e| format!("Could not write servers.dat: {e}"))?;
 
@@ -219,6 +274,7 @@ pub fn write_servers_dat_impl(
         path: path.to_string_lossy().to_string(),
         written: entries.len(),
         entries,
+        skipped,
     })
 }
 
@@ -262,12 +318,56 @@ mod multiplayer_tests {
         let mut cursor = 3usize;
         // a NAME and a STRING VALUE are both a raw u16 length + the bytes
         // (only lists and compounds carry a type byte in their payload)
+        //
+        // This decoder reads JAVA MODIFIED UTF-8, exactly like the vanilla
+        // client (`DataInput.readUTF`) — NOT plain UTF-8. A plain UTF-8
+        // reader here would make the suite agree with a file the real
+        // client throws away.
         let mut read_text = |cursor: &mut usize| -> String {
             let len = u16::from_be_bytes([raw[*cursor], raw[*cursor + 1]]) as usize;
             *cursor += 2;
-            let text = String::from_utf8(raw[*cursor..*cursor + len].to_vec()).expect("utf-8");
+            let payload = &raw[*cursor..*cursor + len];
             *cursor += len;
-            text
+            let mut out = String::with_capacity(payload.len());
+            let mut i = 0usize;
+            while i < payload.len() {
+                match payload[i] {
+                    0x00 => {
+                        out.push('\0');
+                        i += 1;
+                    }
+                    b if b < 0x80 => {
+                        // ASCII — but 0xC0/0xC1 would also land here
+                        out.push(b as char);
+                        i += 1;
+                    }
+                    b if b >> 5 == 0b110 => {
+                        let cp = ((b as u32 & 0x1F) << 6) | (payload[i + 1] as u32 & 0x3F);
+                        out.push(char::from_u32(cp).expect("2-byte modified UTF-8"));
+                        i += 2;
+                    }
+                    b if b >> 4 == 0b1110 => {
+                        let cp = ((b as u32 & 0x0F) << 12)
+                            | ((payload[i + 1] as u32 & 0x3F) << 6)
+                            | (payload[i + 2] as u32 & 0x3F);
+                        // 0xED 0xA0/0xB0.. are surrogates: combine the pair
+                        if (0xD800..0xDC00).contains(&cp) {
+                            let second = ((payload[i + 3] as u32 & 0x0F) << 12)
+                                | ((payload[i + 4] as u32 & 0x3F) << 6)
+                                | (payload[i + 5] as u32 & 0x3F);
+                            i += 6;
+                            let combined =
+                                0x10000 + ((cp - 0xD800) << 10) + (second - 0xDC00);
+                            out.push(char::from_u32(combined).expect("surrogate pair"));
+                        } else {
+                            out.push(char::from_u32(cp).expect("3-byte modified UTF-8"));
+                            i += 3;
+                        }
+                    }
+                    _ => panic!("byte {:#04x} is not Java modified UTF-8", payload[i]),
+                }
+            }
+            out
         };
 
         // the "servers" entry of the root compound
@@ -336,13 +436,92 @@ mod multiplayer_tests {
 
     const TAG_COMPOUND_TAG: u8 = 10;
 
+    /// A broken entry must NOT delete the servers that work. Before, one
+    /// empty name or one invalid address aborted the whole build and every
+    /// instance failed with the same message — the owner's working servers
+    /// vanished from the Multiplayer screen.
+    #[test]
+    fn one_broken_entry_never_takes_the_list_down() {
+        let (bytes, written, skipped) = build_servers_dat(&[
+            server("Mine Rank", "127.0.0.1", Some(25565)),
+            MultiplayerServer {
+                name: "   ".to_string(),
+                address: "127.0.0.1".to_string(),
+                port: None,
+                hidden: false,
+            },
+            MultiplayerServer {
+                name: "Endereço inválido".to_string(),
+                address: "não é endereço".to_string(),
+                port: None,
+                hidden: false,
+            },
+            server("NerdZone.gg", "nerdzone.gg", None),
+        ])
+        .expect("the list must still build");
+
+        // os dois bons entraram
+        assert_eq!(written.len(), 2);
+        assert_eq!(written[0].name, "Mine Rank");
+        assert_eq!(written[1].name, "NerdZone.gg");
+        let decoded = decode(&bytes);
+        assert_eq!(decoded.len(), 2);
+        assert_eq!(decoded[0].1, "127.0.0.1:25565");
+        // e os dois ruins foram REPORTADOS com o motivo, não engolidos
+        assert_eq!(skipped.len(), 2);
+        assert_eq!(skipped[0].name, "   ");
+        assert!(skipped[0].reason.contains("no name"));
+        assert_eq!(skipped[1].name, "Endereço inválido");
+        assert!(skipped[1].reason.contains("Invalid server address"));
+    }
+
+    /// The list the owner wrote is the list the client reads — the
+    /// server name must survive the modified-UTF-8 encoding byte for byte.
+    #[test]
+    fn a_name_with_an_emoji_is_written_as_the_client_reads_it() {
+        let (bytes, written, _) = build_servers_dat(&[server(
+            "Mine Rank \u{1F3AE}",
+            "127.0.0.1",
+            Some(25565),
+        )])
+        .expect("the list must build");
+        assert_eq!(written.len(), 1);
+        let decoded = decode(&bytes);
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(decoded[0].0, "Mine Rank \u{1F3AE}");
+    }
+
+    /// An unbracketed IPv6 address is a port in disguise: `2001:db8::1`
+    /// used to become host `2001:db8:` + port 1, and the client got an
+    /// address nothing can connect to.
+    #[test]
+    fn an_unbracketed_ipv6_is_refused_instead_of_becoming_a_port() {
+        let (_, _, skipped) = build_servers_dat(&[server("IPv6", "2001:db8::1", None)])
+            .expect("the list must build");
+        assert_eq!(skipped.len(), 1);
+        assert!(
+            skipped[0].reason.contains("bracket"),
+            "the reason must say how to write it: {}",
+            skipped[0].reason
+        );
+        // a bracketed one é aceito
+        let (_, _, skipped_ok) = build_servers_dat(&[server("IPv6", "[2001:db8::1]:25565", None)])
+            .expect("the list must build");
+        assert!(
+            skipped_ok.is_empty(),
+            "a bracketed IPv6 must be accepted: {:?}",
+            skipped_ok
+        );
+    }
+
+
     /// The owner's bug, pinned: the official client reads `servers.dat`
     /// with a plain `DataInputStream` — the file is RAW NBT. A gzipped
     /// file is thrown away by the client in silence and the Multiplayer
     /// screen comes up empty.
     #[test]
     fn the_file_is_the_raw_nbt_the_client_reads() {
-        let (bytes, written) = build_servers_dat(&[server(
+        let (bytes, written, _skipped) = build_servers_dat(&[server(
             "Mine Rank",
             "127.0.0.1",
             Some(25565),
@@ -378,7 +557,7 @@ mod multiplayer_tests {
     /// exact prefix the VOXEL file must have.
     #[test]
     fn the_first_bytes_are_the_vanilla_compound_prefix() {
-        let (bytes, _) = build_servers_dat(&[server("Mine Rank", "127.0.0.1", Some(25565))])
+        let (bytes, written, skipped) = build_servers_dat(&[server("Mine Rank", "127.0.0.1", Some(25565))])
             .expect("the list must build");
         assert_eq!(bytes[0], TAG_COMPOUND_TAG);
         assert_eq!(&bytes[1..3], &0u16.to_be_bytes());
@@ -390,7 +569,7 @@ mod multiplayer_tests {
 
     #[test]
     fn an_inline_port_is_honoured() {
-        let (bytes, written) = build_servers_dat(&[server("Local", "127.0.0.1:25566", None)])
+        let (bytes, written, _skipped) = build_servers_dat(&[server("Local", "127.0.0.1:25566", None)])
             .expect("the list must build");
         let decoded = decode(&bytes);
         assert_eq!(decoded[0].1, "127.0.0.1:25566");
@@ -402,7 +581,7 @@ mod multiplayer_tests {
     fn a_hidden_entry_is_written_as_the_vanilla_byte() {
         let mut entry = server("Hidden", "example.net", Some(25565));
         entry.hidden = true;
-        let (bytes, written) = build_servers_dat(&[entry]).expect("the list must build");
+        let (bytes, written, _skipped) = build_servers_dat(&[entry]).expect("the list must build");
         let decoded = decode(&bytes);
         assert_eq!(decoded[0].3, 1);
         assert!(written[0].hidden);
@@ -410,7 +589,7 @@ mod multiplayer_tests {
 
     #[test]
     fn an_empty_list_is_still_a_valid_file() {
-        let (bytes, written) = build_servers_dat(&[]).expect("the list must build");
+        let (bytes, written, _skipped) = build_servers_dat(&[]).expect("the list must build");
         assert_eq!(bytes[0], TAG_COMPOUND_TAG);
         assert_ne!(&bytes[0..2], &[0x1f, 0x8b], "raw NBT, never gzip");
         assert!(written.is_empty());
@@ -459,6 +638,36 @@ mod multiplayer_tests {
             instance.canonicalize().unwrap()
         );
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// E2E: writes a real `servers.dat` with a server name that contains a
+    /// character above U+FFFF (an emoji) into a temp instance, so the
+    /// OFFICIAL client reader can be pointed at it from the shell.
+    ///
+    /// This is the proof of the owner's bug II: with the old plain-UTF-8
+    /// writer, `DataInputStream.readUTF` threw UTFDataFormatException on
+    /// the same bytes and the client discarded the file in silence.
+    #[test]
+    #[ignore = "e2e: writes a servers.dat with an emoji name for the official reader"]
+    fn e2e_the_emoji_name_is_written_as_the_client_reads_it() {
+        let base = std::env::temp_dir().join("voxel-multiplayer-emoji");
+        let instance = base.join("instances").join("emoji");
+        std::fs::create_dir_all(&instance).expect("the instance folder");
+        let result = write_servers_dat_impl(
+            base.to_string_lossy().as_ref(),
+            "emoji",
+            vec![
+                server("Mine Rank \u{1F3AE}", "127.0.0.1", Some(25565)),
+                server("NerdZone.gg", "nerdzone.gg", None),
+            ],
+        )
+        .expect("the list must be written");
+        assert_eq!(result.written, 2);
+        assert!(result.skipped.is_empty());
+        eprintln!(
+            "E2E EMOJI FILE = {} — run the official reader on it",
+            result.path
+        );
     }
 
     /// E2E: the owner's real workspace — the multiplayer list lands in the
