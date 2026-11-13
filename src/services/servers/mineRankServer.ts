@@ -3333,7 +3333,12 @@ export function generateMineRankFiles(): GeneratedFile[] {
     ),
   );
   files.push({
-    path: "resource_pack/assets/mine_rank/textures/item/custom_pickaxe.png",
+    // the SAME prefix as every other file of the pack. Without it the
+    // installer wrote the texture next to the server root, the pack
+    // inside the datapack had no PNG at all, and the custom pickaxe
+    // fell back to the vanilla texture — the owner saw a plain diamond
+    // pickaxe where the module promised its own art.
+    path: `world/datapacks/${MINE_RANK_NS}/resource_pack/assets/mine_rank/textures/item/custom_pickaxe.png`,
     content: "",
     base64: MINE_RANK_PICKAXE_TEXTURE_PNG_BASE64,
   });

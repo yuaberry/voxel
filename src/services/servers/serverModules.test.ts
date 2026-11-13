@@ -66,6 +66,45 @@ describe("mine rank module", () => {
     expect(paths).toContain("world/datapacks/nexus_rank/README.md");
   });
 
+  /**
+   * The texture of the pickaxe carries the custom model, so it has to
+   * land INSIDE the datapack next to the model that references it.
+   *
+   * The generator shipped the PNG with a bare `resource_pack/...` path:
+   * the installer wrote it next to the server root, the pack inside
+   * `world/datapacks/nexus_rank/resource_pack/` ended up with 4 files and
+   * NO image, and the custom pickaxe silently fell back to the vanilla
+   * texture. (Verified against the owner's live server: the PNG was at
+   * `servers/mine-rank/resource_pack/...` and `textures/` did not exist
+   * inside the pack.)
+   */
+  it("puts the pickaxe texture INSIDE the datapack, next to its model", () => {
+    const files = generateModuleFiles("mine_rank");
+    const png = files.find((f) => f.base64);
+    expect(png, "the module must ship the pickaxe texture").toBeDefined();
+    expect(png!.path).toBe(
+      "world/datapacks/nexus_rank/resource_pack/assets/mine_rank/textures/item/custom_pickaxe.png",
+    );
+    expect(png!.base64, "the texture must travel as base64").toBeTruthy();
+
+    // the pack is complete: the model and the texture live side by side
+    const paths = files.map((f) => f.path);
+    expect(paths).toContain(
+      "world/datapacks/nexus_rank/resource_pack/assets/mine_rank/models/item/custom_pickaxe.json",
+    );
+    expect(
+      paths.filter((p) => p.startsWith("world/datapacks/nexus_rank/resource_pack/")),
+    ).toHaveLength(5);
+
+    // and NOTHING of the pack lands outside the datapack
+    const escaped = files.filter(
+      (f) => f.path.startsWith("resource_pack/") || f.path.includes("/resource_pack/") === false
+        ? false
+        : !f.path.startsWith("world/datapacks/nexus_rank/"),
+    );
+    expect(escaped).toEqual([]);
+  });
+
   it("mixes with the other modules without namespace collisions", () => {
     const files = generateSelectedModules([
       "economy",

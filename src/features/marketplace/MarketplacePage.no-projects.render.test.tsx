@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-const launchDialogMock = vi.fn(() => null);
+const launchDialogMock = vi.fn((_props: unknown) => null);
 
 vi.mock("@/features/projects/workspace/LaunchDialog", () => ({
   LaunchDialog: (props: unknown) => {
@@ -78,8 +78,9 @@ describe("MarketplacePage — with no project in the workspace", () => {
         <MarketplacePage />
       </MemoryRouter>,
     );
-    for (const [props] of launchDialogMock.mock.calls) {
-      expect((props as { project?: unknown }).project).toBeDefined();
+    const calls = launchDialogMock.mock.calls as unknown[][];
+    for (const call of calls) {
+      expect(call[0]).toBeDefined();
     }
   });
 });
