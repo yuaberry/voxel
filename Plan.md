@@ -206,6 +206,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
+| **82** | **Auditoria completa: 20 defeitos, 3 alegações falsas e a referência NerdZone** | **NBT em UTF-8 modificado da Java** (um emoji fazia o cliente descartar a lista inteira — bytes conferidos contra o `writeUTF` do JDK e lidos pelo leitor oficial do cliente) · entrada ruim **ignorada e reportada** (uma só não aborta mais a lista) · IPv6 sem colchetes recusado com mensagem acionável · **tela branca do Marketplace** corrigida · **corrida** do `listServersReconciled` que fazia o **servidor local sumir** (dono único das escritas + re-leitura do vencedor) · falha da escrita da lista **reportada** em vez de engolida · skeleton eterno · vazamento de listeners do Tauri · seletores `?? []` · **textura da picareta dentro do datapack** (o PNG era escrito ao lado do server root e a picareta caía na arte vanilla; pack zipado com `pack.mcmeta` na raiz, sha1 registrado) · **heap direito** (`-Xmx2G` empurrava o servidor para o swap → pausas de GC de segundos) · **dois tokens de design mortos** (`warning`, `success` — compilavam para nada) · **site: 39 vs 47 comandos**, nav que desaparecia no celular, transcrição de teste inventada · **3 alegações do datapack desmentidas com prova** (`SelectedItem{…}` funciona no jogador real; a forma proposta é inválida em 1.20.1; a ordem do tick é intencional) · **2289 chunks, 0 corrompidos** · NerdZone.gg medido (FlameCord, protocolo 777, ~1335 online) | strings NBT em UTF-8 puro (emoji descartava o arquivo); lista abortada por uma entrada inválida; IPv6 sem colchetes virava host `2001:db8:` porta 1; `LaunchDialog` com `project` undefined derrubava o app inteiro; UNIQUE(slug) perdido silenciava o servidor; `catch {}` na escrita da lista; `setLoaded(true)` só no caminho feliz; listeners acumulados por lançamento; array novo a cada render; PNG do pack escrito fora do datapack; heap maior que a RAM útil; `warning`/`success` ausentes dos dois tailwind configs; título do site contradizendo o manifesto; nav `hidden md:flex` sem hambúrguer; transcrição de teste manual apresentada como execução real; **2 scripts meus de validação de region file errados** (setores de 4096 bytes; `length` inclui o byte de compressão) |
 | **81** | **Multiplayer: o `servers.dat` que o cliente não lia** | **`servers.dat` em NBT cru** (o cliente 1.20.1 lê com `DataInputStream`, **sem gzip** — o arquivo gzipado era descartado em silêncio e a tela Multiplayer vinha vazia) · **prova com o código oficial do cliente** (`rb.b(File)` do `client.jar` oficial) · a lista escrita em **todas** as instâncias + **sync antes de cada Run** · referências públicas **persistidas** (`launcher.publicServerIds`) · **servidor local como serviço systemd do usuário** (`Restart=always` + linger + console FIFO + guarda de porta ocupada) · **E2E do join real** (cliente vanilla entra no servidor local) · E2E do ping SLP local · **mundo provado íntegro** (1007 chunks, 0 corrompidos) e **watchdog desligado** (`max-tick-time=0`, `sync-chunk-writes=false` — o watchdog matava um servidor saudável, provado pelo crash report) · v0.35.2 | `servers.dat` gravado **gzipado** (o cliente vanilla nunca lê gzip — lista descartada em silêncio); lista escrita em **uma** instância só (invisível nas outras); servidor local morto (runner ad-hoc em `/tmp` limpo pelo sistema); **dois scripts meus de validação de region file errados** (byte offset em vez de setores de 4096; `length` inclui o byte de compressão) — falsaram um "mundo corrompido" que não existia; watchdog matando o servidor por **contenção de recursos** das minhas próprias compilações |
 | **80** | **Launcher: o jogo que não inicia** | **Launcher loader-aware** (vanilla + fabric, `paper`/desconhecidos recusados) · **regras do Mojang corrigidas** (a flag de macOS `-XstartOnFirstThread` matava o JVM no Linux) · **`launcher_runtime_status`** (runtime real: client.jar, libs, 3.600 assets, natives) · **download automático** ao configurar conta Microsoft/Ely.by · aviso do jar **removido** · projeto Mine Rank migrado para `datapack` 1.20.1 vanilla · **E2E real: o cliente chega ao menu principal** · v0.35.0 | `allow` que não casava com o SO era lido como "permitir" (JVM não subia); `instanceExists()` pulava o download; `${version_type}` literal no `--versionType`; classpath com `:` no Windows |
 | 1 | Planejamento | Briefing 61 seções → 11 ADs, riscos, 8 fases, critérios | — |
@@ -1457,3 +1458,162 @@ Três crashes hoje (*"A single server tick took 95.91 seconds"* → *"Considerin
 3. **Ely.by ao vivo** e **`nexus_marketplace`** continuam pendentes do dono (§79.G).
 4. **Domínio + host próprio**: decisão do dono; o `ops/mine-rank/README.md` já documenta o que muda (`server-ip` vazio para escutar em todas as interfaces).
 5. **Custo da mitigação**: com `max-tick-time=0` o watchdog não existe — um tick realmente travado **não** mata o servidor sozinho (ele fica lento até alguém reiniciar). Escolha deliberada: nesta máquina o servidor do dono nunca deve morrer por causa de uma compilação paralela, e o `Restart=always` do systemd cobre a morte por crash.
+
+---
+
+## 82. Sessão 82 — Auditoria completa: 20 defeitos reais, 3 alegações falsas e a referência NerdZone
+
+**Pedido do dono**: *"refaça tudo, altere e configure oque for preciso quero algo realmente bom... quero que realmente avalie o servidor Nerdzone.gg ou Nerdstone.gg e utilize como referencia... melhore o site e o Aplicativo Voxel, para tudo funcionar e não dar um erro"*
+
+A auditoria varreu o formato do `servers.dat`, o frontend, o datapack, o servidor vivo
+e o site. Resultado: **20 defeitos reais** (todos com teste que falha sem a correção),
+**3 alegações que não se confirmaram** — e que, se aplicadas, teriam quebrado código
+que funciona — e uma correção de um validador **meu** que estava errado.
+
+### A. Os defeitos, por área
+
+**A.1 — O `servers.dat` e o formato NBT (4)**
+
+| # | Defeito | Consequência para o dono | Correção |
+|---|---|---|---|
+| 1 | o arquivo era escrito **gzipado**; o cliente 1.20.1 lê com `DataInputStream` puro | a lista era **descartada em silêncio** e a tela Multiplayer abria VAZIA → "não consigo entrar em nenhum servidor" | NBT cru (provado no bytecode do `client.jar` oficial) — §81 |
+| 2 | strings NBT em **UTF-8 puro**, não em UTF-8 modificado da Java | qualquer caractera acima de U+FFFF (emoji) fazia `readUTF` lançar `UTFDataFormatException` e o cliente **descartar o arquivo inteiro** | `push_modified` em `nbt.rs`; bytes **idênticos** aos do `DataOutputStream.writeUTF` do JDK, conferidos byte a byte |
+| 3 | **uma** entrada inválida abortava a lista inteira (nome vazio, endereço ruim) | todos os servidores do dono desapareciam por causa de um | entradas ruins são **ignoradas e reportadas** (`skipped: Vec<SkippedServer>`), a lista nunca morre |
+| 4 | IPv6 sem colchetes (`2001:db8::1`) virava host `2001:db8:` + porta 1 | o cliente recusava e o dono não sabia por quê | recusado com mensagem acionável (`[2001:db8::1]:porta` funciona) |
+
+Prova do nº 2 com o **código oficial do cliente**: o arquivo com `Mine Rank 🎮` escrito pelo
+Rust corrigido é lido pelo leitor oficial e imprime
+`- Mine Rank 🎮 → 127.0.0.1:25565`. Com os bytes antigos, o mesmo leitor lança exceção.
+
+**A.2 — O frontend (7)**
+
+| # | Defeito | Consequência | Correção |
+|---|---|---|---|
+| 5 | `LaunchDialog` montado com `project` **undefined** quando o workspace não tinha projeto | **tela branca**: o app caía no ErrorBoundary ao abrir o Marketplace | guarda `projects.length > 0` (a HomePage já tinha; o Marketplace não) + teste de render |
+| 6 | **corrida** em `listServersReconciled` (5 chamadores ao mesmo tempo, dois `randomUUID`, um estourava o UNIQUE(slug)) | o **servidor local sumia da lista** — era exatamente a queixa do dono | dono único das escritas (promise em voo compartilhada) + quem perde a corrida **re-lê** a linha vencedora |
+| 7 | falha ao escrever a lista era **engolida** (`catch {}`) | o jogo abria, a tela Multiplayer vinha vazia, e o dono não tinha nenhuma pista do motivo | a falha é **reportada** (toast) — o lançamento continua, o silêncio não |
+| 8 | `setLoaded(true)` só no caminho feliz | skeleton **eterno**; o dono concluía que o app travou | a lista vazia é um estado honesto; o erro também marca como carregado |
+| 9 | listeners `launch:log`/`launch:exit` nunca removidos | 2 handlers permanentes por lançamento, todos com a mesma chave — o log de um jogo antigo chegava no novo | removidos quando o jogo sai |
+| 10 | seletores `(s) => s.x ?? []` | array novo a cada render → re-render infinito | seletor puro, tipado |
+| 11 | painel multiplayer **não escrevia lista vazia** | um `servers.dat` velho com entradas removidas nunca podia ser limpo | escreve a lista vazia de verdade |
+
+**A.3 — O datapack e a textura (2)**
+
+| # | Defeito | Consequência | Correção |
+|---|---|---|---|
+| 12 | o PNG da picareta era gerado com caminho **sem** o prefixo `world/datapacks/nexus_rank/` | o arquivo era escrito **ao lado do server root**; o pack dentro do datapack tinha 4 arquivos e **nenhuma imagem** → a picareta caía na textura **vanilla** (verificado no servidor do dono) | caminho corrigido; PNG movido no servidor vivo; pack zipado com `pack.mcmeta` na raiz (sha1 `b2a3a9a0…`) e instalado na instância do cliente com o sha1 já registrado no `server.properties` |
+| 13 | a pasta `resource_pack/` **dentro** de um datapack não é lida pelo vanilla | o pack precisaria ser **empurrado** por URL — um servidor local em loopback não tem uma | instalado no **cliente** (resourcepacks + `options.txt`) e o limite está **escrito** no `ops/README` em vez de fingir que não existe |
+
+**A.4 — Operação do servidor (2)**
+
+| # | Defeito | Consequência | Correção |
+|---|---|---|---|
+| 14 | heap `-Xmx2G` numa máquina em que isso empurrava o servidor para o **swap** | pausas de GC de **segundos** → *"Can't keep up"* e o watchdog matando um servidor saudável | heap certo (`-Xms256M -Xmx1G`) + limites do systemd (`MemoryMax=1536M`, `MemorySwapMax=0`) — **VmSwap=0** depois, medido |
+| 15 | watchdog do vanilla (`max-tick-time`) matava o servidor | o dono perdia o mundo/jogo sem explicação | `max-tick-time=0` (o watchdog só existe quando o valor é > 0, **provado** no código) + `sync-chunk-writes=false` |
+
+**A.5 — Os tokens de design mortos (2)**
+
+| # | Defeito | Consequência | Correção |
+|---|---|---|---|
+| 16 | `warning` usado em 3 lugares do site e **em lugar nenhum declarado** (nem no config, nem no CSS) | as classes compilavam para **nada**: o painel perdia borda, fundo e cor do título, sem erro algum | token criado nos **dois** projetos + teste que varre o JSX de verdade |
+| 17 | `success` — o mesmo defeito, no **app desktop**, no painel Mine Rank | idem | idem (acho pelo meu próprio teste novo, não pelo auditor) |
+
+**A.6 — O site (6)**
+
+| # | Defeito | Consequência | Correção |
+|---|---|---|---|
+| 18 | título da seção com **`39` comandos** fixo, enquanto a mesma página contava **47** (o manifesto tem 47) | o site se **contradizendo em público** sobre o próprio produto | o título lê `MINE_RANK_COMMANDS.length`; os dois metas do `index.html` corrigidos (e sem número fixo, porque `index.html` não importa dado) |
+| 19 | nav `hidden … md:flex` **sem** menu hambúrguer | abaixo de 768px a navegação por seções **não existia** no celular | a barra rola horizontalmente — mesma marcação, sem drawer |
+| 20 | bloco "saída do teste real" era transcrição **escrita à mão**, com um `56s` inventado; o E2E de verdade é `VOXEL_E2E=1` e não roda na CI | o site **afirmava** uma execução que ninguém fez | rotulado como **exemplo** do formato, com a ressalva honesta de que o E2E não roda sozinho |
+
+Mais os menores da mesma passada: `#prova` linkada no nav **e** no footer; a economia do
+lead qualificada (a frase valia para a mina privada; no Pré-Rank o pagamento é
+`base_value_cents × multiplicador da pá`, teto de 50 coins/bloco e **sem** level — conferido
+em `award_blocks`/`terra_one`/`areia_one`); typo `dessegue`; ícones com `aria-hidden`;
+números escritos à mão no Hero/World passaram a ser derivados do manifesto (`MINE_RANK_PLOTS`,
+`MINE_RANK_CURRENCIES.length`, `MINE_RANK_DECK_Y`, `MINE_RANK_ORE_LAYERS.length`, …).
+
+### B. As alegações que NÃO se confirmaram — e as provas do contrário
+
+Uma subauditoria do datapack apontou 4 defeitos. **Dois eram falsos** e um terceiro era
+intencional. Aplicá-los teria **quebrado** código que funciona.
+
+**B.1 — "`execute if data entity @s {SelectedItem:{id:…}}` não funciona num jogador real" — FALSO.**
+Provado com uma sonda mineflayer + cliente real entrando no servidor do dono:
+
+```
+execute if data entity VoxelProbe {SelectedItem:{id:"minecraft:wooden_shovel"}} run say FORMA_DATAPACK_MATCH
+→ [Server] FORMA_DATAPACK_MATCH          (o match aconteceu)
+scoreboard players set VoxelProbe mr_pick_mult 200
+→ VoxelProbe has 200 [Mine Rank — validated shovel mult]
+```
+
+Com `stone_shovel` o valor **não** vira 400. A cadeia inteira (condição → `mr_pick_mult`) funciona.
+
+**B.2 — "a forma correta em 1.20.1 seria `SelectedItem{id:…}` no path" — FALSO (sintaxe inválida).**
+O próprio servidor recusou: *"Found no elements matching SelectedItem"* e o parse aponta
+`…ndItems[0]{id:"minecraft:wooden_shovel"} run say X<--[HERE]`. A "correção" proposta
+**não compilaria** em 1.20.1.
+
+**B.3 — "a ordem das linhas em `tick.mcfunction` está errada" — FALSO (é intencional).**
+O arquivo documenta a graça de 20 ticks que cobre o instante entre quebrar o bloco e pisar
+na próxima camada, para a recompensa não vazar da mina. A ordem é a correta.
+
+**B.4 — "o mundo está corrompido" — FALSO, e o erro era MEU.**
+Dois scripts meus de validação estavam errados: o header de region file usa **setores de
+4096 bytes** (não o byte offset) e o campo `length` **inclui** o byte de compressão. Eles
+fingiram um mundo corrompido que não existia. Correto: **2289 chunks, 0 corrompidos**.
+
+### C. NerdZone.gg — a referência, medida de verdade
+
+| Item | Medido |
+|---|---|
+| Endereço | `jogar.nerdzone.gg:30000` (com resolução SRV) |
+| Software | FlameCord (proxy multi-versão) |
+| Protocolo | 777 |
+| Jogadores online | ~1335 (SLP, no momento da medição) |
+| Versões aceitas | 1.7.x até 1.2x — o proxy segura clientes de várias eras |
+| Site | regras públicas com **tabela de punições**, loja e guias |
+| `nerdstone.gg` | **não resolve em DNS** desta máquina — **não há medição**, e não vou inventar |
+
+**O que serve de referência para o dono** (e já está no Mine Rank): documentação pública do
+que cada comando faz, uma progressão que o jogador entende sem perguntar, e um comando de
+jogador único e clicável (`/trigger`) em vez de uma pareia de comandos.
+
+**O que NÃO se aplica ao Caminho A** (datapack vanilla 1.20.1, §6): multi-versão via proxy,
+portas separadas por versão, loja integrada. Um servidor vanilla puro não faz nada disso —
+a Diferença está escrita no site (`#referencia`) em vez de ser escondida.
+
+### D. Estado verificado no fim da sessão
+
+| Verificação | Resultado |
+|---|---|
+| `pnpm typecheck` (raiz + site) | **0 erros** |
+| `pnpm lint` | **0 problemas** |
+| `pnpm test:unit` | **371 passaram**, 1 pulado (era 362) |
+| `cargo test` (src-tauri) | **142 passaram**, 18 ignorados (E2E) |
+| build do site | ok (195 kB JS / 21 kB CSS, base `/voxel/mine-rank/`) |
+| servidor do dono | **ativo**, 0 watchdog disparado, VmSwap=0 |
+| release | v0.35.2 publicada (8 assets, HTTP 200) |
+
+Commits desta sessão: `260cb2a` (heap/swap) · `8fb0802` (NBT modificado + robustez da lista) ·
+`ec577c4` (tela branca do Marketplace + servidor sumindo + escrita silenciosa) ·
+`de765ff` (textura dentro do datapack) · `4ca21f7` (sonda removida do repo).
+
+### E. Pendências honestas (nada disso está feito)
+
+1. **O app instalado do dono ainda é a v0.35.1** (`/usr/bin/nexuscraft-studio`), que
+   **escreve gzip** — não há sudo para trocar. O arquivo em disco já está correto, mas
+   clicar em "Write servers.dat" na v0.35.1 **quebra de novo**. Ele precisa instalar o
+   `.deb`/AppImage da v0.35.2.
+2. **A verificação na tela é dele**: a sessão do desktop está travada; cliques automatizados
+   batem no greeter. Falta ele abrir o jogo e ver **"Mine Rank → 127.0.0.1:25565"** e a
+   **picareta com a textura própria** (o pack já está na instância).
+3. **Resource pack por URL**: impossível enquanto o servidor é local (loopback); resolvido
+   no cliente e documentado no `ops/README`.
+4. **`nerdstone.gg`**: sem dados — DNS não resolve daqui.
+5. **Pacote do site não é autossuficiente**: `vitest`/`@testing-library/react`/`jsdom` não
+   estão nas devDeps dele (funciona por `nodeLinker: hoisted`; a CI instala os filtros
+   juntos). A tentativa de adicionar quebrou o lockfile (*missing snapshot*) e foi
+   **revertida** — registrada em vez de maquiada.
+6. **Ely.by ao vivo**, **`nexus_marketplace`**, **domínio + host próprio**: decisões do dono.

@@ -47,10 +47,42 @@ não tem `tps` — o TPS se mede com `time query gametime`).
 | Porta | `25565` (loopback) |
 | Versão | vanilla 1.20.1 (protocolo 763) |
 | Modos | `online-mode=false` (o servidor local aceita a conta do dono sem verificação Mojang) |
-| Memória | `-Xms512M -Xmx2G` |
+| Memória | `-Xms256M -Xmx1G` (**right-sized** — o `-Xmx2G` antigo empurrava o servidor para o swap e o GC pausava por segundos) · limites do systemd: `MemoryMax=1536M`, `MemorySwapMax=0` |
 | Reinício | `Restart=always`, `RestartSec=10` |
 | Encerramento | `SIGTERM` + 90 s para o mundo ser salvo |
 | Tick | `max-tick-time=0` (watchdog **desligado**) · `sync-chunk-writes=false` (ver abaixo) |
+| Resource pack | `resource-pack-sha1=<sha1 do nexus_rank>` já registrado; **sem URL** enquanto o servidor é só local (ver abaixo) |
+
+## O resource pack da picareta
+
+A picareta customizada (`CustomModelData:1`) precisa de um resource pack
+para mostrar a textura própria. **Um datapack não pode carregar um
+resource pack** — o vanilla ignora a pasta `resource_pack/` dentro de
+`world/datapacks/`. O caminho vanilla é o servidor **empurrar** o pack:
+
+```
+resource-pack=<URL HTTP do .zip>
+resource-pack-sha1=<sha1 do mesmo zip>
+```
+
+O SHA-1 já está gravado no `server.properties` (o zip é
+`world/datapacks/nexus_rank/resource_pack/` compactado com `pack.mcmeta`
+na raiz). Falta a **URL**: um servidor local em loopback não tem uma.
+
+**Enquanto é local**, o pack é instalado no **cliente**:
+
+```bash
+# o zip dentro da resourcepacks da instância (o cliente carrega sozinho)
+cp nexus_rank_rp.zip ~/Voxel/instances/mine-rank/resourcepacks/mine-rank-pickaxe.zip
+# e entra na lista de packs ativos (senão o dono teria que ligar à mão)
+sed -i 's/resourcePacks:\[\]/resourcePacks:["vanilla","mine-rank-pickaxe"]/' \
+  ~/Voxel/instances/mine-rank/options.txt
+```
+
+> **Quando o servidor for público** (VPS com domínio), hospede o zip e
+> preencha `resource-pack=https://…` — a textura passa a chegar em
+> qualquer cliente sem instalar nada.
+
 
 ## O watchdog e os "Can't keep up"
 
