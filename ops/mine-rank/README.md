@@ -53,6 +53,49 @@ não tem `tps` — o TPS se mede com `time query gametime`).
 | Tick | `max-tick-time=0` (watchdog **desligado**) · `sync-chunk-writes=false` (ver abaixo) |
 | Resource pack | `resource-pack-sha1=<sha1 do nexus_rank>` já registrado; **sem URL** enquanto o servidor é só local (ver abaixo) |
 
+## A mina ficou menor (sessão 82) — e o reset agora é derivado
+
+A mina privada passou de **3×3 × 8 camadas (72 blocos)** para
+**3×3 × 5 camadas (45 blocos)**: carvão, ferro, ouro, diamante e esmeralda
+(de cima para baixo). Os **ranks não mudaram** — os 8 tiers são por *nível*
+(0/100/250/450/650/800/950/1000), nunca por camada de minério.
+
+Duas coisas que só funcionam juntas:
+
+| Item | Antes | Agora |
+|---|---|---|
+| Camadas de minério | 8 (com cobre, redstone e lápis) | **5** (carvão → ferro → ouro → diamante → esmeralda) |
+| Restauração automática | 100 blocos **escritos à mão** | **27 blocos, derivados** do volume (60% de 45) |
+| Restauração das minas de Pré-Rank | o mesmo 100 (emprestado) | **88 blocos**, derivados do volume delas (60% de 147) |
+
+**Por que o reset tinha que mudar junto**: com 8 camadas a mina já tinha
+72 blocos e o restore pedia 100 — ele só disparava depois de você cavar
+**mais** blocos do que a mina tem (ou cavar as paredes do poço). Com 45
+blocos, um limite de 100-nunca-dispersaria: a mina esvaziaria e ficaria
+vazia para sempre até o reset manual (25 coins). Os dois testes em
+`src/services/servers/mineRankServer.test.ts` (`restores every mine while
+it still has ore in it`) seguram esse acoplamento.
+
+### Migrar um mundo que já existe
+
+A geometria nova **não** se aplica sozinha a um mundo já gerado — o poço
+antigo (8 camadas, até y=91) continua no disco. Para reconstruir um terreno
+com a geometria nova, pelo console do servidor (ou pelo Console do VOXEL):
+
+```bash
+# terreno 1 (centro em x=20 z=20). Troque as coordenadas por terreno.
+fill 18 88 18 22 99 22 minecraft:air     # limpa o poço antigo
+function nexus_rank:build_plot_1        # reconstrói com a geometria nova
+```
+
+Centro de cada terreno: `1→(20,20) 2→(36,20) 3→(52,20) 4→(68,20)
+5→(20,36) 6→(36,36) 7→(52,36) 8→(68,36)`.
+
+> **Atenção**: o `fill` apaga TUDO o que estiver construído dentro daquele
+> poço (o deck e o anel colorido ficam de fora). Rode só no terreno que for
+> usar, e de preferência com o servidor parado ou com ninguém dentro dele.
+> Um mundo novo (servidor recém-criado) já nasce com a geometria nova.
+
 ## O resource pack da picareta
 
 A picareta customizada (`CustomModelData:1`) precisa de um resource pack

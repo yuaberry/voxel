@@ -8,7 +8,11 @@ import {
   MINE_RANK_DECK_Y,
   MINE_RANK_HUB,
   MINE_RANK_MINE_FLOOR_Y,
+  MINE_RANK_MINE_RESET_BLOCKS,
   MINE_RANK_MINE_TOP_Y,
+  MINE_RANK_MINE_VOLUME,
+  MINE_RANK_PRERANK_MINE_RESET_BLOCKS,
+  MINE_RANK_PRERANK_MINE_VOLUME,
   MINE_RANK_NS,
   MINE_RANK_ORE_LAYERS,
   MINE_RANK_PLOTS,
@@ -325,9 +329,9 @@ describe("Mine Rank — the datapack", () => {
     }
   });
 
-  it("builds the private mines: 8 plots with 8 ore layers each", () => {
+  it("builds the private mines: 8 plots with 5 ore layers each", () => {
     expect(MINE_RANK_PLOTS).toBe(8);
-    expect(MINE_RANK_ORE_LAYERS).toHaveLength(8);
+    expect(MINE_RANK_ORE_LAYERS).toHaveLength(5);
     for (let plot = 1; plot <= MINE_RANK_PLOTS; plot += 1) {
       const { x: cx, z: cz } = mineRankPlotCenter(plot);
       const build = fn(`build_plot_${plot}`);
@@ -335,12 +339,14 @@ describe("Mine Rank — the datapack", () => {
       expect(build).toContain(
         `fill ${cx - 5} ${MINE_RANK_BASE_Y} ${cz - 5} ${cx + 5} ${MINE_RANK_BASE_Y} ${cz + 5} minecraft:stone`,
       );
-      // the shaft: 8 ore layers from the top down to the floor
+      // the shaft hangs from the deck: coal right under the hole, emerald
+      // one above the bedrock floor
       expect(build).toContain(
         `fill ${cx - 1} ${MINE_RANK_MINE_TOP_Y} ${cz - 1} ${cx + 1} ${MINE_RANK_MINE_TOP_Y} ${cz + 1} minecraft:coal_ore`,
       );
+      const deepestOre = MINE_RANK_MINE_FLOOR_Y + 1;
       expect(build).toContain(
-        `fill ${cx - 1} ${MINE_RANK_MINE_FLOOR_Y} ${cz - 1} ${cx + 1} ${MINE_RANK_MINE_FLOOR_Y} ${cz + 1} minecraft:emerald_ore`,
+        `fill ${cx - 1} ${deepestOre} ${cz - 1} ${cx + 1} ${deepestOre} ${cz + 1} minecraft:emerald_ore`,
       );
       expect(build).toContain(
         `fill ${cx - 2} ${MINE_RANK_MINE_FLOOR_Y} ${cz - 2} ${cx + 2} ${MINE_RANK_MINE_FLOOR_Y} ${cz + 2} minecraft:bedrock`,
@@ -349,7 +355,52 @@ describe("Mine Rank — the datapack", () => {
       const reset = fn(`reset_plot_${plot}`);
       expect(reset).toContain("minecraft:coal_ore");
       expect(reset).toContain("minecraft:emerald_ore");
+      // and every ore layer the mine holds, in the same order
+      for (const ore of MINE_RANK_ORE_LAYERS) {
+        expect(reset).toContain(`minecraft:${ore}`);
+      }
     }
+  });
+
+  /**
+   * The coupling that broke silently.
+   *
+   * The automatic restore used to fire at a hand-written 100 blocks while
+   * the whole mine held 72 (8 layers of 3x3). The restore could therefore
+   * only happen after the player had mined MORE blocks than the mine
+   * contains — in practice after digging the shaft walls. A smaller mine
+   * makes that worse, never better: the mine empties and stays empty.
+   *
+   * The threshold is now derived from the volume, and these tests hold the
+   * two together for every mine the module builds.
+   */
+  it("restores every mine while it still has ore in it", () => {
+    // the private mine: 5 layers of 3x3
+    expect(MINE_RANK_MINE_VOLUME).toBe(MINE_RANK_ORE_LAYERS.length * 9);
+    expect(MINE_RANK_MINE_RESET_BLOCKS).toBeLessThan(MINE_RANK_MINE_VOLUME);
+
+    // the pre-rank mines: a 7x7 platform, 3 layers of dirt/sand
+    expect(MINE_RANK_PRERANK_MINE_VOLUME).toBe(49 * 3);
+    expect(MINE_RANK_PRERANK_MINE_RESET_BLOCKS).toBeLessThan(
+      MINE_RANK_PRERANK_MINE_VOLUME,
+    );
+
+    // and the threshold has to leave a margin, not fire on the last block
+    expect(MINE_RANK_MINE_RESET_BLOCKS).toBeLessThanOrEqual(
+      Math.floor(MINE_RANK_MINE_VOLUME * 0.75),
+    );
+    expect(MINE_RANK_PRERANK_MINE_RESET_BLOCKS).toBeLessThanOrEqual(
+      Math.floor(MINE_RANK_PRERANK_MINE_VOLUME * 0.75),
+    );
+  });
+
+  it("hangs the mine from the deck, with no gap to fall through", () => {
+    // the first ore layer is the block under the deck's hole
+    expect(MINE_RANK_MINE_TOP_Y).toBe(MINE_RANK_BASE_Y - 1);
+    // and the walls wrap every ore layer, no more and no less
+    expect(MINE_RANK_MINE_FLOOR_Y + 1).toBe(
+      MINE_RANK_MINE_TOP_Y - (MINE_RANK_ORE_LAYERS.length - 1),
+    );
   });
 
   it("keeps the whole world within 5 chunks of the hub", () => {

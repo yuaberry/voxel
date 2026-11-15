@@ -44,8 +44,13 @@ export const MINE_RANK_PLOT_ORIGIN = 20;
 export const MINE_RANK_PLOT_COLUMNS = 4;
 /** Level needed to prestige. */
 export const MINE_RANK_PRESTIGE_LEVEL = 1000;
-/** Blocks mined before the private mine is restored. */
-export const MINE_RANK_MINE_RESET_BLOCKS = 100;
+/** Blocks mined before the private mine is restored.
+ *
+ * Hand-written once at 100 — which is MORE than the whole mine holds (the
+ * 8 layers of 3x3 were 72 blocks), so the automatic restore could only fire
+ * after the player mined more blocks than the mine contains, or dug the
+ * shaft walls. It is now DERIVED from the volume of the mine, right below
+ * the ore layers, so the two can never drift apart again. */
 /** Price (coins) of a manual mine restore. */
 export const MINE_RANK_MINE_RESET_COST = 25;
 /** Ticks of one fishing session (20 ticks = 1s). */
@@ -263,19 +268,57 @@ export const SHOVEL_DISPLAY_NAME: Record<ShovelMaterial, string> = {
 export const MINE_RANK_ORE_LAYERS = [
   "coal_ore",
   "iron_ore",
-  "copper_ore",
   "gold_ore",
-  "redstone_ore",
-  "lapis_ore",
   "diamond_ore",
   "emerald_ore",
 ] as const;
 
-/** The deepest ore layer of a private mine. */
-export const MINE_RANK_MINE_FLOOR_Y = 91;
-/** The top ore layer of a private mine (the player stands on it). */
-export const MINE_RANK_MINE_TOP_Y =
-  MINE_RANK_MINE_FLOOR_Y + MINE_RANK_ORE_LAYERS.length - 1;
+/**
+ * The top ore layer of a private mine — the block the player stands on the
+ * moment they step into the shaft.
+ *
+ * The mine HANGS FROM THE DECK. It used to be derived from a fixed floor
+ * (y=91) plus the number of layers, so with fewer layers a gap opened
+ * between the deck and the first ore layer: the player fell several blocks
+ * on entering and could see the mine from above. Anchoring the TOP to the
+ * deck and letting the floor rise is the same total size with none of that.
+ */
+export const MINE_RANK_MINE_TOP_Y = MINE_RANK_BASE_Y - 1;
+/** The bedrock floor of a private mine, one below its deepest ore layer. */
+export const MINE_RANK_MINE_FLOOR_Y =
+  MINE_RANK_MINE_TOP_Y - MINE_RANK_ORE_LAYERS.length;
+
+/**
+ * How many blocks ONE private mine holds — the layers times the 3x3 shaft.
+ *
+ * The single source for the restore threshold below: a smaller mine must
+ * restore sooner, or it empties and never comes back on its own.
+ */
+export const MINE_RANK_MINE_VOLUME = MINE_RANK_ORE_LAYERS.length * 9;
+
+/**
+ * Blocks mined before the private mine is restored.
+ *
+ * Hand-written once at 100 — which is MORE than the whole mine held, so the
+ * automatic restore could only fire after the player mined more blocks than
+ * the mine contained (or dug the shaft walls to make up the difference).
+ * Now derived from the volume: 60% of it, so the restore always happens
+ * while ore is still in the ground.
+ */
+export const MINE_RANK_MINE_RESET_BLOCKS = Math.round(
+  MINE_RANK_MINE_VOLUME * 0.6,
+);
+
+/**
+ * The pre-rank mines are much bigger (7x7 platform, `PRE_MINE_LAYERS` deep),
+ * so they keep their own restore rhythm — one shared number between a
+ * 45-block mine and a 147-block mine was the same defect in another place.
+ */
+export const MINE_RANK_PRERANK_MINE_VOLUME =
+  (2 * MINE_RANK_PRE_MINE_RADIUS + 1) ** 2 * MINE_RANK_PRE_MINE_LAYERS;
+export const MINE_RANK_PRERANK_MINE_RESET_BLOCKS = Math.round(
+  MINE_RANK_PRERANK_MINE_VOLUME * 0.6,
+);
 
 /** Colored marker of each plot — the owner sees which one is which. */
 export const MINE_RANK_PLOT_MARKERS = [
@@ -1216,7 +1259,10 @@ function preMineLines(
     "# clear the sky above the mine (a mountain must never bury it)",
     `fill ${cx - r - 2} ${MINE_RANK_BASE_Y - 1} ${cz - r - 2} ${cx + r + 2} ${MINE_RANK_DECK_Y + 10} ${cz + r + 2} minecraft:air`,
     "# the solid base (the mine never floats)",
-    `fill ${cx - r} ${MINE_RANK_MINE_FLOOR_Y - 21} ${cz - r} ${cx + r} ${MINE_RANK_BASE_Y - 2} ${cz + r} minecraft:stone`,
+    // anchored to the DECK, not to the private mine's floor: the pre-rank
+    // platform must keep the exact same shape it always had (30 below the
+    // deck), whatever happens to the size of the private mines above it
+    `fill ${cx - r} ${MINE_RANK_DECK_Y - 30} ${cz - r} ${cx + r} ${MINE_RANK_BASE_Y - 2} ${cz + r} minecraft:stone`,
     "# the walls of the pit",
     `fill ${cx - r - 1} ${MINE_RANK_BASE_Y - 2} ${cz - r - 1} ${cx - r - 1} ${MINE_RANK_DECK_Y} ${cz + r + 1} minecraft:stone`,
     `fill ${cx + r + 1} ${MINE_RANK_BASE_Y - 2} ${cz - r - 1} ${cx + r + 1} ${MINE_RANK_DECK_Y} ${cz + r + 1} minecraft:stone`,
@@ -2907,7 +2953,7 @@ function systemFunctions(): Record<string, string[]> {
     `execute if score @s mr_terra_pending matches 1.. run function ${MINE_RANK_NS}:terra_one`,
     "# the pre-rank ladder and the mine restore",
     `execute if score @s mr_blocks_terra matches ${MINE_RANK_PRERANK_REQUIREMENTS.terra.blocks}.. run function ${MINE_RANK_NS}:check_prerank`,
-    `execute if score @s mr_blocks_terra matches ${MINE_RANK_MINE_RESET_BLOCKS}.. run function ${MINE_RANK_NS}:restore_terra_mine`,
+    `execute if score @s mr_blocks_terra matches ${MINE_RANK_PRERANK_MINE_RESET_BLOCKS}.. run function ${MINE_RANK_NS}:restore_terra_mine`,
   ];
 
   map.collect_areia = [
@@ -2968,7 +3014,7 @@ function systemFunctions(): Record<string, string[]> {
     "scoreboard players set @s mr_pick_reward 0",
     `execute if score @s mr_areia_pending matches 1.. run function ${MINE_RANK_NS}:areia_one`,
     `execute if score @s mr_blocks_areia matches ${MINE_RANK_PRERANK_REQUIREMENTS.areia.blocks}.. run function ${MINE_RANK_NS}:check_prerank`,
-    `execute if score @s mr_blocks_areia matches ${MINE_RANK_MINE_RESET_BLOCKS}.. run function ${MINE_RANK_NS}:restore_areia_mine`,
+    `execute if score @s mr_blocks_areia matches ${MINE_RANK_PRERANK_MINE_RESET_BLOCKS}.. run function ${MINE_RANK_NS}:restore_areia_mine`,
   ];
 
   map.check_prerank = [
