@@ -24,6 +24,19 @@ export default {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+        // the Mine Rank panel already used border-warning/30, bg-warning/5 and
+        // text-warning — without this token they compiled to nothing
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        // the green accent of the Mine Rank panel's "what works" box — it was
+        // also missing while `border-success/30`, `bg-success/5` and
+        // `text-success` were already in the JSX
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",

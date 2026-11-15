@@ -40,6 +40,17 @@ body {
     --destructive: 0 74% 56%;
     --destructive-foreground: 0 0% 100%;
 
+    /* amber — used by the Mine Rank panel (border-warning/30, bg-warning/5,
+       text-warning). The colour was MISSING here while the classes were
+       already in the JSX, so they compiled to nothing. */
+    --warning: 32 95% 55%;
+    --warning-foreground: 0 0% 100%;
+
+    /* green — the "what works" box of the Mine Rank panel (border-success/30,
+       bg-success/5, text-success); the token was missing too */
+    --success: 152 76% 45%;
+    --success-foreground: 0 0% 100%;
+
     --border: 230 16% 11%;               /* #191c29 */
     --input: 230 16% 13%;
     --ring: 258 96% 70%;
