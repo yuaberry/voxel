@@ -442,7 +442,7 @@ function Canvas() {
               compiled.files.map((file) => (
                 <div key={file.path} className="rounded-lg border border-border/60 bg-background/70 p-2">
                   <p className="truncate font-mono text-[9px] text-primary">{file.path.split("datapacks/")[1]}</p>
-                  <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[9px] leading-relaxed text-muted-foreground">
+                  <pre className="mt-1 max-h-40 min-w-0 overflow-auto whitespace-pre-wrap break-words font-mono text-[9px] leading-relaxed text-muted-foreground">
                     {file.content}
                   </pre>
                 </div>

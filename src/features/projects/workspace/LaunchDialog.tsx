@@ -374,7 +374,15 @@ export function LaunchDialog({ project, open, onOpenChange }: Props) {
               {isVanilla ? " — join your server from the Multiplayer list" : " with your mod installed"}
             </p>
             {gameLog.length > 0 && (
-              <pre className="max-h-24 overflow-auto font-mono text-[9px] leading-relaxed text-muted-foreground">
+              // `min-w-0` + `whitespace-pre-wrap`: a <pre> does NOT wrap by
+              // default, so the longest line (the java command line that
+              // starts the game runs to thousands of pixels) set the
+              // MIN-CONTENT width of the dialog's grid column. max-w-md
+              // caps the box but the content spilled out of it — the owner
+              // saw the dialog "expand" showing the launch code while every
+              // other row stayed small. Wrapping and a zero minimum width
+              // keep the log inside the dialog it belongs to.
+              <pre className="max-h-24 min-w-0 overflow-auto whitespace-pre-wrap break-words font-mono text-[9px] leading-relaxed text-muted-foreground">
                 {gameLog.slice(-8).join("\n")}
               </pre>
             )}

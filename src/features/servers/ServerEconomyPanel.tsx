@@ -319,7 +319,7 @@ export function ServerEconomyPanel({ server, basePath }: Props) {
               </p>
             )}
             {tunnelLines.length > 0 && !tunnelAddress && (
-              <pre className="mt-1 max-h-16 overflow-auto font-mono text-[8px] text-muted-foreground/70">
+              <pre className="mt-1 max-h-16 min-w-0 overflow-auto whitespace-pre-wrap break-words font-mono text-[8px] text-muted-foreground/70">
                 {tunnelLines.slice(-5).join("\n")}
               </pre>
             )}

@@ -393,7 +393,7 @@ function ToolCard({ activity }: { activity: ToolActivity }) {
           )}
         </button>
         {open && activity.output && (
-          <pre className="max-h-48 overflow-auto border-t border-border/50 bg-background/60 px-3.5 py-2.5 font-mono text-[10px] leading-relaxed text-muted-foreground">
+          <pre className="max-h-48 min-w-0 overflow-auto whitespace-pre-wrap break-words border-t border-border/50 bg-background/60 px-3.5 py-2.5 font-mono text-[10px] leading-relaxed text-muted-foreground">
             {activity.output}
           </pre>
         )}

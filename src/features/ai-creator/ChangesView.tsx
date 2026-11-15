@@ -68,7 +68,7 @@ export function ChangesView({
             </p>
           </div>
         ) : (
-          <pre className="p-3 font-mono text-[11px] leading-relaxed">
+          <pre className="min-w-0 whitespace-pre-wrap break-words p-3 font-mono text-[11px] leading-relaxed">
             {diff.split("\n").map((line, index) => {
               const isAdd = line.startsWith("+") && !line.startsWith("+++");
               const isRemove = line.startsWith("-") && !line.startsWith("---");
