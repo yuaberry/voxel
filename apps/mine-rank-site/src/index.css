@@ -25,6 +25,10 @@
     --border: 230 16% 11%;
     --input: 230 16% 13%;
     --ring: 258 96% 70%;
+    /* amber — the warning accent of the panel (matches the amber-500 dots
+       already drawn in the Hero's fake terminal chrome). */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
     --radius: 0.85rem;
   }
 

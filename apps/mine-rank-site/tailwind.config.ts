@@ -29,6 +29,15 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // the amber accent used by the "why the world is small" panel and by
+        // the desktop app's Mine Rank panel. It was MISSING here while the
+        // classes were already in use — `text-warning`, `border-warning/30`
+        // and `bg-warning/5` compiled to NOTHING (verified: zero occurrences
+        // of "warning" in the built CSS), so the panel lost its colour.
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
       },
       fontFamily: {
         sans: ["'Inter Variable'", "Inter", "system-ui", "sans-serif"],
