@@ -108,7 +108,7 @@ export function Dedication() {
             . O guia do servidor mostrava como uma progressão de mineração pode ser
             simples, clara e divertida — reservar um terreno, cavar a sua mina,
             vender minério, subir de tier. O Mine Rank existe como uma{" "}
-            <span className="text-foreground">variação própria</span> dessegue: outra
+            <span className="text-foreground">variação própria</span> desse gênero: outra
             economia, outro mundo, outra linguagem de comandos.
           </p>
           <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">

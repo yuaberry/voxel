@@ -39,11 +39,11 @@ export function Proof() {
         <div className="flex items-center gap-2 border-b border-border/60 bg-background/50 px-4 py-2.5">
           <TerminalIcon className="h-3.5 w-3.5 text-primary" />
           <span className="font-mono text-[11px] text-muted-foreground">
-            saída do teste real
+            exemplo da saída do E2E
           </span>
         </div>
         <pre className="overflow-x-auto p-4 font-mono text-[11px] leading-relaxed text-muted-foreground">
-{`✓ src/services/servers/mineRankServer.e2e.test.ts (1 test) 56s
+{`✓ src/services/servers/mineRankServer.e2e.test.ts (1 test)
   ✓ Mine Rank — E2E real (vanilla 1.20.1 server)
     > plays the whole command surface with a real client
       and mines for real
@@ -53,6 +53,13 @@ export function Proof() {
   erros         0
   stalls        0`}
         </pre>
+        <p className="border-t border-border/60 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+          O bloco acima mostra o <b className="text-foreground">formato</b> da saída — os
+          números vêm do manifesto, o tempo de execução não é fixado porque depende
+          da máquina. O E2E de verdade baixa o jar da Mojang e entra com um cliente
+          real: ele é <code className="font-mono">VOXEL_E2E=1</code> e não roda
+          sozinho na CI (por isso não existe aqui um tempo "medido" para exibir).
+        </p>
         <div className="border-t border-border/60 px-5 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Como usar no seu servidor

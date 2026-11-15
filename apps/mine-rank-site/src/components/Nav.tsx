@@ -6,6 +6,7 @@ const LINKS = [
   { href: "#progressao", label: "Progressão" },
   { href: "#mundo", label: "Mundo" },
   { href: "#referencia", label: "Referência" },
+  { href: "#prova", label: "Prova" },
   { href: "#dedicatoria", label: "Dedicação" },
 ];
 
@@ -37,7 +38,11 @@ export function Nav() {
           </span>
         </a>
 
-        <nav className="hidden items-center gap-1 md:flex">
+        {/* Below 768px the links used to be `hidden ... md:flex` with no
+            hamburger anywhere: the section navigation simply DID NOT EXIST
+            on a phone. Now the bar scrolls horizontally — same markup, no
+            drawer, and every section stays one tap away. */}
+        <nav className="flex items-center gap-1 overflow-x-auto md:gap-1">
           {LINKS.map((link) => (
             <a
               key={link.href}

@@ -5,6 +5,8 @@
  * filter or an empty section.
  */
 import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import App from "./App";
 import { Commands } from "./components/Commands";
@@ -17,6 +19,25 @@ import {
 } from "./data";
 
 afterEach(() => cleanup());
+
+/**
+ * Reads a file that lives NEXT TO this test, whatever form `import.meta.url`
+ * takes (a file: URL under node, a bare path under jsdom — both happen here).
+ */
+function readSibling(relative: string): string {
+  const url = import.meta.url;
+  const full = url.startsWith("file:")
+    ? new URL(relative, url).pathname
+    : resolve(dirname(url), relative);
+  return readFileSync(full, "utf8");
+}
+
+function siblingDir(relative: string): string {
+  const url = import.meta.url;
+  return url.startsWith("file:")
+    ? new URL(relative, url).pathname
+    : resolve(dirname(url), relative);
+}
 
 describe("Mine Rank site renders (no dead page)", () => {
   it("renders every section of the page", () => {
@@ -41,11 +62,104 @@ describe("Mine Rank site renders (no dead page)", () => {
   it("shows the REAL numbers of the manifest — never a hand-written one", () => {
     render(<App />);
 
-    // 39 commands and 117 triggers (39 × 3 values) are both on the page
+    // the manifest decides the number: the section title, the hero and the
+    // command counter all read it from the same array
     expect(screen.getAllByText(String(MINE_RANK_COMMANDS.length)).length).toBeGreaterThan(0);
     expect(
       screen.getAllByText(String(MINE_RANK_COMMANDS.length * 3)).length,
     ).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The honest surface — what the site says about itself must be TRUE.
+ *
+ * Three of these were false at the same time and nobody noticed, because
+ * the page still rendered:
+ *
+ *  1. the section title said "39 comandos" while the same page counted 47
+ *     (the site publicly contradicting its own product);
+ *  2. the static metas in index.html repeated the same stale 39;
+ *  3. a hand-written "test output" (with an invented 56s) was presented as
+ *     the real E2E run, which is gated by VOXEL_E2E=1 and never runs in CI.
+ */
+describe("Mine Rank site — the honest surface", () => {
+  it("titles the command section with the count of the manifest", () => {
+    render(<App />);
+    const title = `${MINE_RANK_COMMANDS.length} comandos, um único manifesto`;
+    expect(screen.getAllByText(title).length).toBeGreaterThan(0);
+    expect(document.body.textContent).not.toContain("39 comandos");
+  });
+
+  it("keeps the static metas of index.html in step with the manifest", () => {
+    const html = readSibling("../index.html");
+    const counts = [...html.matchAll(/(\d+)\s+comandos/g)].map((m) => Number(m[1]));
+    expect(counts.length, "the metas name the command count").toBeGreaterThan(0);
+    for (const count of counts) {
+      expect(count, "a hand-written count in a static meta drifts silently").toBe(
+        MINE_RANK_COMMANDS.length,
+      );
+    }
+  });
+
+  it("never claims a hand-written transcript is the real test output", () => {
+    render(<App />);
+    expect(screen.queryByText("saída do teste real")).toBeNull();
+    expect(screen.getAllByText(/exemplo da saída do E2E/i).length).toBeGreaterThan(0);
+  });
+
+  it("keeps the section navigation reachable on a phone", () => {
+    render(<App />);
+    const nav = document.querySelector("nav");
+    expect(nav).toBeTruthy();
+    // the links were `hidden ... md:flex` with no hamburger: below 768px the
+    // navigation simply did not exist
+    expect(nav!.className).not.toContain("hidden");
+    for (const href of ["#comandos", "#progressao", "#mundo", "#referencia", "#prova"]) {
+      expect(
+        document.querySelector(`nav a[href="${href}"]`),
+        `the header must link ${href}`,
+      ).toBeTruthy();
+    }
+  });
+
+  it("links every rendered section from the footer too", () => {
+    render(<App />);
+    for (const href of ["#comandos", "#progressao", "#mundo", "#referencia", "#prova", "#dedicatoria"]) {
+      const footer = document.querySelector("footer");
+      expect(
+        footer?.querySelector(`a[href="${href}"]`),
+        `the footer must link ${href}`,
+      ).toBeTruthy();
+    }
+  });
+
+  /**
+   * The Tailwind token guard.
+   *
+   * `text-warning`, `border-warning/30` and `bg-warning/5` were already in
+   * the JSX of BOTH the site and the desktop app's Mine Rank panel, but
+   * `warning` existed in neither tailwind.config.ts nor in index.css — so
+   * every one of those classes compiled to NOTHING (verified: zero hits for
+   * "warning" in the built CSS) and the panel silently lost its colour.
+   */
+  it("declares the warning token the components actually use", () => {
+    const config = readSibling("../tailwind.config.ts");
+    const css = readSibling("./index.css");
+    expect(config).toMatch(/warning:\s*\{/);
+    expect(config).toContain("hsl(var(--warning))");
+    expect(css).toMatch(/--warning:\s*\d+/);
+
+    // and every class that relies on it is still in use — if a component
+    // stops using it, the token is dead weight and this test says so
+    const sources = readdirSync(siblingDir("./components")).filter((f) =>
+      f.endsWith(".tsx"),
+    );
+    const used = sources.filter((file) => {
+      const source = readSibling(`./components/${file}`);
+      return /(text|bg|border)-warning\b/.test(source);
+    });
+    expect(used.length, "no component uses the warning token anymore").toBeGreaterThan(0);
   });
 });
 

@@ -10,6 +10,10 @@ const base = (props: IconProps) => ({
   strokeWidth: 1.8,
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
+  // decorative by default: every icon sits inside a link/button that already
+  // has text, so announcing "group" with no name was only noise for a screen
+  // reader. A caller that needs a named icon can still override.
+  "aria-hidden": true,
   ...props,
 });
 

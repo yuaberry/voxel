@@ -2,6 +2,9 @@ import {
   MINE_RANK_ARENA,
   MINE_RANK_DECK_Y,
   MINE_RANK_HUB,
+  MINE_RANK_MINE_RESET_BLOCKS,
+  MINE_RANK_MINE_RESET_COST,
+  MINE_RANK_ORE_LAYERS,
   MINE_RANK_PLOT_COLUMNS,
   MINE_RANK_PLOT_ORIGIN,
   MINE_RANK_PLOTS,
@@ -38,7 +41,7 @@ export function World() {
           viewBox="0 0 170 104"
           className="mt-4 w-full"
           role="img"
-          aria-label="Mapa do mundo do Mine Rank: hub no centro, oito terrenos em grade 4 por 2, lago ao norte e arena a oeste"
+          aria-label={`Mapa do mundo do Mine Rank: hub no centro, ${MINE_RANK_PLOTS} terrenos em grade ${MINE_RANK_PLOT_COLUMNS} por ${rows}, lago ao norte e arena a oeste`}
         >
           <defs>
             <linearGradient id="hub" x1="0" y1="0" x2="1" y2="1">
@@ -241,9 +244,10 @@ export function World() {
               </span>
             </li>
             <li className="flex justify-between gap-3 border-b border-border/40 pb-2">
-              <span>terreno 8</span>
+              <span>terreno {MINE_RANK_PLOTS}</span>
               <span className="text-foreground">
-                {mineRankPlotCenter(8).x} {MINE_RANK_DECK_Y} {mineRankPlotCenter(8).z}
+                {mineRankPlotCenter(MINE_RANK_PLOTS).x} {MINE_RANK_DECK_Y}{" "}
+                {mineRankPlotCenter(MINE_RANK_PLOTS).z}
               </span>
             </li>
             <li className="flex justify-between gap-3 border-b border-border/40 pb-2">
@@ -283,10 +287,13 @@ export function World() {
             O que existe em cada terreno
           </p>
           <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
-            <li>· deck próprio em y=100 (uma plataforma, acima de qualquer terreno)</li>
-            <li>· um furo 3×3 no centro e uma mina de 8 camadas de minério</li>
+            <li>· deck próprio em y={MINE_RANK_DECK_Y} (uma plataforma, acima de qualquer terreno)</li>
+            <li>· um furo 3×3 no centro e uma mina de {MINE_RANK_ORE_LAYERS.length} camadas de minério</li>
             <li>· anel colorido — cada terreno tem a sua cor</li>
-            <li>· restauração automática a cada 100 blocos (ou por 25 coins)</li>
+            <li>
+              · restauração automática a cada {MINE_RANK_MINE_RESET_BLOCKS} blocos (ou por{" "}
+              {MINE_RANK_MINE_RESET_COST} coins)
+            </li>
           </ul>
         </div>
       </div>

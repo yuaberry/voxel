@@ -1,6 +1,8 @@
 import {
   MINE_RANK_COMMANDS,
+  MINE_RANK_CURRENCIES,
   MINE_RANK_MINE_RESET_COST,
+  MINE_RANK_PLOTS,
   MINE_RANK_TIERS,
   PROOFS,
 } from "../data";
@@ -43,9 +45,9 @@ export function Hero() {
               Um <span className="text-foreground">Rankup de verdade</span> em{" "}
               <span className="text-foreground">datapack vanilla</span> — sem plugin,
               sem dependência, sem fake data. {MINE_RANK_COMMANDS.length} comandos,
-              {MINE_RANK_TIERS.length} tiers, prestígio, 8 minas privadas, 4 moedas,
-              clans, pesca e arena — tudo testado num servidor Minecraft 1.20.1 de
-              verdade.
+              {MINE_RANK_TIERS.length} tiers, prestígio, {MINE_RANK_PLOTS} minas privadas,{" "}
+              {MINE_RANK_CURRENCIES.length} moedas, clans, pesca e arena — tudo testado
+              num servidor Minecraft 1.20.1 de verdade.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">

@@ -7,6 +7,11 @@ import { Proof } from "./components/Proof";
 import { World } from "./components/World";
 import { Section } from "./components/ui";
 import { ArrowIcon, PickaxeIcon } from "./components/Icons";
+// the count comes from the manifest itself — a hand-written number in the
+// title contradicted the very same page (the section said "39" while the
+// hero and the command list said 47, and the site was publicly wrong about
+// its own product)
+import { MINE_RANK_COMMANDS } from "./data";
 
 function Footer() {
   return (
@@ -49,6 +54,11 @@ function Footer() {
                 <li>
                   <a href="#referencia" className="transition-colors hover:text-foreground">
                     Referência
+                  </a>
+                </li>
+                <li>
+                  <a href="#prova" className="transition-colors hover:text-foreground">
+                    Prova
                   </a>
                 </li>
                 <li>
@@ -127,7 +137,7 @@ export default function App() {
         <Section
           id="comandos"
           eyebrow="A superfície"
-          title={`${39} comandos, um único manifesto`}
+          title={`${MINE_RANK_COMMANDS.length} comandos, um único manifesto`}
           lead="No Minecraft puro o único comando de jogador é o /trigger. Por isso cada comando do Mine Rank é um /trigger com um número — e os menus do chat são clicáveis: cada botão já executa o comando certo."
         >
           <Commands />
@@ -137,7 +147,7 @@ export default function App() {
           id="progressao"
           eyebrow="A progressão"
           title="Do Novato ao Mítico — e o prestígio que muda tudo"
-          lead="Cada bloco minerado vale 1 level e 1 coin. A cada 100 blocos a mina se restaura sozinha. No level 1000 o prestígio zera o level e dá +1 coin por bloco para sempre."
+          lead="Na mina privada cada bloco vale 1 level e 1 coin. A cada 100 blocos ela se restaura sozinha. No Pré-Rank o pagamento é outro: o valor do bloco daquele andar multiplicado pela pá equipada, com teto de 50 coins por bloco e sem level. No level 1000 o prestígio zera o level e dá +1 coin por bloco para sempre."
         >
           <Progress />
         </Section>
