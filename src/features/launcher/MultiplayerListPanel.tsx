@@ -117,6 +117,23 @@ export function MultiplayerListPanel({ instances }: MultiplayerListPanelProps) {
 
   return (
     <section className="mt-10">
+      {/*
+        The offline-server login, stated once where the owner writes the list.
+        A server in offline mode authenticates the NAME and asks for its own
+        password in chat — the Ely.by/Microsoft account only proves who the
+        player IS, never that they may play. The owner hit exactly this: a
+        registered account on NerdZone, a wrong password, and a Multiplayer
+        screen that looked like a failure of the launcher.
+      */}
+      <p className="mb-3 rounded-lg border border-warning/30 bg-warning/5 p-2.5 text-[11px] leading-relaxed text-muted-foreground">
+        <span className="font-semibold text-warning">Servidores em modo offline</span> (como o
+        NerdZone) aceitam a sua conta Ely.by normalmente, mas pedem a{" "}
+        <span className="font-medium text-foreground">senha do próprio servidor</span> no chat.
+        Se a conta já existir lá:{" "}
+        <code className="font-mono">{"/logar <senha>"}</code>. Na primeira vez:{" "}
+        <code className="font-mono">{"/registrar <senha> <senha>"}</code>. A conta Ely.by
+        continua sendo a que o VOXEL usa — é ela que identifica você no servidor.
+      </p>
       <div className="mb-3 flex items-center gap-2">
         <List className="h-4 w-4 text-primary" />
         <h2 className="font-semibold">Multiplayer list</h2>

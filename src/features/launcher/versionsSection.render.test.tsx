@@ -10,12 +10,18 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 
 const catalogMock = vi.fn();
 
+const settingsState = {
+  settings: {
+    storage: { basePath: "/workspace" },
+    launcher: { publicServerIds: ["nerdzone"], ramMb: 1024, java: { customJavaPath: null }, elyClientId: "" },
+  },
+};
 vi.mock("@/stores/settingsStore", () => ({
-  useSettingsStore: (selector: (s: unknown) => unknown) =>
-    selector({ settings: { storage: { basePath: "/workspace" } } }),
+  useSettingsStore: (selector: (s: unknown) => unknown) => selector(settingsState),
 }));
 
 vi.mock("@/services/launcher/versionsService", () => ({
@@ -29,6 +35,28 @@ vi.mock("@/services/launcher/versionsService", () => ({
 vi.mock("@/services/launcher/instanceService", () => ({
   prepareInstance: vi.fn(async () => ({})),
   launchGame: vi.fn(async () => ""),
+}));
+
+
+vi.mock("@/services/servers/multiplayerService", () => ({
+  buildWorkspaceServerEntries: vi.fn(async () => []),
+  buildMultiplayerEntries: vi.fn(async () => []),
+  writeInstanceServerList: vi.fn(async () => ({ written: [], failed: [], entries: [] })),
+}));
+
+vi.mock("@/services/launcher/instanceService", () => ({
+  runtimeStatus: vi.fn(async () => ({ ready: true, mcVersion: "1.20.1", loader: "vanilla", missing: [] })),
+  prepareInstance: vi.fn(async () => ({})),
+  launchGame: vi.fn(async () => ""),
+}));
+
+
+vi.mock("@/services/db/repositories/serversRepository", () => ({
+  listServersReconciled: vi.fn(async () => []),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
 vi.mock("@/services/launcher/accountService", () => ({
@@ -87,5 +115,22 @@ describe("VersionsSection — Java and the truth about Bedrock", () => {
     render(<VersionsSection />);
     expect(await screen.findByText(/Shaders e packs de textura/i)).toBeTruthy();
     expect(screen.getAllByText(/Modpacks e mods/i).length).toBeGreaterThan(0);
+  });
+});
+describe("MultiplayerListPanel — the offline login is stated once", () => {
+  it("explains that an offline server asks for its own password in chat", async () => {
+    const { MultiplayerListPanel } = await import("./MultiplayerListPanel");
+    render(
+      <MemoryRouter>
+        <MultiplayerListPanel
+          instances={[
+            { slug: "mine-rank" },
+          ]}
+        />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/Servidores em modo offline/i)).toBeTruthy();
+    expect(screen.getAllByText(/\/logar/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\/registrar/).length).toBeGreaterThan(0);
   });
 });
