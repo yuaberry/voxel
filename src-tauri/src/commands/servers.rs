@@ -358,6 +358,11 @@ fn server_create_impl(
     std::fs::write(dir.join("server.properties"), format!("{}\n", lines.join("\n")))
         .map_err(|e| format!("{e}"))?;
 
+    // The Multiplayer-screen icon. Generated here (not copied): a server
+    // without it shows a grey unknown-server mark to every player.
+    let icon = server_icon_png()?;
+    std::fs::write(dir.join("server-icon.png"), icon).map_err(|e| format!("{e}"))?;
+
     // Self-describing manifest: the DISK is the source of truth, so a server
     // folder can always reconcile itself back into the app database (if the
     // db write failed after creation, the server is never lost — the next
@@ -401,6 +406,97 @@ fn server_create_impl(
     })
 }
 
+/// The server icon (`server-icon.png`) — 64x64, the size the vanilla client
+/// reads for the Multiplayer screen.
+///
+/// Original art generated here (no asset is copied from anywhere): a dark
+/// blueprint gradient with the VOXEL pickaxe silhouette, in the product's
+/// violet. A server WITHOUT an icon shows a grey "unknown server" mark on
+/// every player's screen, so this is part of creating a server, not a
+/// finishing touch.
+pub fn server_icon_png() -> Result<Vec<u8>, String> {
+    const SIZE: u32 = 64;
+    let mut px = vec![[0u8, 0, 0, 0]; (SIZE * SIZE) as usize];
+    let put = |px: &mut [[u8; 4]], x: u32, y: u32, c: [u8; 4]| {
+        if x < SIZE && y < SIZE {
+            px[(y * SIZE + x) as usize] = c;
+        }
+    };
+
+    // gradient background: deep navy → violet, with a darker frame
+    for y in 0..SIZE {
+        for x in 0..SIZE {
+            let t = (x + y) as f32 / 126.0;
+            let mut c = [
+                (14.0 + 26.0 * t) as u8,
+                (16.0 + 20.0 * t) as u8,
+                (38.0 + 60.0 * t) as u8,
+                255,
+            ];
+            let frame = x < 2 || y < 2 || x > SIZE - 3 || y > SIZE - 3;
+            if frame {
+                c[0] = (c[0] as f32 * 0.55) as u8;
+                c[1] = (c[1] as f32 * 0.55) as u8;
+                c[2] = (c[2] as f32 * 0.55) as u8;
+            }
+            put(&mut px, x, y, c);
+        }
+    }
+
+    // the pickaxe: a diagonal handle and a head, drawn with a 4x scale so the
+    // 16x16 design reads as a real icon at 64x64
+    let s = 4u32;
+    let violet = [167u8, 139, 250, 255];
+    let light = [226u8, 214, 255, 255];
+    let dark = [109u8, 40, 217, 255];
+    let handle = |px: &mut [[u8; 4]]| {
+        for i in 0..6u32 {
+            for k in 0..2u32 {
+                put(px, 8 + i * s, 52 - i * s + k * s, dark);
+                put(px, 8 + i * s + s - 1, 52 - i * s + k * s, dark);
+            }
+        }
+    };
+    let head = |px: &mut [[u8; 4]]| {
+        // the top-left arc of the head
+        for i in 0..7u32 {
+            let x = 12 + i * s;
+            let y = 16 + (6 - i) * s;
+            for k in 0..2u32 {
+                put(px, x, y + k * s, violet);
+                put(px, x + s - 1, y + k * s, light);
+            }
+        }
+        // the bottom-right arc
+        for i in 0..5u32 {
+            let x = 12 + i * s;
+            let y = 44 - i * s;
+            for k in 0..2u32 {
+                put(px, x, y + k * s, violet);
+                put(px, x + s - 1, y + k * s, light);
+            }
+        }
+    };
+    let mut px = px;
+    handle(&mut px);
+    head(&mut px);
+
+    let mut buf = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut buf, SIZE, SIZE);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder
+            .write_header()
+            .map_err(|e| format!("server icon header failed: {e}"))?;
+        let raw: Vec<u8> = px.iter().flat_map(|p| [p[0], p[1], p[2], p[3]]).collect();
+        writer
+            .write_image_data(&raw)
+            .map_err(|e| format!("server icon data failed: {e}"))?;
+    }
+    Ok(buf)
+}
+
 /// Curated server.properties baseline, with style-preset overrides applied.
 /// Keys/values are format-validated (no separators/newlines) — the presets
 /// come from our own catalog, this is defense in depth.
@@ -408,8 +504,14 @@ pub fn curated_properties(
     port: u16,
     overrides: Option<&std::collections::HashMap<String, String>>,
 ) -> Vec<(String, String)> {
+    // the Multiplayer-screen description: colour codes and a second line.
+    // The line break is the two characters backslash + n, NOT a real newline:
+    // a real newline would truncate server.properties itself (measured on
+    // the live server — the second half of the MOTD silently vanished).
+    const DEFAULT_MOTD: &str =
+        "§b§lVOXEL SERVER §8▪ §fMinecraft 1.20.1\\n§7vanilla · datapack · Ely.by ou Microsoft";
     let mut curated: Vec<(String, String)> = vec![
-        ("motd".into(), "A VOXEL server".into()),
+        ("motd".into(), DEFAULT_MOTD.to_string()),
         ("server-port".into(), port.to_string()),
         ("online-mode".into(), "true".into()),
         ("gamemode".into(), "survival".into()),
@@ -3572,5 +3674,40 @@ mod automation_tests {
         .is_ok());
 
         let _ = std::fs::remove_dir_all(&base);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The Multiplayer-screen icon: a 64x64 RGBA PNG, the only size the
+    /// vanilla client reads (anything else shows as the grey unknown-server
+    /// mark).
+    #[test]
+    fn the_server_icon_is_a_64x64_png_the_client_reads() {
+        let bytes = server_icon_png().expect("the icon must be generated");
+        assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n", "PNG signature");
+        // IHDR: width and height are the first two big-endian u32
+        let width = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
+        let height = u32::from_be_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]);
+        assert_eq!((width, height), (64, 64));
+        assert_eq!(bytes[24], 8, "bit depth 8");
+        assert_eq!(bytes[25], 6, "colour type RGBA");
+        // a 64x64 RGBA image cannot compress to almost nothing: the art has
+        // to be there, or the icon renders as a flat square
+        assert!(bytes.len() > 400, "icon is suspiciously small: {} bytes", bytes.len());
+    }
+
+    /// The default MOTD carries colour codes and a second line — the way the
+    /// owner's own server shows itself on the Multiplayer screen.
+    #[test]
+    fn the_default_motd_is_not_a_grey_line_of_text() {
+        let props = curated_properties(25565, None);
+        let (key, motd) = props.first().expect("the curated properties exist");
+        assert_eq!(key, "motd");
+        assert!(motd.contains('§'), "the MOTD must carry colour codes");
+        assert!(motd.contains("\\n"), "the MOTD must have a second line");
+        assert!(motd.len() <= 256);
     }
 }

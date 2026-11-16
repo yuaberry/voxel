@@ -53,6 +53,30 @@ não tem `tps` — o TPS se mede com `time query gametime`).
 | Tick | `max-tick-time=0` (watchdog **desligado**) · `sync-chunk-writes=false` (ver abaixo) |
 | Resource pack | `resource-pack-sha1=<sha1 do nexus_rank>` já registrado; **sem URL** enquanto o servidor é só local (ver abaixo) |
 
+## A capa e a descrição do servidor (tela Multiplayer)
+
+O ícone (`server-icon.png`) é gerado pelo VOXEL — 64×64 RGBA, o único tamanho
+que o cliente vanilla lê. Sem ele o servidor aparece com a marca cinza de
+"desconhecido" na tela de todos os jogadores.
+
+A descrição (`motd` no `server.properties`) usa códigos de cor e **duas
+linhas** — a quebra de linha são os dois caracteres barra + n, nunca uma
+quebra real (uma quebra real corta o `server.properties` e a segunda linha
+some sem aviso; medido no servidor ao vivo).
+
+```
+motd=§6§lMINE RANK §8▪ §fRankup 100% vanilla 1.20.1\n§7/mina §8· §7/encantos §8· §eMineCoin §8· §f8 minas privadas
+```
+
+**As propriedades só valem no START do servidor** — um `/reload` recarrega os
+datapacks, não o `server.properties`. Mexeu no `motd` ou no ícone?
+`systemctl --user restart voxel-mine-rank.service`.
+
+O ícone deste servidor está versionado em `ops/mine-rank/server-icon.png` e é
+gerado de novo a cada servidor criado pelo VOXEL (`server_icon_png`, em
+`src-tauri/src/commands/servers.rs`), com teste que confere as dimensões, a
+assinatura e o tamanho mínimo da arte.
+
 ## A mina ficou menor (sessão 82) — e o reset agora é derivado
 
 A mina privada passou de **3×3 × 8 camadas (72 blocos)** para
