@@ -17,6 +17,9 @@ import {
   MINE_RANK_ARENA,
   MINE_RANK_BASE_Y,
   MINE_RANK_COMMANDS,
+  MINE_RANK_CHAIN_MAX_PRICE,
+  MINE_RANK_CHAIN_MIN_PRICE,
+  MINE_RANK_CHAIN_INITIAL_PRICE,
   MINE_RANK_MINE_FLOOR_Y,
   MINE_RANK_MINE_TOP_Y,
   MINE_RANK_MINE_VOLUME,
@@ -383,5 +386,108 @@ describe("the manual book and the menus are clickable and honest", () => {
     );
     // and the book itself is the same payload the command gives
     expect(pickaxe).toContain(manualBook().slice(0, 60));
+  });
+});
+
+describe("the Chain — the market the admin controls", () => {
+  it("declares the Chain objectives and starts the price where the owner agreed", () => {
+    const load = functionSource.get("load") ?? "";
+    for (const objective of ["mr_chain", "mr_supply", "mr_issue", "mr_total"]) {
+      expect(load, `${objective} must be declared`).toContain(
+        `scoreboard objectives add ${objective} dummy`,
+      );
+    }
+    // the price starts at R$1000, in centavos, and never at zero
+    expect(load).toContain(
+      `scoreboard players set #chain mr_chain ${MINE_RANK_CHAIN_INITIAL_PRICE}`,
+    );
+    // and the board is a real boss bar, created at setup
+    expect(load).toContain("bossbar add nexus_rank:chain");
+    expect(load).toContain("bossbar set nexus_rank:chain players @a");
+  });
+
+  it("clamps the price between the floor and the ceiling the owner agreed", () => {
+    // R$1000–2700: the admin can move the market, not print his way past it
+    expect(MINE_RANK_CHAIN_MIN_PRICE).toBeLessThanOrEqual(MINE_RANK_CHAIN_INITIAL_PRICE);
+    expect(MINE_RANK_CHAIN_MAX_PRICE).toBeGreaterThan(MINE_RANK_CHAIN_INITIAL_PRICE);
+    expect(MINE_RANK_CHAIN_MAX_PRICE).toBe(
+      MINE_RANK_CHAIN_MIN_PRICE + 170_000,
+    );
+    const up = functionSource.get("cmd_chain_up") ?? "";
+    expect(up).toContain(
+      `if score #chain mr_chain matches ${MINE_RANK_CHAIN_MAX_PRICE + 1}.. run scoreboard players set #chain mr_chain ${MINE_RANK_CHAIN_MAX_PRICE}`,
+    );
+    const down = functionSource.get("cmd_chain_down") ?? "";
+    expect(down).toContain(
+      `if score #chain mr_chain matches ..${MINE_RANK_CHAIN_MIN_PRICE - 1} run scoreboard players set #chain mr_chain ${MINE_RANK_CHAIN_MIN_PRICE}`,
+    );
+  });
+
+  it("closes the market to everyone but a tagged admin", () => {
+    // every command that moves the price or emits coins refuses a non-admin
+    // WITH A MESSAGE — a silent refusal is how a player concludes the server
+    // is broken
+    for (const command of ["cmd_chain_up", "cmd_chain_down", "cmd_chain_issue", "chain_team_menu"]) {
+      const source = functionSource.get(command) ?? "";
+      expect(
+        source,
+        `${command} must answer a non-admin`,
+      ).toContain("execute unless entity @s[tag=mr_admin] run");
+    }
+  });
+
+  it("issues in DIRECT PROPORTION to what each player mined", () => {
+    const issue = functionSource.get("cmd_chain_issue") ?? "";
+    // the total mined since the last restore
+    expect(issue).toContain(
+      "scoreboard players set #chain mr_total 0",
+    );
+    expect(issue).toContain(
+      "execute as @a run scoreboard players operation #chain mr_total += @s mr_mine_used",
+    );
+    // and each player takes issue × mine_used / total — never evenly
+    expect(issue).toContain(
+      "execute if entity @s[tag=mr_admin] if score #chain mr_total matches 1.. as @a run scoreboard players operation @s mr_tmp = #chain mr_issue",
+    );
+    expect(issue).toContain(
+      "execute if entity @s[tag=mr_admin] if score #chain mr_total matches 1.. as @a run scoreboard players operation @s mr_tmp *= @s mr_mine_used",
+    );
+    expect(issue).toContain(
+      "execute if entity @s[tag=mr_admin] if score #chain mr_total matches 1.. as @a run scoreboard players operation @s mr_tmp /= #chain mr_total",
+    );
+    // nobody mined → the emission does not happen (an even split with an
+    // empty board would hand coins to a player who never dug)
+    expect(issue).toContain(
+      "if score #chain mr_total matches 0 run",
+    );
+  });
+
+  it("promotes and demotes the NEAREST player, never a hand-typed name", () => {
+    // vanilla cannot target a player by name inside a datapack, so the tag
+    // is applied to the nearest OTHER player while the requester is mr_req
+    for (const command of ["chain_admin_add", "chain_admin_del", "chain_tester_add", "chain_tester_del"]) {
+      const source = functionSource.get(command) ?? "";
+      expect(source, `${command} must tag the requester`).toContain(
+        "tag @s add mr_req",
+      );
+      expect(source, `${command} must act on the nearest player`).toContain(
+        "tag @a[limit=1,sort=nearest,tag=!mr_req]",
+      );
+      expect(source, `${command} must release the requester`).toContain(
+        "tag @s remove mr_req",
+      );
+    }
+  });
+
+  it("keeps the board in front of the player at spawn", () => {
+    const tick = functionSource.get("tick") ?? "";
+    // the boss bar carries the price, the supply and the online count
+    expect(tick).toContain("bossbar set nexus_rank:chain name");
+    expect(tick).toContain('"objective":"mr_chain","name":"#chain"');
+    expect(tick).toContain('"objective":"mr_supply","name":"#chain"');
+    // and the action bar repeats it near the hub
+    expect(tick).toContain("execute as @a[x=0,y=100,z=0,distance=..40] run title @s actionbar");
+    // the admin tag is re-applied every tick, so a late join is an admin
+    expect(tick).toContain("tag @a[name=Verifier] add mr_admin");
   });
 });

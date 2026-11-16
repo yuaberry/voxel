@@ -46,6 +46,34 @@ export const MINE_RANK_PLOT_COLUMNS = 4;
 export const MINE_RANK_PRESTIGE_LEVEL = 1000;
 
 /**
+ * The MINE COIN market — the inflation the owner controls.
+ *
+ * The Chain holds the MINE COIN price in REAIS (stored in centavos, integer
+ * money), the supply of coins ever emitted, and the rule that ties them
+ * together: the owner sets the price and issues tokens, and the issuance is
+ * split among the ONLINE players in direct proportion to what each one
+ * mined — never evenly, never at random.
+ */
+export const MINE_RANK_CHAIN_INITIAL_PRICE = 100_000; // R$ 1.000,00
+/** The floor of the price — the owner cannot print his way below R$1000. */
+export const MINE_RANK_CHAIN_MIN_PRICE = 100_000;
+/** The ceiling of the price — the owner cannot print his way above R$2700. */
+export const MINE_RANK_CHAIN_MAX_PRICE = 270_000;
+/** One price step (a click on the admin menu moves this much). */
+export const MINE_RANK_CHAIN_STEP_PCT = 5;
+/** The issuance sizes offered by the admin menu (in MINE COIN). */
+export const MINE_RANK_CHAIN_ISSUANCE = [10, 50, 100];
+/**
+ * The server admins — the ONLY accounts that can touch the Chain.
+ *
+ * Vanilla has no "permission" for a datapack function, so an admin is a tag
+ * (`mr_admin`). These names are re-applied every tick: an admin who joins
+ * later is an admin from the first second, and the list is data, not a
+ * hand-typed command someone has to remember to run.
+ */
+export const MINE_RANK_ADMIN_NAMES = ["Verifier"];
+
+/**
  * The rank (level) at which the pickaxe enchantment ladder OPENS.
  *
  * Below it the player is still learning the mine — and the MineCoin they
@@ -124,7 +152,7 @@ export const MINE_RANK_HYPE_STEP = 1000;
  * It is asserted against the real generator output by the unit test — never a
  * hand-written number that can drift when a function is added.
  */
-export const MINE_RANK_DATAPACK_FILE_COUNT = 296;
+export const MINE_RANK_DATAPACK_FILE_COUNT = 311;
 
 // ---------------------------------------------------------------------------
 // Pre-ranks Terra and Areia — the economic ladder before Bronze
@@ -1241,6 +1269,53 @@ export const MINE_RANK_COMMANDS: MineRankCommand[] = [
     fn: "cmd_areia_mine",
   },
   // ---- MineCoin (unlocked at Bronze) --------------------------------------
+  {
+    id: "chain",
+    args: [],
+    trigger: "mr_t_chain",
+    family: "economia",
+    surface: "menu",
+    description:
+      "Painel da Chain: preço da MineCoin, emissão e (para admins) o controle da inflação.",
+    fn: "cmd_chain",
+  },
+  {
+    id: "chain inflar",
+    args: [],
+    trigger: "mr_t_chain_up",
+    family: "economia",
+    surface: "action",
+    description: "Sobe o preço da MineCoin em 5% (só admin).",
+    fn: "cmd_chain_up",
+  },
+  {
+    id: "chain desinflar",
+    args: [],
+    trigger: "mr_t_chain_down",
+    family: "economia",
+    surface: "action",
+    description: "Baixa o preço da MineCoin em 5% (só admin).",
+    fn: "cmd_chain_down",
+  },
+  {
+    id: "chain emitir",
+    args: [],
+    trigger: "mr_t_chain_issue",
+    family: "economia",
+    surface: "action",
+    description:
+      "Emite MineCoin e distribui entre os jogadores online, proporcional ao que cada um minerou (só admin).",
+    fn: "cmd_chain_issue",
+  },
+  {
+    id: "chain equipe",
+    args: [],
+    trigger: "mr_t_chain_team",
+    family: "economia",
+    surface: "menu",
+    description: "Admins e testers do servidor (só admin).",
+    fn: "cmd_chain_team",
+  },
   {
     id: "mnc",
     args: [],
@@ -2844,6 +2919,259 @@ for (const enchant of MINE_RANK_PICKAXE_ENCHANTS) {
   ];
 
   // ---- MineCoin (Bronze only) ---------------------------------------------
+  // ---- the Chain: the MINE COIN market the admin controls ----------------
+  // A part of every line below only runs for a tagged admin, and every
+  // refusal says WHY (a silent refusal is how a player concludes the server
+  // is broken).
+
+  map.cmd_chain = [
+    `execute if entity @s[tag=mr_admin] run function ${MINE_RANK_NS}:chain_admin_panel`,
+    `execute unless entity @s[tag=mr_admin] run function ${MINE_RANK_NS}:chain_public`,
+    "scoreboard players set @s mr_t_chain 0",
+  ];
+
+  map.chain_public = [
+    tell([
+      tag(),
+      { text: "MINE COIN (Chain)", color: "#fbbf24", bold: true },
+    ]),
+    tell([
+      { text: " Preço: ", color: "gray" },
+      { text: "R$ ", color: "#fbbf24" },
+      { score: { objective: "mr_chain", name: "#chain" }, color: "#fbbf24" },
+      { text: " (centavos) · ", color: "gray" },
+      { text: "emissão: ", color: "gray" },
+      { score: { objective: "mr_supply", name: "#chain" }, color: "#a78bfa" },
+      { text: " MNC", color: "gray" },
+    ]),
+    tell([
+      { text: " Jogadores online: ", color: "gray" },
+      { score: { objective: "mr_online", name: "#mr_online" }, color: "#22d3ee" },
+    ]),
+    tell([
+      tag(),
+      {
+        text: "O preço e a emissão são controlados pelo administrador do servidor.",
+        color: "dark_gray",
+      },
+    ]),
+  ];
+
+  map.chain_admin_panel = [
+    tell([
+      tag(),
+      { text: "CHAIN — painel do administrador", color: "#fbbf24", bold: true },
+    ]),
+    tell([
+      { text: " Preço da MineCoin: ", color: "gray" },
+      { text: "R$ ", color: "#fbbf24" },
+      { score: { objective: "mr_chain", name: "#chain" }, color: "#fbbf24" },
+      { text: " (centavos)", color: "gray" },
+    ]),
+    tell([
+      { text: " Emissão total: ", color: "gray" },
+      { score: { objective: "mr_supply", name: "#chain" }, color: "#a78bfa" },
+      { text: " MNC · online: ", color: "gray" },
+      { score: { objective: "mr_online", name: "#mr_online" }, color: "#22d3ee" },
+    ]),
+    tell([
+      { text: " ── controlar ──", color: "dark_gray" },
+    ]),
+    tell([
+      option(` Inflar +${MINE_RANK_CHAIN_STEP_PCT}%`, "mr_t_chain_up", 1, "#fbbf24"),
+    ]),
+    tell([
+      option(` Desinflar -${MINE_RANK_CHAIN_STEP_PCT}%`, "mr_t_chain_down", 1, "#fbbf24"),
+    ]),
+    tell([
+      option(" Emitir MineCoin para os jogadores", "mr_t_chain_issue", 1, "#22d3ee"),
+    ]),
+    tell([
+      option(" Admins e testers", "mr_t_chain_team", 1, "#a78bfa"),
+    ]),
+  ];
+
+  // the price moves by a percentage, never by a hand-typed amount, and it is
+  // clamped to the floor and the ceiling the owner agreed on (R$1000–2700)
+  map.cmd_chain_up = [
+    `execute unless entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Só um administrador mexe no preço da MineCoin.", color: "red" },
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run scoreboard players operation #chain mr_tmp = #chain mr_chain`,
+    `execute if entity @s[tag=mr_admin] run scoreboard players operation #chain mr_tmp *= #chain mr_step`,
+    `execute if entity @s[tag=mr_admin] run scoreboard players operation #chain mr_tmp /= #chain mr_pct`,
+    `execute if entity @s[tag=mr_admin] run scoreboard players operation #chain mr_chain += #chain mr_tmp`,
+    `execute if entity @s[tag=mr_admin] if score #chain mr_chain matches ${MINE_RANK_CHAIN_MAX_PRICE + 1}.. run scoreboard players set #chain mr_chain ${MINE_RANK_CHAIN_MAX_PRICE}`,
+    `function ${MINE_RANK_NS}:chain_say`,
+    "scoreboard players set @s mr_t_chain_up 0",
+  ];
+
+  map.cmd_chain_down = [
+    `execute unless entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Só um administrador mexe no preço da MineCoin.", color: "red" },
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run scoreboard players operation #chain mr_tmp = #chain mr_chain`,
+    `execute if entity @s[tag=mr_admin] run scoreboard players operation #chain mr_tmp *= #chain mr_step`,
+    `execute if entity @s[tag=mr_admin] run scoreboard players operation #chain mr_tmp /= #chain mr_pct`,
+    `execute if entity @s[tag=mr_admin] run scoreboard players operation #chain mr_chain -= #chain mr_tmp`,
+    `execute if entity @s[tag=mr_admin] if score #chain mr_chain matches ..${MINE_RANK_CHAIN_MIN_PRICE - 1} run scoreboard players set #chain mr_chain ${MINE_RANK_CHAIN_MIN_PRICE}`,
+    `function ${MINE_RANK_NS}:chain_say`,
+    "scoreboard players set @s mr_t_chain_down 0",
+  ];
+
+  map.chain_say = [
+    "tellraw @a " +
+      JSON.stringify([
+        tag(),
+        { text: "O preço da MineCoin agora é R$ ", color: "#fbbf24" },
+        { score: { objective: "mr_chain", name: "#chain" }, color: "#fbbf24" },
+        { text: " (centavos).", color: "gray" },
+      ]),
+  ];
+
+  // the issuance: 1 = 10 MNC, 2 = 50, 3 = 100 — split among the online players
+  // in DIRECT PROPORTION to what each one mined since the last restore.
+  map.cmd_chain_issue = [
+    `execute unless entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Só um administrador emite MineCoin.", color: "red" },
+    ])}`,
+    `execute if entity @s[tag=mr_admin] if score @s mr_t_chain_issue matches 1 run scoreboard players set #chain mr_issue ${MINE_RANK_CHAIN_ISSUANCE[0]}`,
+    `execute if entity @s[tag=mr_admin] if score @s mr_t_chain_issue matches 2 run scoreboard players set #chain mr_issue ${MINE_RANK_CHAIN_ISSUANCE[1]}`,
+    `execute if entity @s[tag=mr_admin] if score @s mr_t_chain_issue matches 3 run scoreboard players set #chain mr_issue ${MINE_RANK_CHAIN_ISSUANCE[2]}`,
+    // how much did the ONLINE players mine? no mining → no emission (honest)
+    "scoreboard players set #chain mr_total 0",
+    "execute as @a run scoreboard players operation #chain mr_total += @s mr_mine_used",
+    `execute if entity @s[tag=mr_admin] if score #chain mr_total matches 0 run ${tell([
+      tag(),
+      { text: "Ninguém minerou desde a última restauração — a emissão não tem como ser proporcional.", color: "red" },
+    ])}`,
+    // each player takes issue × mine_used / total
+    `execute if entity @s[tag=mr_admin] if score #chain mr_total matches 1.. as @a run scoreboard players operation @s mr_tmp = #chain mr_issue`,
+    `execute if entity @s[tag=mr_admin] if score #chain mr_total matches 1.. as @a run scoreboard players operation @s mr_tmp *= @s mr_mine_used`,
+    `execute if entity @s[tag=mr_admin] if score #chain mr_total matches 1.. as @a run scoreboard players operation @s mr_tmp /= #chain mr_total`,
+    `execute if entity @s[tag=mr_admin] if score #chain mr_total matches 1.. as @a run function ${MINE_RANK_NS}:chain_pay`,
+    `execute if entity @s[tag=mr_admin] if score #chain mr_total matches 1.. run function ${MINE_RANK_NS}:chain_issued`,
+    "scoreboard players set @s mr_t_chain_issue 0",
+  ];
+
+  map.chain_pay = [
+    // the cap is the one rule the emission cannot break: nobody goes over
+    `execute if score @s mr_tmp matches 1.. run scoreboard players operation @s mr_mnc += @s mr_tmp`,
+  ];
+
+  map.chain_issued = [
+    "scoreboard players operation #chain mr_supply += #chain mr_issue",
+    "tellraw @a " +
+      JSON.stringify([
+        tag(),
+        { text: "Emissão de ", color: "#22d3ee" },
+        { score: { objective: "mr_issue", name: "#chain" }, color: "#fbbf24" },
+        { text: " MineCoin distribuída entre os jogadores online, na proporção do que cada um minerou.", color: "#22d3ee" },
+      ]),
+  ];
+
+  // the team: promote/demote the NEAREST player (vanilla cannot name one).
+  // The target is the closest OTHER player — the admin tags himself `mr_req`
+  // while the call runs, exactly like the TPA commands do.
+  map.cmd_chain_team = [
+    `execute if score @s mr_t_chain_team matches 1 run function ${MINE_RANK_NS}:chain_team_menu`,
+    `execute if score @s mr_t_chain_team matches 2 run function ${MINE_RANK_NS}:chain_admin_add`,
+    `execute if score @s mr_t_chain_team matches 3 run function ${MINE_RANK_NS}:chain_admin_del`,
+    `execute if score @s mr_t_chain_team matches 4 run function ${MINE_RANK_NS}:chain_tester_add`,
+    `execute if score @s mr_t_chain_team matches 5 run function ${MINE_RANK_NS}:chain_tester_del`,
+    "scoreboard players set @s mr_t_chain_team 0",
+  ];
+
+  map.chain_team_menu = [
+    `execute unless entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Só um administrador mexe na equipe.", color: "red" },
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Equipe — o alvo é o jogador mais próximo de você.", color: "#a78bfa", bold: true },
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run ${tell([
+      { text: " Alvo agora: ", color: "gray" },
+      { selector: nearestPlayer(), color: "#a78bfa" },
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run ${tell([
+      option(" 1. Promover a ADMIN", "mr_t_chain_team", 2, "#fbbf24"),
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run ${tell([
+      option(" 2. Rebaixar de ADMIN", "mr_t_chain_team", 3, "#fbbf24"),
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run ${tell([
+      option(" 3. Promover a TESTER", "mr_t_chain_team", 4, "#22d3ee"),
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run ${tell([
+      option(" 4. Rebaixar de TESTER", "mr_t_chain_team", 5, "#22d3ee"),
+    ])}`,
+  ];
+
+  map.chain_admin_add = [
+    `execute unless entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Só um administrador promove.", color: "red" },
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run tag @s add mr_req`,
+    `execute if entity @s[tag=mr_admin] run tag ${nearestPlayer()} add mr_admin`,
+    `execute if entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Promovido a ADMIN: ", color: "#fbbf24" },
+      { selector: nearestPlayer(), color: "#a78bfa" },
+    ])}`,
+    "tag @s remove mr_req",
+  ];
+
+  map.chain_admin_del = [
+    `execute unless entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Só um administrador rebaixa.", color: "red" },
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run tag @s add mr_req`,
+    `execute if entity @s[tag=mr_admin] run tag ${nearestPlayer()} remove mr_admin`,
+    `execute if entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Rebaixado de ADMIN: ", color: "gray" },
+      { selector: nearestPlayer(), color: "#a78bfa" },
+    ])}`,
+    "tag @s remove mr_req",
+  ];
+
+  map.chain_tester_add = [
+    `execute unless entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Só um administrador promove.", color: "red" },
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run tag @s add mr_req`,
+    `execute if entity @s[tag=mr_admin] run tag ${nearestPlayer()} add mr_tester`,
+    `execute if entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Promovido a TESTER: ", color: "#22d3ee" },
+      { selector: nearestPlayer(), color: "#a78bfa" },
+    ])}`,
+    "tag @s remove mr_req",
+  ];
+
+  map.chain_tester_del = [
+    `execute unless entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Só um administrador rebaixa.", color: "red" },
+    ])}`,
+    `execute if entity @s[tag=mr_admin] run tag @s add mr_req`,
+    `execute if entity @s[tag=mr_admin] run tag ${nearestPlayer()} remove mr_tester`,
+    `execute if entity @s[tag=mr_admin] run ${tell([
+      tag(),
+      { text: "Rebaixado de TESTER: ", color: "gray" },
+      { selector: nearestPlayer(), color: "#a78bfa" },
+    ])}`,
+    "tag @s remove mr_req",
+  ];
+
   map.cmd_mnc = [
     "# /trigger mr_t_mnc — 1 saldo · 2 mercado · 3 receber · 4 transferir",
     "# 5 negociar · 6 premium · 7 converter coins · 8 comprar a picareta",
@@ -3238,6 +3566,9 @@ const PLAYER_ZERO_OBJECTIVES = [
   // the pickaxe enchantment levels are NOT zeroed here: a new player starts
   // at the level the pickaxe itself starts at (init_player sets that), and
   // zeroing them would silently lower the pickaxe the player is holding
+  // the Chain (server-wide, held by the fake player #chain) and the roles
+  "mr_admin",
+  "mr_tester",
   ...MNC_PERMISSION_OBJECTIVES,
   "mr_ore_coal",
   "mr_ore_iron",
@@ -3713,6 +4044,9 @@ function loadLines(): string[] {
     "scoreboard objectives add mr_const dummy \"Mine Rank — constants\"",
     "scoreboard objectives add mr_tmp dummy \"Mine Rank — temporary\"",
     "scoreboard objectives add mr_tmp2 dummy \"Mine Rank — temporary 2\"",
+    "# the roles (a tag carries them, the objective carries the number)",
+    "scoreboard objectives add mr_admin dummy \"Mine Rank — admin\"",
+    "scoreboard objectives add mr_tester dummy \"Mine Rank — tester\"",
     "scoreboard objectives add mr_ore_coal dummy \"Mine Rank — coal to sell\"",
     "scoreboard objectives add mr_ore_iron dummy \"Mine Rank — iron to sell\"",
     "scoreboard objectives add mr_ore_gold dummy \"Mine Rank — gold to sell\"",
@@ -3735,6 +4069,27 @@ function loadLines(): string[] {
     "scoreboard objectives add mr_last_sand dummy",
     "scoreboard objectives add mr_last_kills dummy",
     "scoreboard objectives add mr_last_pt dummy",
+    // ---- the Chain: the MINE COIN market the admin controls ------------
+    "# the Chain (server-wide, held by the fake player #chain)",
+    'scoreboard objectives add mr_chain dummy "Mine Coin — preço em centavos"',
+    'scoreboard objectives add mr_supply dummy "Mine Coin — emitido"',
+    'scoreboard objectives add mr_issue dummy "Mine Coin — emissão atual"',
+    'scoreboard objectives add mr_total dummy "Mine Rank — total minerado"',
+    'scoreboard objectives add mr_step dummy "Mine Rank — passo do preço"',
+    'scoreboard objectives add mr_pct dummy "Mine Rank — porcentagem"',
+    "# the price starts where the owner agreed: R$1000 (in centavos)",
+    `scoreboard players set #chain mr_step ${MINE_RANK_CHAIN_STEP_PCT}`,
+    "scoreboard players set #chain mr_pct 100",
+    "scoreboard players set #chain mr_supply 0",
+    `execute unless score #chain mr_chain matches 0.. run scoreboard players set #chain mr_chain ${MINE_RANK_CHAIN_INITIAL_PRICE}`,
+    "# the spawn board: a boss bar the owner (and only him) can read at a glance",
+    'bossbar add nexus_rank:chain {"text":"MINE COIN (CHAIN)","color":"yellow","bold":true}',
+    "bossbar set nexus_rank:chain color yellow",
+    "bossbar set nexus_rank:chain style progress",
+    "bossbar set nexus_rank:chain max 100",
+    "bossbar set nexus_rank:chain players @a",
+    "# the admins are TAGGED, and the list is data (never a hand-typed command)",
+    ...MINE_RANK_ADMIN_NAMES.map((name) => `tag @a[name=${name}] add mr_admin`),
     "# the player commands (the only surface vanilla gives us)",
     ...MINE_RANK_COMMANDS.map(
       (command) =>
@@ -3764,6 +4119,24 @@ function tickLines(): string[] {
     "# Mine Rank — every tick",
     "scoreboard players set #mr_online mr_online 0",
     "execute as @a run scoreboard players add #mr_online mr_online 1",
+    "# the Chain board: the price, the supply and the online players, with the",
+    "# price drawn as a gauge between the floor and the ceiling",
+    `execute store result bossbar nexus_rank:chain value run scoreboard players get #chain mr_chain`,
+    `bossbar set nexus_rank:chain name {"text":"MINE COIN (CHAIN)  R$ ","color":"yellow","bold":true,"extra":[{"score":{"objective":"mr_chain","name":"#chain"},"color":"gold"},{"text":" (centavos)  ·  emissão ","color":"gray"},{"score":{"objective":"mr_supply","name":"#chain"},"color":"aqua"},{"text":" MNC  ·  online ","color":"gray"},{"score":{"objective":"mr_online","name":"#mr_online"},"color":"green"}]}`,
+    "bossbar set nexus_rank:chain players @a",
+    "# the spawn placar: the same numbers on the action bar, near the hub",
+    "execute as @a[x=0,y=100,z=0,distance=..40] run title @s actionbar " +
+      JSON.stringify([
+        { text: "MINE COIN ", color: "#fbbf24", bold: true },
+        { text: "R$ ", color: "gold" },
+        { score: { objective: "mr_chain", name: "#chain" }, color: "gold" },
+        { text: " · emissão ", color: "gray" },
+        { score: { objective: "mr_supply", name: "#chain" }, color: "#22d3ee" },
+        { text: " MNC · online ", color: "gray" },
+        { score: { objective: "mr_online", name: "#mr_online" }, color: "#4ade80" },
+      ]),
+    "# an admin who joins later is an admin from the first tick",
+    ...MINE_RANK_ADMIN_NAMES.map((name) => `tag @a[name=${name}] add mr_admin`),
     "# enable the player commands",
     ...MINE_RANK_COMMANDS.map((command) => `scoreboard players enable @a ${command.trigger}`),
     "# a player who just joined starts with zeroes (the datapack has no join event)",
