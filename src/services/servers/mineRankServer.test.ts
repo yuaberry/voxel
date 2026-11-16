@@ -15,14 +15,22 @@ import {
   MINE_RANK_PRERANK_MINE_VOLUME,
   MINE_RANK_NS,
   MINE_RANK_ORE_LAYERS,
+  MINE_RANK_PICKAXE_BASE_LEVEL,
+  MINE_RANK_PICKAXE_ENCHANTS,
+  MINE_RANK_PICKAXE_ITEM,
   MINE_RANK_PLOTS,
   MINE_RANK_POND,
   MINE_RANK_PRESTIGE_LEVEL,
   MINE_RANK_TIERS,
+  MINE_RANK_ENCHANT_MIN_LEVEL,
+  MINE_RANK_ENCHANT_BENCH_POS,
+  MINE_RANK_MNC_CAP,
+  MINE_RANK_MNC_PICKAXE_PRICE,
   SHOVEL_MULTIPLIER_MILLE,
   SHOVEL_UPGRADE_PRICE_COINS,
   generateMineRankFiles,
   mineRankCommandsMarkdown,
+  mineRankEnchantPrice,
   mineRankPlotCenter,
 } from "./mineRankServer";
 
@@ -302,10 +310,24 @@ describe("Mine Rank — the datapack", () => {
     // `give` takes item(+NBT) → count: in 1.20.1 the NBT is attached to the
     // item id and the count comes AFTER it (the real E2E proved both orders)
     const pickaxe = fn("cmd_pickaxe");
+    // the new pickaxe is the SAME item the shop and the Bronze rank hand
+    // over (one definition), and it lands in the MAIN HAND when that hand is
+    // free or already holds the pickaxe — `item replace` never destroys an
+    // unrelated item the way a blind `give` into a full hotbar can strand one
+    expect(pickaxe).toContain(MINE_RANK_PICKAXE_ITEM);
     expect(pickaxe).toContain(
-      'give @s minecraft:diamond_pickaxe{Enchantments:[{id:"minecraft:efficiency",lvl:3}',
+      "execute if data entity @s {SelectedItem:{}} run item replace entity @s weapon.mainhand with",
     );
-    expect(pickaxe).toContain('}]} 1');
+    expect(pickaxe).toContain(
+      'execute if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} run item replace entity @s weapon.mainhand with',
+    );
+    // a busy hand gets a plain give (the NBT is attached to the item id and
+    // the count comes AFTER it — the real E2E proved both orders)
+    expect(pickaxe).toContain(
+      "execute unless data entity @s {SelectedItem:{}} unless data entity @s {SelectedItem:{id:\"minecraft:diamond_pickaxe\"}} run give @s",
+    );
+    // the levels the player BUILT go back onto the new pickaxe
+    expect(pickaxe).toContain(`function ${MINE_RANK_NS}:apply_enchants`);
     const fishing = fn("cmd_fishing");
     expect(fishing).toContain(
       'give @s minecraft:fishing_rod{Enchantments:[{id:"minecraft:lure",lvl:3}]} 1',
@@ -689,5 +711,207 @@ describe("Mine Rank — the reference that ships with the pack", () => {
     expect(doc).toContain("o vanilla não aceita digitar um nick");
     expect(doc).toContain("nerdzone.gg");
     expect(byPath.get(`world/datapacks/${MINE_RANK_NS}/COMMANDS.md`)).toBe(doc);
+  });
+});
+
+/**
+ * The pickaxe enchantments — bought with MINE COIN, never with tokens.
+ *
+ * The owner's rule: "adicione encantamentos somente com a criptomoeda".
+ * These tests are the guard on three things that would each break the
+ * server in a different way:
+ *
+ *  1. the currency — an enchant charged in the wrong coin drains the wrong
+ *     balance and the player is never told why it stopped working;
+ *  2. the price — every level branch must match the single price formula,
+ *     or the menu lies about what a click costs;
+ *  3. the item — the level lives in a scoreboard and only reaches the item
+ *     through `data modify` on the MAIN HAND pickaxe. Touching another item
+ *     would silently corrupt whatever the player was holding.
+ */
+describe("Mine Rank — the pickaxe enchantments", () => {
+  it("exposes one menu command and one buy command per enchantment", () => {
+    const enchants = MINE_RANK_COMMANDS.filter((command) =>
+      command.id.startsWith("encantar_"),
+    );
+    expect(enchants).toHaveLength(MINE_RANK_PICKAXE_ENCHANTS.length);
+    for (const enchant of MINE_RANK_PICKAXE_ENCHANTS) {
+      const command = enchants.find((entry) => entry.id === `encantar_${enchant.objective.replace("mr_enc_", "")}`);
+      expect(command, `no command buys ${enchant.label}`).toBeDefined();
+      expect(command!.trigger).toBe(enchant.trigger);
+      // the description carries the price of the NEXT level — the one a
+      // player at the pickaxe's own base actually pays
+      const base = MINE_RANK_PICKAXE_BASE_LEVEL[enchant.objective] ?? 0;
+      expect(command!.description).toContain(
+        `${mineRankEnchantPrice(enchant, base + 1)} MNC`,
+      );
+      expect(command!.description).not.toContain("token");
+    }
+    const menu = MINE_RANK_COMMANDS.find((command) => command.id === "encantos");
+    expect(menu).toBeDefined();
+  });
+
+  it("charges the price the formula says, on every level", () => {
+    for (const enchant of MINE_RANK_PICKAXE_ENCHANTS) {
+      const key = enchant.objective.replace("mr_enc_", "");
+      const buy = fn(`cmd_enc_${key}`);
+      for (let level = 0; level < enchant.maxLevel; level += 1) {
+        const expected = mineRankEnchantPrice(enchant, level + 1);
+        expect(
+          buy,
+          `${enchant.label}: level ${level} must charge ${expected} MNC`,
+        ).toContain(
+          `execute if score @s ${enchant.objective} matches ${level} run scoreboard players set @s mr_enc_price ${expected}`,
+        );
+      }
+      // the price is charged in MINE COIN — and the coin balance is the one
+      // that moves
+      expect(buy).toContain(
+        `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. if score @s mr_p_market matches 1 if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} if score @s ${enchant.objective} matches ..${enchant.maxLevel - 1} if score @s mr_mnc >= @s mr_enc_price run function ${MINE_RANK_NS}:enc_take_${key}`,
+      );
+      // and never in tokens
+      expect(buy).not.toContain("mr_tokens");
+    }
+  });
+
+  it("closes the ladder at the ceiling and asks for the pickaxe in hand", () => {
+    for (const enchant of MINE_RANK_PICKAXE_ENCHANTS) {
+      const key = enchant.objective.replace("mr_enc_", "");
+      const buy = fn(`cmd_enc_${key}`);
+      // the ladder only OPENS at the rank gate — and the gate is part of
+      // every branch, so holding the pickaxe or owning the coin cannot
+      // bypass it
+      expect(buy).toContain(
+        `execute if score @s mr_level matches ..${MINE_RANK_ENCHANT_MIN_LEVEL - 1} run function ${MINE_RANK_NS}:enc_rank`,
+      );
+      for (const line of [
+        `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. unless score @s mr_p_market matches 1`,
+        `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. if score @s mr_p_market matches 1 unless data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}}`,
+        `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. if score @s mr_p_market matches 1 if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} if score @s ${enchant.objective} matches ..${enchant.maxLevel - 1} if score @s mr_mnc >= @s mr_enc_price`,
+        `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. if score @s mr_p_market matches 1 if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} if score @s ${enchant.objective} matches ${enchant.maxLevel}..`,
+        `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. if score @s mr_p_market matches 1 if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} if score @s ${enchant.objective} matches ..${enchant.maxLevel - 1} unless score @s mr_mnc >= @s mr_enc_price`,
+      ]) {
+        expect(buy, `${enchant.label}: every branch carries the rank gate`).toContain(line);
+      }
+      // holding the pickaxe is a hard requirement
+      expect(buy).toContain(
+        `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. if score @s mr_p_market matches 1 unless data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} run function ${MINE_RANK_NS}:enc_hold`,
+      );
+      // the ceiling stops the ladder
+      expect(buy).toContain(
+        `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. if score @s mr_p_market matches 1 if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} if score @s ${enchant.objective} matches ${enchant.maxLevel}.. run function ${MINE_RANK_NS}:enc_max_${key}`,
+      );
+    }
+    // and the failure messages say which coin is missing
+    const poor = fn("enc_poor");
+    expect(poor).toContain("MineCoin insuficiente");
+    expect(poor).toContain("mr_mnc");
+    expect(fn("enc_hold")).toContain("Picareta de Mineração na mão");
+  });
+
+  it("writes the bought level into the pickaxe the player is holding", () => {
+    for (const enchant of MINE_RANK_PICKAXE_ENCHANTS) {
+      const key = enchant.objective.replace("mr_enc_", "");
+      const take = fn(`enc_take_${key}`);
+      // the coin is really deducted, and only then the level rises
+      expect(take).toContain("scoreboard players operation @s mr_mnc -= @s mr_enc_price");
+      expect(take).toContain(`scoreboard players add @s ${enchant.objective} 1`);
+      // VANILLA TRUTH (measured on a live server): a command CANNOT write a
+      // player's NBT — every `data modify entity <player>` answers
+      // "Unable to modify player data", while the same command on another
+      // entity works. So the item travels through the work barrel: block
+      // entities ARE writable, and `item replace ... from` copies (the
+      // player never loses the item if a step fails)
+      const at = MINE_RANK_ENCHANT_BENCH_POS;
+      expect(take).toContain(
+        `item replace block ${at} container.0 from entity @s weapon.mainhand`,
+      );
+      // the level travels from the SCOREBOARD into the item NBT: vanilla has
+      // no command that adds an enchantment to a held item
+      expect(take).toContain(
+        `data merge storage ${MINE_RANK_NS}:ench {value:{id:"${enchant.id}"}}`,
+      );
+      expect(take).toContain(
+        `execute store result storage ${MINE_RANK_NS}:ench value.lvl byte 1 run scoreboard players get @s ${enchant.objective}`,
+      );
+      // the stale entry for that enchantment is removed first, so the item
+      // never carries two levels of the same enchantment
+      expect(take).toContain(
+        `data remove block ${at} Items[{Slot:0b}].tag.Enchantments[{id:"${enchant.id}"}]`,
+      );
+      expect(take).toContain(
+        `data modify block ${at} Items[{Slot:0b}].tag.Enchantments append from storage ${MINE_RANK_NS}:ench value`,
+      );
+      // and the enchanted item comes BACK to the hand
+      expect(take).toContain(
+        `item replace entity @s weapon.mainhand from block ${at} container.0`,
+      );
+      // and NEVER touches the player's own NBT
+      expect(take).not.toContain("data modify entity @s");
+    }
+  });
+
+  it("re-applies the built levels onto a brand-new pickaxe", () => {
+    const apply = fn("apply_enchants_ok");
+    for (const enchant of MINE_RANK_PICKAXE_ENCHANTS) {
+      expect(apply).toContain(
+        `execute if score @s ${enchant.objective} matches 1.. run function ${MINE_RANK_NS}:apply_${enchant.objective.replace("mr_enc_", "")}`,
+      );
+    }
+    // only the item in HAND is ever touched, and only when it is the pickaxe
+    expect(fn("apply_enchants")).toContain(
+      `execute if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} run function ${MINE_RANK_NS}:apply_enchants_ok`,
+    );
+  });
+
+  it("keeps the whole ladder affordable inside the MineCoin cap", () => {
+    // the cap is what stops the MineCoin from flooding the economy
+    const total = MINE_RANK_PICKAXE_ENCHANTS.reduce(
+      (sum, enchant) => sum + mineRankEnchantPrice(enchant, enchant.maxLevel),
+      0,
+    );
+    expect(total).toBeLessThan(MINE_RANK_MNC_CAP);
+    // and the pickaxe itself still costs less than the whole ladder
+    expect(MINE_RANK_MNC_PICKAXE_PRICE).toBeLessThan(total);
+  });
+
+  /**
+   * The base level of the pickaxe — the bug the LIVE E2E caught.
+   *
+   * The enchantment ladder does not start at zero: the pickaxe is handed
+   * over with Efficiency III and Unbreaking III, and buying a level
+   * REPLACES the item's entry with the scoreboard level (vanilla has no
+   * command that adds one point to an enchantment). With the objectives
+   * starting at 0, the first purchase wrote `lvl:1b` over the pickaxe's own
+   * `lvl:3b` and the player paid to make the pickaxe WORSE — measured on
+   * the live server: "Eficiência subiu para o nível 1 (-2 MNC)".
+   */
+  it("starts the ladder at the level the pickaxe already has", () => {
+    const init = fn("init_player");
+    for (const enchant of MINE_RANK_PICKAXE_ENCHANTS) {
+      const base = MINE_RANK_PICKAXE_BASE_LEVEL[enchant.objective] ?? 0;
+      expect(
+        init,
+        `${enchant.label} must start at ${base} (the pickaxe's own level)`,
+      ).toContain(`scoreboard players set @s ${enchant.objective} ${base}`);
+    }
+    // and the objectives are NOT in the zero list — zeroing them would lower
+    // the pickaxe the player is holding
+    expect(init).not.toContain("scoreboard players set @s mr_enc_eff 0");
+  });
+
+  it("charges the NEXT level from the base, not from zero", () => {
+    for (const enchant of MINE_RANK_PICKAXE_ENCHANTS) {
+      const key = enchant.objective.replace("mr_enc_", "");
+      const buy = fn(`cmd_enc_${key}`);
+      const base = MINE_RANK_PICKAXE_BASE_LEVEL[enchant.objective] ?? 0;
+      const expected = mineRankEnchantPrice(enchant, base + 1);
+      expect(
+        buy,
+        `${enchant.label}: the first purchase (level ${base}) costs ${expected} MNC`,
+      ).toContain(
+        `execute if score @s ${enchant.objective} matches ${base} run scoreboard players set @s mr_enc_price ${expected}`,
+      );
+    }
   });
 });

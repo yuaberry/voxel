@@ -23,11 +23,18 @@ import {
   MINE_RANK_COMMANDS,
   MINE_RANK_CURRENCIES,
   MINE_RANK_FAMILY_LABELS,
+  MINE_RANK_ENCHANT_MIN_LEVEL,
+  MINE_RANK_MNC_CAP,
+  MINE_RANK_MNC_COIN_PRICE,
+  MINE_RANK_MNC_PICKAXE_PRICE,
   MINE_RANK_NS,
+  MINE_RANK_ORE_LAYERS,
+  MINE_RANK_PICKAXE_ENCHANTS,
   MINE_RANK_PLOTS,
   MINE_RANK_PRESTIGE_LEVEL,
   MINE_RANK_TIERS,
   generateMineRankFiles,
+  mineRankEnchantPrice,
   type MineRankFamily,
 } from "@/services/servers/mineRankServer";
 import { readProjectFile, writeProjectFile, writeProjectFileBase64 } from "@/services/projects/projectsService";
@@ -215,8 +222,8 @@ export function MineRankPanel({ server, basePath, running }: Props) {
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
             Progressão estilo Rankup escrita pelo VOXEL: {MINE_RANK_COMMANDS.length} comandos,
             {MINE_RANK_TIERS.length} tiers, prestígio no level {MINE_RANK_PRESTIGE_LEVEL},{" "}
-            {MINE_RANK_PLOTS} terrenos com 8 camadas de minério e 4 moedas — 100% vanilla 1.20.1,
-            sem plugin.
+            {MINE_RANK_PLOTS} terrenos com {MINE_RANK_ORE_LAYERS.length} camadas de minério e{" "}
+            {MINE_RANK_CURRENCIES.length} moedas — 100% vanilla 1.20.1, sem plugin.
           </p>
         </div>
         <Button size="sm" variant={installed ? "outline" : "gradient"} onClick={() => void handleInstall()} disabled={busy}>
@@ -271,6 +278,40 @@ export function MineRankPanel({ server, basePath, running }: Props) {
               </p>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* MineCoin — the server's own crypto-currency, and what it buys */}
+      <div className="space-y-2">
+        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <Gem className="h-3 w-3" /> MineCoin (MNC) — a criptomoeda do servidor
+        </p>
+        <div className="rounded-lg border border-warning/30 bg-warning/5 p-2.5">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            <span className="font-medium text-warning">1 MNC</span> ={" "}
+            {MINE_RANK_MNC_COIN_PRICE.toLocaleString("pt-BR")} coins convertidos · saldo
+            limitado a {MINE_RANK_MNC_CAP} MNC · a Picareta de Mineração custa{" "}
+            {MINE_RANK_MNC_PICKAXE_PRICE} MNC. No jogo:{" "}
+            <code className="font-mono">/trigger mr_t_mnc</code>.
+          </p>
+          <ul className="mt-1.5 space-y-0.5 text-[10px] leading-relaxed text-muted-foreground">
+            <li>
+              ·{" "}
+              <span className="font-medium text-warning">Encantamentos da picareta</span>{" "}
+              — a partir do rank {MINE_RANK_ENCHANT_MIN_LEVEL}, só em MNC (nunca em coins
+              ou tokens):
+            </li>
+            {MINE_RANK_PICKAXE_ENCHANTS.map((enchant) => (
+              <li key={enchant.objective} className="pl-3">
+                · {enchant.label}: nível {enchant.maxLevel} por{" "}
+                <span className="font-mono">
+                  {mineRankEnchantPrice(enchant, enchant.maxLevel)} MNC
+                </span>{" "}
+                ({mineRankEnchantPrice(enchant, 1)} MNC no nível 1
+                {enchant.step > 0 ? `, +${enchant.step} por nível` : ", preço único"})
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 

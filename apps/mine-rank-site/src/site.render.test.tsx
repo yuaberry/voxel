@@ -91,15 +91,20 @@ describe("Mine Rank site — the honest surface", () => {
     expect(document.body.textContent).not.toContain("39 comandos");
   });
 
-  it("keeps the static metas of index.html in step with the manifest", () => {
+  it("keeps the static metas of index.html free of hand-written counts", () => {
+    // index.html imports NOTHING: any number written there is a number
+    // waiting to drift (it said "39 comandos" for years while the page
+    // counted 47). The honest fix is no count in the static metas at all —
+    // the rendered page shows the real one, derived from the manifest.
     const html = readSibling("../index.html");
     const counts = [...html.matchAll(/(\d+)\s+comandos/g)].map((m) => Number(m[1]));
-    expect(counts.length, "the metas name the command count").toBeGreaterThan(0);
-    for (const count of counts) {
-      expect(count, "a hand-written count in a static meta drifts silently").toBe(
-        MINE_RANK_COMMANDS.length,
-      );
-    }
+    expect(
+      counts,
+      "a static meta must not carry a command count it cannot derive",
+    ).toEqual([]);
+    // and the real count IS on the page, from the manifest
+    render(<App />);
+    expect(screen.getAllByText(String(MINE_RANK_COMMANDS.length)).length).toBeGreaterThan(0);
   });
 
   it("never claims a hand-written transcript is the real test output", () => {

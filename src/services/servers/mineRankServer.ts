@@ -44,6 +44,16 @@ export const MINE_RANK_PLOT_ORIGIN = 20;
 export const MINE_RANK_PLOT_COLUMNS = 4;
 /** Level needed to prestige. */
 export const MINE_RANK_PRESTIGE_LEVEL = 1000;
+
+/**
+ * The rank (level) at which the pickaxe enchantment ladder OPENS.
+ *
+ * Below it the player is still learning the mine — and the MineCoin they
+ * earn is meant for the first pickaxe, not for a ladder of enchantments
+ * they cannot judge yet. The gate is part of every buy condition, so it
+ * cannot be bypassed by holding the pickaxe or by owning the coin.
+ */
+export const MINE_RANK_ENCHANT_MIN_LEVEL = 200;
 /** Blocks mined before the private mine is restored.
  *
  * Hand-written once at 100 — which is MORE than the whole mine holds (the
@@ -114,7 +124,7 @@ export const MINE_RANK_HYPE_STEP = 1000;
  * It is asserted against the real generator output by the unit test — never a
  * hand-written number that can drift when a function is added.
  */
-export const MINE_RANK_DATAPACK_FILE_COUNT = 270;
+export const MINE_RANK_DATAPACK_FILE_COUNT = 296;
 
 // ---------------------------------------------------------------------------
 // Pre-ranks Terra and Areia — the economic ladder before Bronze
@@ -245,6 +255,159 @@ export const SHOVEL_LADDER: ShovelMaterial[] = [
  */
 export const MINE_RANK_PICKAXE_ITEM =
   'minecraft:diamond_pickaxe{CustomModelData:1,Enchantments:[{id:"minecraft:efficiency",lvl:3},{id:"minecraft:unbreaking",lvl:3}],display:{Name:\'{"text":"Picareta de Mineração"}\'}}';
+
+/**
+ * One buyable enchantment of the mining pickaxe.
+ *
+ * The level is kept in a SCOREBOARD objective (the single source of truth)
+ * and written into the item NBT only when it changes — vanilla cannot add
+ * an enchantment to a held item, but `data modify` on `SelectedItem.tag`
+ * can, and that is what the module does.
+ */
+export interface MineRankEnchant {
+  /** the vanilla enchantment id written into the item NBT */
+  id: string;
+  /** the scoreboard objective that holds the player's level */
+  objective: string;
+  /** PT-BR name shown in the menu and in the docs */
+  label: string;
+  /** ceiling of the levels a player can buy */
+  maxLevel: number;
+  /** tokens for the FIRST level */
+  basePrice: number;
+  /** extra tokens for each level above the first */
+  step: number;
+  /** the `/trigger` a player clicks to buy one level */
+  trigger: string;
+}
+
+/**
+ * The enchantments of the mining pickaxe, bought with **MineCoin (MNC)** —
+ * the server's own crypto-currency, never with coins or tokens.
+ *
+ * `maxLevel` deliberately goes ABOVE the vanilla cap for most of them
+ * (vanilla stops efficiency at V and fortune at III): that is the whole
+ * point of a Rankup pickaxe, and it is honest — the menu and the generated
+ * COMMANDS.md show the real ceiling, never a vanilla-looking one.
+ *
+ * The prices are in MNC, the same coin the pickaxe itself costs
+ * (MINE_RANK_MNC_PICKAXE_PRICE = 25). Maxing every enchantment costs 39 MNC
+ * and the balance is capped at MINE_RANK_MNC_CAP (100), so the whole ladder
+ * is reachable but never free.
+ */
+export const MINE_RANK_PICKAXE_ENCHANTS: MineRankEnchant[] = [
+  {
+    id: "minecraft:efficiency",
+    objective: "mr_enc_eff",
+    label: "Eficiência",
+    maxLevel: 10,
+    basePrice: 2,
+    step: 1,
+    trigger: "mr_t_enc_eff",
+  },
+  {
+    id: "minecraft:fortune",
+    objective: "mr_enc_fort",
+    label: "Fortuna",
+    maxLevel: 5,
+    basePrice: 5,
+    step: 2,
+    trigger: "mr_t_enc_fort",
+  },
+  {
+    id: "minecraft:unbreaking",
+    objective: "mr_enc_unb",
+    label: "Inquebrável",
+    maxLevel: 5,
+    basePrice: 3,
+    step: 1,
+    trigger: "mr_t_enc_unb",
+  },
+  {
+    id: "minecraft:mending",
+    objective: "mr_enc_mend",
+    label: "Reparo",
+    maxLevel: 1,
+    basePrice: 8,
+    step: 0,
+    trigger: "mr_t_enc_mend",
+  },
+];
+
+/**
+ * The level a brand-new mining pickaxe ALREADY has of each enchantment.
+ *
+ * The pickaxe is handed over with Efficiency III and Unbreaking III (see
+ * MINE_RANK_PICKAXE_ITEM). The enchantment ladder does NOT start at zero:
+ * it starts where the item starts, and buying a level REPLACES the item's
+ * entry with the scoreboard level (vanilla has no command that adds one
+ * point to an enchantment).
+ *
+ * The live E2E caught the consequence of getting this wrong: with the
+ * objectives starting at 0, the first purchase wrote `lvl:1b` over the
+ * pickaxe's `lvl:3b` — the player PAID to make the pickaxe worse.
+ */
+export const MINE_RANK_PICKAXE_BASE_LEVEL: Record<string, number> = {
+  mr_enc_eff: 3,
+  mr_enc_unb: 3,
+};
+
+/**
+ * MineCoin needed to REACH `level` of an enchantment.
+ *
+ * The single price formula: `basePrice + (level - 1) * step`. The generated
+ * datapack writes it out as one branch per level (scoreboards cannot
+ * multiply by a variable), and the test suite checks that every branch
+ * matches this function — so the price a player is charged and the price
+ * the menu promises can never drift apart.
+ */
+/**
+ * The hidden work barrel inside the hub deck.
+ *
+ * VANILLA TRUTH (measured on the live server): a command cannot write a
+ * PLAYER's NBT — every `data modify entity <player>` answers "Unable to
+ * modify player data", while the very same command on any other entity
+ * works ("Modified entity data of ..."). So the enchanted item travels:
+ * hand → barrel → NBT edit → hand. Block entities are writable, and
+ * `item replace ... from` copies instead of moving, so the player never
+ * loses the item if a step fails.
+ *
+ * It sits INSIDE the hub's stone deck, where no player can reach it.
+ */
+export const MINE_RANK_ENCHANT_BENCH = { x: 3, y: MINE_RANK_BASE_Y, z: 3 };
+
+/** The barrel slot the enchanted item passes through. */
+export const MINE_RANK_ENCHANT_BENCH_POS = `${MINE_RANK_ENCHANT_BENCH.x} ${MINE_RANK_ENCHANT_BENCH.y} ${MINE_RANK_ENCHANT_BENCH.z}`;
+
+/**
+ * Writes the level held in `enchant.objective` into the pickaxe in the
+ * player's MAIN HAND, through the work barrel.
+ *
+ * Vanilla has no command that adds a point to an enchantment, and a
+ * player's NBT is read-only to commands — the barrel is the only honest
+ * way to do it, and it is the one proven end to end on a real server.
+ */
+function applyEnchantLines(enchant: MineRankEnchant): string[] {
+  const at = MINE_RANK_ENCHANT_BENCH_POS;
+  const slot = `block ${at} Items[{Slot:0b}]`;
+  return [
+    `# a player's NBT is read-only to commands ("Unable to modify player data"),`,
+    `# so the item travels through the work barrel: block entities ARE writable`,
+    `item replace block ${at} container.0 from entity @s weapon.mainhand`,
+    `data merge storage ${MINE_RANK_NS}:ench {value:{id:"${enchant.id}"}}`,
+    `execute store result storage ${MINE_RANK_NS}:ench value.lvl byte 1 run scoreboard players get @s ${enchant.objective}`,
+    `data remove ${slot}.tag.Enchantments[{id:"${enchant.id}"}]`,
+    `data modify ${slot}.tag.Enchantments append from storage ${MINE_RANK_NS}:ench value`,
+    `item replace entity @s weapon.mainhand from block ${at} container.0`,
+  ];
+}
+
+export function mineRankEnchantPrice(
+  enchant: MineRankEnchant,
+  level: number,
+): number {
+  return enchant.basePrice + Math.max(0, level - 1) * enchant.step;
+}
 
 /**
  * The texture of the mining pickaxe — a real 16x16 RGBA PNG, original art.
@@ -519,6 +682,27 @@ export const MINE_RANK_COMMANDS: MineRankCommand[] = [
     description: "Pega uma picareta nova (eficiência e unbreaking III).",
     fn: "cmd_pickaxe",
   },
+  {
+    id: "encantos",
+    args: [],
+    trigger: "mr_t_enchants",
+    family: "progressao",
+    surface: "menu",
+    description:
+      "Abre o menu de encantamentos da picareta (pagamento em tokens).",
+    fn: "cmd_enchants",
+  },
+  // one buy command per enchantment: vanilla menus must run `/trigger`,
+  // so each purchasable line needs its own objective
+  ...MINE_RANK_PICKAXE_ENCHANTS.map((enchant) => ({
+    id: `encantar_${enchant.objective.replace("mr_enc_", "")}`,
+    args: [],
+    trigger: enchant.trigger,
+    family: "progressao" as const,
+    surface: "action" as const,
+    description: `Sobe um nível de ${enchant.label} na picareta (rank ${MINE_RANK_ENCHANT_MIN_LEVEL}+; máx. ${enchant.maxLevel}; ${mineRankEnchantPrice(enchant, (MINE_RANK_PICKAXE_BASE_LEVEL[enchant.objective] ?? 0) + 1)} MNC o próximo nível — só com a Picareta de Mineração na mão).`,
+    fn: `cmd_enc_${enchant.objective.replace("mr_enc_", "")}`,
+  })),
   {
     id: "prestigio",
     args: [],
@@ -1129,6 +1313,10 @@ function buildWorldLines(): string[] {
     `setblock -5 ${MINE_RANK_DECK_Y} 5 minecraft:sea_lantern`,
     `setblock 5 ${MINE_RANK_DECK_Y} -5 minecraft:sea_lantern`,
     `setworldspawn ${MINE_RANK_HUB.x} ${MINE_RANK_HUB.y} ${MINE_RANK_HUB.z}`,
+    // the hidden work barrel: the enchanted item passes through it, because
+    // a command cannot write a PLAYER's NBT. Inside the hub's stone deck,
+    // unreachable by hand, replaced every time it is used.
+    `setblock ${MINE_RANK_ENCHANT_BENCH_POS} minecraft:barrel`,
     "# fishing pond",
     `fill ${pond.x - 6} ${MINE_RANK_BASE_Y} ${pond.z - 6} ${pond.x + 6} ${MINE_RANK_BASE_Y} ${pond.z + 6} minecraft:stone`,
     `fill ${pond.x - 5} ${MINE_RANK_DECK_Y} ${pond.z - 5} ${pond.x + 5} ${MINE_RANK_DECK_Y} ${pond.z + 5} minecraft:water`,
@@ -1407,12 +1595,189 @@ function commandFunctions(): Record<string, string[]> {
 
   // ---- progression ------------------------------------------------------
   map.cmd_pickaxe = [
-    "give @s minecraft:diamond_pickaxe{Enchantments:[{id:\"minecraft:efficiency\",lvl:3},{id:\"minecraft:unbreaking\",lvl:3}]} 1",
+    "# /trigger mr_t_pickaxe — a NEW pickaxe is the SAME item the shop and the",
+    "# Bronze rank hand over (one definition: custom texture, name, enchants).",
+    "# Empty hand (or already holding a pickaxe) → the main hand is replaced,",
+    "# which never destroys an unrelated item; a busy hand gets a plain give.",
+    `execute if data entity @s {SelectedItem:{}} run item replace entity @s weapon.mainhand with ${MINE_RANK_PICKAXE_ITEM} 1`,
+    `execute if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} run item replace entity @s weapon.mainhand with ${MINE_RANK_PICKAXE_ITEM} 1`,
+    `execute unless data entity @s {SelectedItem:{}} unless data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} run give @s ${MINE_RANK_PICKAXE_ITEM} 1`,
+    "# the levels the player BUILT go back onto the new pickaxe",
+    `function ${MINE_RANK_NS}:apply_enchants`,
     tell([
       tag(),
       { text: "Você recebeu uma picareta nova (eficiência III + unbreaking III).", color: "#22d3ee" },
     ]),
     "scoreboard players set @s mr_t_pickaxe 0",
+  ];
+
+  // ---- pickaxe enchantments (bought with tokens) ------------------------
+  map.cmd_enchants = [
+    tell([
+      tag(),
+      { text: "Encantamentos da picareta", color: "#22d3ee", bold: true },
+    ]),
+    tell([
+      { text: " MineCoin: ", color: "gray" },
+      score("mr_mnc", "@s", "#fbbf24"),
+      { text: " MNC", color: "gray" },
+    ]),
+    // the same normalisation, so the menu never shows a blank level for a
+    // player who joined before the enchantments existed
+    ...MINE_RANK_PICKAXE_ENCHANTS.map(
+      (enchant) =>
+        `execute unless score @s ${enchant.objective} matches -2147483648.. run scoreboard players set @s ${enchant.objective} ${MINE_RANK_PICKAXE_BASE_LEVEL[enchant.objective] ?? 0}`,
+    ),
+    ...MINE_RANK_PICKAXE_ENCHANTS.flatMap((enchant) => [
+      tell([
+        { text: ` ${enchant.label}: nível `, color: "gray" },
+        score(enchant.objective, "@s", "#a78bfa"),
+        { text: `/${enchant.maxLevel} `, color: "dark_gray" },
+        option(
+          "[comprar]",
+          enchant.trigger,
+          1,
+          "#fbbf24",
+          (() => {
+            const base = MINE_RANK_PICKAXE_BASE_LEVEL[enchant.objective] ?? 0;
+            const next = mineRankEnchantPrice(enchant, base + 1);
+            return enchant.step > 0
+              ? `Sua picareta começa no nível ${base}: o próximo custa ${next} MNC e sobe ${enchant.step} MNC por nível.`
+              : `Custa ${next} MNC (preço único).`;
+          })(),
+        ),
+      ]),
+    ]),
+    tell([
+      tag(),
+      {
+        text: `Abre no rank ${MINE_RANK_ENCHANT_MIN_LEVEL} · só a Picareta de Mineração encanta · conversão de coins em MNC em /trigger mr_t_mnc.`,
+        color: "dark_gray",
+      },
+    ]),
+    "scoreboard players set @s mr_t_enchants 0",
+  ];
+
+for (const enchant of MINE_RANK_PICKAXE_ENCHANTS) {
+    const key = enchant.objective.replace("mr_enc_", "");
+    // the price of the NEXT level, one branch per level: a scoreboard cannot
+    // multiply by a variable, and every branch is checked against
+    // mineRankEnchantPrice by the test suite
+    const prices = Array.from(
+      { length: enchant.maxLevel },
+      (_, level) => level,
+    ).map(
+      (level) =>
+        `execute if score @s ${enchant.objective} matches ${level} run scoreboard players set @s mr_enc_price ${mineRankEnchantPrice(enchant, level + 1)}`,
+    );
+
+    // the level lives in a SCOREBOARD and reaches the item NBT only when it
+    // changes: vanilla has no command that adds an enchantment to a held
+    // item, but `data modify` on `SelectedItem.tag` can
+    const applyLines = applyEnchantLines(enchant);
+
+    // an EXISTING player (a real one, already mr_ready) never runs
+    // init_player again — so an unset objective would leave the menu blank
+    // and every price branch false. Normalise to the pickaxe's own base.
+    const base = MINE_RANK_PICKAXE_BASE_LEVEL[enchant.objective] ?? 0;
+    const normalise = `execute unless score @s ${enchant.objective} matches -2147483648.. run scoreboard players set @s ${enchant.objective} ${base}`;
+
+    map[`cmd_enc_${key}`] = [
+      `# /trigger ${enchant.trigger} — one level of ${enchant.label}, paid in MineCoin`,
+      normalise,
+      ...prices,
+      `# the enchantment ladder opens at rank ${MINE_RANK_ENCHANT_MIN_LEVEL} — below that the`,
+      "# player is still learning the mine, and the MineCoin is not theirs to spend yet",
+      `execute if score @s mr_level matches ..${MINE_RANK_ENCHANT_MIN_LEVEL - 1} run function ${MINE_RANK_NS}:enc_rank`,
+      "# the MineCoin market permission is the one the pickaxe itself needs",
+      `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. unless score @s mr_p_market matches 1 run function ${MINE_RANK_NS}:mnc_no_permission`,
+      `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. if score @s mr_p_market matches 1 unless data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} run function ${MINE_RANK_NS}:enc_hold`,
+      `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. if score @s mr_p_market matches 1 if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} if score @s ${enchant.objective} matches ..${enchant.maxLevel - 1} if score @s mr_mnc >= @s mr_enc_price run function ${MINE_RANK_NS}:enc_take_${key}`,
+      `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. if score @s mr_p_market matches 1 if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} if score @s ${enchant.objective} matches ${enchant.maxLevel}.. run function ${MINE_RANK_NS}:enc_max_${key}`,
+      `execute if score @s mr_level matches ${MINE_RANK_ENCHANT_MIN_LEVEL}.. if score @s mr_p_market matches 1 if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} if score @s ${enchant.objective} matches ..${enchant.maxLevel - 1} unless score @s mr_mnc >= @s mr_enc_price run function ${MINE_RANK_NS}:enc_poor`,
+      `scoreboard players set @s ${enchant.trigger} 0`,
+    ];
+    map[`enc_take_${key}`] = [
+      "scoreboard players operation @s mr_mnc -= @s mr_enc_price",
+      `scoreboard players add @s ${enchant.objective} 1`,
+      ...applyLines,
+      tell([
+        tag(),
+        { text: `${enchant.label} subiu para o nível `, color: "#22d3ee" },
+        score(enchant.objective, "@s", "#a78bfa"),
+        { text: " (-", color: "gray" },
+        score("mr_enc_price", "@s", "#fbbf24"),
+        { text: " MNC).", color: "gray" },
+      ]),
+      "playsound minecraft:entity.player.levelup master @s ~ ~ ~ 0.5 1.2",
+    ];
+    map[`enc_max_${key}`] = [
+      tell([
+        tag(),
+        {
+          text: `${enchant.label} já está no nível máximo (${enchant.maxLevel}).`,
+          color: "#fbbf24",
+        },
+      ]),
+    ];
+    // re-applied onto a brand-new pickaxe
+    map[`apply_${key}`] = [
+      `execute if score @s ${enchant.objective} matches 1.. run function ${MINE_RANK_NS}:apply_ench_${key}`,
+    ];
+    map[`apply_ench_${key}`] = applyLines;
+  }
+
+  map.enc_hold = [
+    tell([
+      tag(),
+      {
+        text: "Segure a Picareta de Mineração na mão para encantar.",
+        color: "#f87171",
+      },
+    ]),
+  ];
+
+  // below the rank gate the ladder does not exist yet — the message names the
+  // rank and the tier it belongs to, never a bare number
+  map.enc_rank = [
+    tell([
+      tag(),
+      {
+        text: `Os encantamentos abrem no rank ${MINE_RANK_ENCHANT_MIN_LEVEL}.`,
+        color: "#f87171",
+      },
+    ]),
+    tell([
+      { text: " Seu rank: ", color: "gray" },
+      score("mr_level", "@s", "#a78bfa"),
+      { text: " · continue minerando na sua mina.", color: "gray" },
+    ]),
+  ];
+
+  map.enc_poor = [
+    tell([
+      tag(),
+      { text: "MineCoin insuficiente: precisa de ", color: "#f87171" },
+      score("mr_enc_price", "@s", "#f87171"),
+      { text: " MNC e você tem ", color: "#f87171" },
+      score("mr_mnc", "@s", "#a78bfa"),
+      {
+        text: " MNC. Converta coins em MNC no menu MineCoin (/trigger mr_t_mnc).",
+        color: "#f87171",
+      },
+    ]),
+  ];
+
+  // A new pickaxe carries the levels the player BUILT — and only the item in
+  // HAND is ever touched, and only when it really is the pickaxe.
+  map.apply_enchants = [
+    `execute if data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} run function ${MINE_RANK_NS}:apply_enchants_ok`,
+  ];
+  map.apply_enchants_ok = [
+    ...MINE_RANK_PICKAXE_ENCHANTS.map(
+      (enchant) =>
+        `execute if score @s ${enchant.objective} matches 1.. run function ${MINE_RANK_NS}:apply_${enchant.objective.replace("mr_enc_", "")}`,
+    ),
   ];
 
   map.cmd_prestige = [
@@ -2031,7 +2396,11 @@ function commandFunctions(): Record<string, string[]> {
       tag(),
       { text: "Você não tem nenhum pedido de teleporte.", color: "red" },
     ])}`,
-    "scoreboard players set @s mr_tp_ok 0",
+    // the trigger is `mr_t_tp_ok` — the manifest is the single source. It
+    // used to reset `mr_tp_ok`, an objective that does not exist, so the
+    // real trigger stayed at 1 and the confirm re-ran EVERY TICK: a player
+    // who accepted a teleport was teleported to the nearest player forever.
+    "scoreboard players set @s mr_t_tp_ok 0",
   ];
 
   map.tp_accept = [
@@ -2691,6 +3060,9 @@ const PLAYER_ZERO_OBJECTIVES = [
   "mr_terra_off",
   "mr_areia_off",
   "mr_pick_mult",
+  // the pickaxe enchantment levels are NOT zeroed here: a new player starts
+  // at the level the pickaxe itself starts at (init_player sets that), and
+  // zeroing them would silently lower the pickaxe the player is holding
   ...MNC_PERMISSION_OBJECTIVES,
   "mr_ore_coal",
   "mr_ore_iron",
@@ -2708,6 +3080,13 @@ function systemFunctions(): Record<string, string[]> {
     ...PLAYER_ZERO_OBJECTIVES.map(
       (objective) => `scoreboard players set @s ${objective} 0`,
     ),
+    "# the enchantments start where the PICKAXE starts: zeroing them would",
+      "# make the first purchase write lvl:1b over the pickaxe's own lvl:3b,",
+      "# and the player would pay to make it worse",
+    ...MINE_RANK_PICKAXE_ENCHANTS.map((enchant) => {
+      const base = MINE_RANK_PICKAXE_BASE_LEVEL[enchant.objective] ?? 0;
+      return `scoreboard players set @s ${enchant.objective} ${base}`;
+    }),
     "scoreboard players set @s mr_rank 1",
     "tag @s add mr_ready",
     `function ${MINE_RANK_NS}:init_prerank`,
@@ -3140,6 +3519,15 @@ function loadLines(): string[] {
     "scoreboard objectives add mr_terra_off dummy \"Mine Rank — terra off dirt\"",
     "scoreboard objectives add mr_areia_off dummy \"Mine Rank — areia off sand\"",
     "scoreboard objectives add mr_pick_mult dummy \"Mine Rank — validated shovel mult\"",
+    // the pickaxe enchantment levels — the player commands (and the item
+    // NBT) read them. Without the declaration every `scoreboard players add`
+    // and every `execute if score` on them is silently discarded, and the
+    // whole ladder is inert: the menu opens, the click does nothing.
+    ...MINE_RANK_PICKAXE_ENCHANTS.map(
+      (enchant) =>
+        `scoreboard objectives add ${enchant.objective} dummy "Mine Rank — ${enchant.label}"`,
+    ),
+    "scoreboard objectives add mr_enc_price dummy \"Mine Rank — enchantment price\"",
     ...MNC_PERMISSION_OBJECTIVES.map(
       (objective) => `scoreboard objectives add ${objective} dummy \"Mine Rank — MineCoin permission\"`,
     ),
