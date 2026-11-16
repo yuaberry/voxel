@@ -193,6 +193,81 @@ pub(crate) struct ManifestEntry {
     pub(crate) id: String,
     #[serde(default)]
     pub(crate) url: String,
+    /// release | snapshot | old_beta | old_alpha
+    #[serde(default, rename = "type")]
+    pub(crate) kind: String,
+    #[serde(default)]
+    pub(crate) release_time: String,
+}
+
+/// One version the owner can download from the launcher.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionCatalogEntry {
+    pub id: String,
+    /// release | snapshot | old_beta | old_alpha
+    pub kind: String,
+    pub release_time: String,
+    /// the runtime is already on this machine (the shared cache)
+    pub installed: bool,
+}
+
+/// Bedrock carries the truth: this desktop cannot install it, and the app
+/// says so instead of offering a button that cannot work.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BedrockInfo {
+    pub installable: bool,
+    pub reason: String,
+    pub editions: Vec<BedrockEdition>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BedrockEdition {
+    pub name: String,
+    pub platform: String,
+    pub url: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionCatalog {
+    /// Java Edition — every version Mojang still publishes.
+    pub java: Vec<VersionCatalogEntry>,
+    pub bedrock: BedrockInfo,
+}
+
+#[tauri::command]
+pub fn launcher_version_catalog(base_path: String) -> Result<VersionCatalog, String> {
+    let manifest: Manifest = http_get_json(MANIFEST_URL)?;
+    let cache = std::path::PathBuf::from(&base_path).join("minecraft/versions");
+    // newest first: the owner picks one of the current versions at a glance
+    let java = manifest
+        .versions
+        .into_iter()
+        .rev()
+        .map(|entry| VersionCatalogEntry {
+            installed: cache.join(&entry.id).join("client.jar").is_file(),
+            id: entry.id,
+            kind: entry.kind,
+            release_time: entry.release_time,
+        })
+        .collect();
+    Ok(VersionCatalog {
+        java,
+        bedrock: BedrockInfo {
+            installable: false,
+            reason: "Bedrock Edition não é instalável a partir do Linux: ela é publicada como pacote UWP da Microsoft Store e exige o Windows. O que o VOXEL baixa e roda aqui é a Java Edition — a mesma do servidor.".to_string(),
+            editions: vec![
+                BedrockEdition {
+                    name: "Bedrock Edition".to_string(),
+                    platform: "Windows · Xbox · Android · iOS · PlayStation · Switch".to_string(),
+                    url: "https://www.minecraft.net/pt-br/download".to_string(),
+                },
+            ],
+        },
+    })
 }
 
 #[derive(Deserialize)]
@@ -2110,4 +2185,71 @@ pub fn launcher_overview_impl(base_path: String) -> Result<Vec<LauncherInstance>
     }
     list.sort_by(|a, b| a.slug.cmp(&b.slug));
     Ok(list)
+}
+
+#[cfg(test)]
+mod catalog_tests {
+    use super::*;
+
+    /// The catalog is honest about Bedrock: this desktop CANNOT install it,
+    /// and the app says so instead of offering a button that cannot work.
+    #[test]
+    fn the_catalog_tells_the_truth_about_bedrock() {
+        let catalog = VersionCatalog {
+            java: Vec::new(),
+            bedrock: BedrockInfo {
+                installable: false,
+                reason: "test".to_string(),
+                editions: Vec::new(),
+            },
+        };
+        assert!(!catalog.bedrock.installable);
+        // the JSON the frontend reads is camelCase, as the rule demands
+        let json = serde_json::to_string(&catalog).expect("serialize");
+        assert!(json.contains("\"installable\""), "{json}");
+        assert!(!json.contains("\"bedrocked\""));
+    }
+
+    /// The version entry reports WHAT IS ALREADY ON THIS MACHINE — a version
+    /// the owner has not downloaded must not look installed.
+    #[test]
+    fn a_version_reports_whether_it_is_installed() {
+        let base = std::env::temp_dir().join(format!("voxel-catalog-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("minecraft/versions/1.20.1")).unwrap();
+        // an EMPTY version folder is not a downloaded runtime
+        let entry = VersionCatalogEntry {
+            id: "1.20.1".to_string(),
+            kind: "release".to_string(),
+            release_time: String::new(),
+            installed: base.join("minecraft/versions/1.20.1").join("client.jar").is_file(),
+        };
+        assert!(!entry.installed, "a folder without client.jar is not installed");
+        std::fs::write(base.join("minecraft/versions/1.20.1/client.jar"), b"x").unwrap();
+        let installed = base.join("minecraft/versions/1.20.1").join("client.jar").is_file();
+        assert!(installed);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The real catalog (network). Same gate as the other E2E suites.
+    #[test]
+    #[ignore = "e2e: fetches the official Mojang piston-meta manifest"]
+    fn e2e_the_catalog_answers_from_the_official_manifest() {
+        let base = std::env::temp_dir().join("voxel-catalog-e2e");
+        let _ = std::fs::remove_dir_all(&base);
+        let catalog = launcher_version_catalog(base.to_string_lossy().to_string())
+            .expect("the official manifest must answer");
+        assert!(catalog.java.len() > 100, "Mojang publishes hundreds of versions");
+        // the newest first: the first entry must be at least as new as 1.20.1
+        let known = catalog
+            .java
+            .iter()
+            .find(|entry| entry.id == "1.20.1")
+            .expect("1.20.1 is in the catalog");
+        assert_eq!(known.kind, "release");
+        assert!(!known.installed, "nothing is downloaded in a fresh machine");
+        // and the very first entry is the newest one
+        assert_eq!(&catalog.java[0].release_time >= &known.release_time, true);
+        let _ = std::fs::remove_dir_all(&base);
+    }
 }

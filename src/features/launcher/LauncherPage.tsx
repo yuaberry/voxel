@@ -18,6 +18,7 @@ import { openInFileManager } from "@/services/storage/storageService";
 import { invoke } from "@tauri-apps/api/core";
 import { LaunchDialog } from "@/features/projects/workspace/LaunchDialog";
 import { MultiplayerListPanel } from "@/features/launcher/MultiplayerListPanel";
+import { VersionsSection } from "@/features/launcher/VersionsSection";
 import { EmptyArt } from "@/components/EmptyState";
 import { formatRelativeTime } from "@/lib/utils";
 import {
@@ -237,6 +238,10 @@ export function LauncherPage() {
       )}
 
       <MultiplayerListPanel instances={instances} />
+
+      {/* Java Edition (and the truth about Bedrock), straight from the
+          official Mojang manifest — the owner asked for both here */}
+      <VersionsSection />
 
       {runProject && (
         <LaunchDialog
