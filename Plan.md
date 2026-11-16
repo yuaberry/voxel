@@ -206,6 +206,7 @@ Testes: vitest 154 · cargo 89 (+11 E2E) · render-smoke jsdom dos 5 dialogs cr�
 
 | # | Fase | O que foi feito | Bugs caçados |
 |---|---|---|---|
+| **83** | **Login do NerdStone + layout do Play + mina menor + encantamentos em MineCoin + Chain** | **login do NerdStone diagnosticado pelos logs e por sonda** (não era a conta Ely.by: o servidor é *modo offline com senha própria*, faltava `/registrar <senha> <senha>`; NerdZone e NerdStone são a **mesma rede**) · **layout do Play corrigido** (o `<pre>` do log não quebra linha e definia a largura da coluna do grid do diálogo — 5 blocos iguais corrigidos, teste aponta arquivo e linha) · **mina 3×3 × 5 camadas (45 blocos)** e **reset derivado do volume** (era 100 fixo, maior que os 72 blocos da mina; as minas de Pré-Rank ganharam o próprio) · **encantamentos da picareta só em MineCoin, a partir do rank 200** · **livro manual** com comandos clicáveis (o `/trigger` é o único comando do vanilla — o livro entrega a experiência sem fingir um `/mina`) · **capa 64×64 gerada em Rust + descrição de 2 linhas** · **Chain: boss bar com preço/emissão/online, preço em centavos, passos de 5% limitados a R$1000–2700, emissão proporcional ao que cada jogador minerou** · **admins e testers por tag, lista em dado** · **catálogo de versões Java no launcher** (manifest oficial) + **a verdade sobre Bedrock** (não instalável no Linux, dita em vez de um botão que não funciona) + atalhos de shaders/marketplace · **5 bugs que só o servidor real pega** (objetivos nunca declarados; trigger do teleporte com nome errado repetindo a cada tick; `data modify` em jogador proibido pelo vanilla → refeito pelo barril de trabalho; base da escada zerada fazendo o jogador pagar para piorar a picareta; `\n` dentro de string citada derrubando a função inteira) · release **v0.36.0** | `data remove`/`data modify` em NBT de jogador (o vanilla responde *Unable to modify player data*); `cmd_pickaxe` inteiro falhando ao carregar por escape inválido dentro de uma string citada; objetivo de trigger resetado com o nome errado; encantamentos sem objetivo declarado (escada inerte); reset automático maior que a capacidade da mina; MOTD com quebra real truncando o `server.properties`; `<pre>` sem wrap dentro de um diálogo grid; `warning`/`success` … ver §82 |
 | **82** | **Auditoria completa: 20 defeitos, 3 alegações falsas e a referência NerdZone** | **NBT em UTF-8 modificado da Java** (um emoji fazia o cliente descartar a lista inteira — bytes conferidos contra o `writeUTF` do JDK e lidos pelo leitor oficial do cliente) · entrada ruim **ignorada e reportada** (uma só não aborta mais a lista) · IPv6 sem colchetes recusado com mensagem acionável · **tela branca do Marketplace** corrigida · **corrida** do `listServersReconciled` que fazia o **servidor local sumir** (dono único das escritas + re-leitura do vencedor) · falha da escrita da lista **reportada** em vez de engolida · skeleton eterno · vazamento de listeners do Tauri · seletores `?? []` · **textura da picareta dentro do datapack** (o PNG era escrito ao lado do server root e a picareta caía na arte vanilla; pack zipado com `pack.mcmeta` na raiz, sha1 registrado) · **heap direito** (`-Xmx2G` empurrava o servidor para o swap → pausas de GC de segundos) · **dois tokens de design mortos** (`warning`, `success` — compilavam para nada) · **site: 39 vs 47 comandos**, nav que desaparecia no celular, transcrição de teste inventada · **3 alegações do datapack desmentidas com prova** (`SelectedItem{…}` funciona no jogador real; a forma proposta é inválida em 1.20.1; a ordem do tick é intencional) · **2289 chunks, 0 corrompidos** · NerdZone.gg medido (FlameCord, protocolo 777, ~1335 online) | strings NBT em UTF-8 puro (emoji descartava o arquivo); lista abortada por uma entrada inválida; IPv6 sem colchetes virava host `2001:db8:` porta 1; `LaunchDialog` com `project` undefined derrubava o app inteiro; UNIQUE(slug) perdido silenciava o servidor; `catch {}` na escrita da lista; `setLoaded(true)` só no caminho feliz; listeners acumulados por lançamento; array novo a cada render; PNG do pack escrito fora do datapack; heap maior que a RAM útil; `warning`/`success` ausentes dos dois tailwind configs; título do site contradizendo o manifesto; nav `hidden md:flex` sem hambúrguer; transcrição de teste manual apresentada como execução real; **2 scripts meus de validação de region file errados** (setores de 4096 bytes; `length` inclui o byte de compressão) |
 | **81** | **Multiplayer: o `servers.dat` que o cliente não lia** | **`servers.dat` em NBT cru** (o cliente 1.20.1 lê com `DataInputStream`, **sem gzip** — o arquivo gzipado era descartado em silêncio e a tela Multiplayer vinha vazia) · **prova com o código oficial do cliente** (`rb.b(File)` do `client.jar` oficial) · a lista escrita em **todas** as instâncias + **sync antes de cada Run** · referências públicas **persistidas** (`launcher.publicServerIds`) · **servidor local como serviço systemd do usuário** (`Restart=always` + linger + console FIFO + guarda de porta ocupada) · **E2E do join real** (cliente vanilla entra no servidor local) · E2E do ping SLP local · **mundo provado íntegro** (1007 chunks, 0 corrompidos) e **watchdog desligado** (`max-tick-time=0`, `sync-chunk-writes=false` — o watchdog matava um servidor saudável, provado pelo crash report) · v0.35.2 | `servers.dat` gravado **gzipado** (o cliente vanilla nunca lê gzip — lista descartada em silêncio); lista escrita em **uma** instância só (invisível nas outras); servidor local morto (runner ad-hoc em `/tmp` limpo pelo sistema); **dois scripts meus de validação de region file errados** (byte offset em vez de setores de 4096; `length` inclui o byte de compressão) — falsaram um "mundo corrompido" que não existia; watchdog matando o servidor por **contenção de recursos** das minhas próprias compilações |
 | **80** | **Launcher: o jogo que não inicia** | **Launcher loader-aware** (vanilla + fabric, `paper`/desconhecidos recusados) · **regras do Mojang corrigidas** (a flag de macOS `-XstartOnFirstThread` matava o JVM no Linux) · **`launcher_runtime_status`** (runtime real: client.jar, libs, 3.600 assets, natives) · **download automático** ao configurar conta Microsoft/Ely.by · aviso do jar **removido** · projeto Mine Rank migrado para `datapack` 1.20.1 vanilla · **E2E real: o cliente chega ao menu principal** · v0.35.0 | `allow` que não casava com o SO era lido como "permitir" (JVM não subia); `instanceExists()` pulava o download; `${version_type}` literal no `--versionType`; classpath com `:` no Windows |
@@ -1617,3 +1618,169 @@ Commits desta sessão: `260cb2a` (heap/swap) · `8fb0802` (NBT modificado + robu
    juntos). A tentativa de adicionar quebrou o lockfile (*missing snapshot*) e foi
    **revertida** — registrada em vez de maquiada.
 6. **Ely.by ao vivo**, **`nexus_marketplace`**, **domínio + host próprio**: decisões do dono.
+
+---
+
+## 83. Sessão 83 — O login do NerdStone, o layout do Play, a mina menor, os encantamentos em MineCoin e a Chain
+
+**Pedidos do dono**, todos nesta sessão:
+
+1. *"não consigo logar no servidor do Nerdstone com a minha conta da ely.by"*
+2. *"toda vez que eu clico em play no servidor lá em Laucher, a tela expande exibindo o código de execução para abrir o minecraft, mas todo o resto permanece no layout pequeno, oque fica totalmente bugado"*
+3. *"quero uma mina menor, já que a velocidade de mineração da minha picareta vai ser a velocidade normal do jogo"*
+4. *"adicione encantamentos somente com a criptomoeda"* + *"deixe os comandos mais faceis"* + *"coloque uma capa e melhore a descrição"* + *"placar no Spawn para eu acompanhar a Inflação da Criptomoeda (Chain)"* + *"opção para eu adicionar mais admins ou testers"* + *"opção de mods no Minecraft"* + *"gere todos os executaveis para todos os sistemas Operacionais"*
+
+### A. O login do NerdStone — não era a conta Ely.by
+
+O log do cliente era conclusivo, e uma sonda confirmou no servidor:
+
+```
+[14:46:38] [System] [CHAT] Utilize o comando /registrar <senha> <senha>.
+[14:46:48] [System] [CHAT] Senha incorreta. Por favor, tente novamente.
+```
+
+NerdZone e NerdStone são **a mesma rede** (o MOTD deles diz *"servidor do NERDSTONE"*) e o
+servidor é **modo offline com senha própria**: a conta Ely.by entra normalmente (a
+autenticação funciona — o dono chegou a entrar no mundo) mas exige cadastro. Ele **nunca se
+registrou lá**. Solução: `/registrar SUA_SENHA SUA_SENHA` na primeira vez, `/logar SUA_SENHA`
+depois. Nenhuma correção no VOXEL era possível — a autenticação é do servidor.
+
+Sobre as prints do NerdZone: **eu não consigo tirar screenshots dentro do jogo** (não dirijo o
+cliente 3D — a sessão do desktop fica travada). O que usei, de verdade: o guia oficial deles, a
+medição do servidor (FlameCord, protocolo 777, ~1335 online) e uma sonda que entrou lá e leu as
+respostas. Se o dono mandar as imagens, eu adapto item por item.
+
+### B. O layout do Play — o `<pre>` que esticava o diálogo
+
+`DialogContent` é um **grid** (`grid w-full max-w-lg`), e uma coluna implícita se dimensiona
+pelo **conteúdo mínimo** dos itens. Um `<pre>` tem `white-space: pre` — **não quebra linha** —
+então a linha mais longa (o comando Java que inicia o jogo, milhares de pixels) definia a
+largura da coluna. `max-w-md` limita a caixa, mas o conteúdo estourava para fora: exatamente o
+"expandiu mas o resto continua pequeno" que o dono descreveu. Corrigido com
+`whitespace-pre-wrap` + `min-w-0`, o mesmo padrão que o `VisualLogicPage` já usava. O mesmo
+defeito latente existia em **mais 4 `<pre>`** (AI Creator, diff de código, log do túnel,
+visual logic) — todos corrigidos, com teste que aponta o arquivo e a linha.
+
+### C. A mina menor — 3×3 × 5 camadas, e o reset que era maior que a mina
+
+A mina privada passou de **72 para 45 blocos** (carvão → ferro → ouro → diamante → esmeralda).
+Os **ranks não mudaram** (os 8 tiers são por nível: 0/100/250/…/1000, nunca por camada). Duas
+constantes acopladas que estavam erradas juntas:
+
+- o reset automático era **100 blocos escritos à mão** enquanto a mina inteira tinha 72 — ele só
+  dispararia depois de o jogador cavar **mais** blocos do que a mina contém (ou cavar as
+  paredes). Agora é **derivado do volume** (60%: 27 para a privada);
+- as minas de Pré-Rank **tomavam emprestado** o mesmo 100. São de outro tamanho (7×7 × 3 =
+  147), então ganharam o próprio limite derivado (88).
+
+O mundo ao vivo foi reconstruído e verificado bloco a bloco: `98 coal … 94 emerald, 93
+bedrock`, e o poço antigo de 8 camadas foi limpo (`fill` + `function nexus_rank:build_plot_N`).
+
+### D. Os encantamentos da picareta — só MineCoin, a partir do rank 200
+
+Escada de encantamentos (Eficiência 10 · Fortuna 5 · Inquebrável 5 · Reparo 1) comprada **só com
+MineCoin**, aberta no **rank 200**. Provada ponta a ponta no servidor real:
+
+```
+[Mine Rank] Eficiência subiu para o nível 4 (-5 MNC).
+{item: {Enchantments: [{lvl: 4b, id: "minecraft:efficiency"}, ...]}}
+```
+
+**Quatro bugs que só apareceram no servidor real** (nenhum deles quebra um teste unitário):
+
+1. os objetivos dos encantamentos **nunca eram declarados** — `scoreboard players add` e
+   `execute if score` sobre um objetivo não declarado são descartados em silêncio: o menu
+   abriria e o clique não faria nada. A escada inteira era **inerte**;
+2. `/tpaccept` resetava o trigger **errado** (`mr_tp_ok` em vez de `mr_t_tp_ok`, que não
+   existe) — o trigger real ficava em 1 e o teleporte aceito **repetia a cada tick**;
+3. o vanilla **proíbe escrever no NBT de um jogador**: todo `data modify entity <jogador>`
+   responde *"Unable to modify player data"* (medido; o mesmo comando em outra entidade
+   funciona). A compra "funcionava" no chat mas **não modificava o item**. Refito pelo **barril
+   de trabalho** escondido no deck do hub (entidades de bloco são graváveis, e
+   `item replace … from` copia em vez de mover);
+4. a base da escada: a picareta nasce com Eficiência/Unbreaking III e comprar um nível
+   **substitui** a entrada do item pelo nível do placar — com os objetivos em zero, a primeira
+   compra escreveria `lvl:1b` sobre o `lvl:3b` da picareta: **o jogador pagaria para piorar a
+   picareta**. Agora a base é explícita, o preço é cobrado a partir dela, e um jogador antigo é
+   normalizado na primeira abertura do menu.
+
+### E. Os comandos faceis e o livro manual
+
+Vanilla 1.20.1 (Caminho A) dá ao jogador **um** comando: `/trigger`. Um comando raiz como
+`/mina` **não pode existir** num datapack — então o livro entrega a mesma experiência sem
+mentir: cada linha é um **comando clicável** que executa o trigger real, com tooltip, e as
+páginas carregam o estado real do jogador em componentes de placar (MineCoin, level, rank,
+prestígio e cada encantamento). `/picareta` entrega a picareta **e** o livro; `/mina` abriu a
+seleção de locais (minha mina, restaurar, Terra, Areia, hub).
+
+O livro é gerado, nunca escrito à mão. **Mais um bug que só o servidor real pega**: o
+`cmd_pickaxe` inteiro **falhava ao carregar** — *"Invalid escape sequence '\n' in quoted
+string"*. A página vive dentro de uma string citada no comando, e o parser come a barra como
+escape: o `\n` do JSON chegava como escape inválido e levava a picareta junto. Toda barra é
+duplicada agora (`\\` → `\`), com teste que impede a regressão. Verificado ao vivo: o livro
+chega com 13 comandos clicáveis, todos com trigger existente no manifesto.
+
+### F. A capa, a descrição e a Chain
+
+- **Capa**: `server-icon.png` 64×64 gerado pelo VOXEL (arte original em Rust, o mesmo encoder
+  das texturas) + **descrição de 2 linhas com cores**. Quebra de linha = barra + n, nunca
+  quebra real (uma quebra real corta o `server.properties` e a segunda linha **some sem
+  aviso** — medido ao vivo e agora protegido por teste). As propriedades só valem no **START**.
+- **Chain**: boss bar `MINE COIN (CHAIN) R$ … · emissão N MNC · online P` criada no setup, com o
+  preço desenhado como medidor entre o piso e o teto, e os mesmos números na action bar de quem
+  está a 40 blocos do hub. Preço começa em **R$1000**, guardado em **centavos** (dinheiro
+  inteiro — float nunca chega num placar). Movimento em passos de **5%**, **limitado a
+  R$1000–2700**. Emissão de 10/50/100 MineCoin **distribuída entre os jogadores online em
+  proporção direta ao que cada um minerou** (`issue × mine_used / total`); ninguém minerou →
+  a emissão **não acontece**, com o motivo dito em voz alta.
+- ** Admins e testers**: admin é uma **tag**, e a lista é **dado** (`MINE_RANK_ADMIN_NAMES`)
+  reaplicada a cada tick — um admin que entra depois é admin desde o primeiro segundo, e
+  ninguém precisa lembrar um comando. Promover/rebaixar mira o jogador **mais próximo**
+  enquanto o solicitante está marcado `mr_req` (o limite honesto do vanilla, **dito no menu**
+  em vez de fingir que um nome pode ser alvo). Toda recusa (preço, emissão, equipe) **diz o
+  motivo**, porque uma recusa silenciosa é como o jogador conclui que o servidor quebrou.
+  Verificado ao vivo: entrei como o dono, o painel de admin abriu, +5% moveu o preço de
+  100000 para 105000 centavos, e emitir 10 MineCoin pôs 10 no saldo de quem minerou e 10 no
+  contador de emissão.
+
+### G. O launcher: versões Java, a verdade sobre Bedrock e os mods
+
+`launcher_version_catalog` lê o **manifesto oficial da Mojang** pelo mesmo perímetro que baixa
+o runtime: lista pesquisável, mais novas primeiro, marcando o que já está na máquina pelo cache
+compartilhado, e um botão que baixa o runtime e entrega o jogo para a conta já conectada
+(Ely.by ou Microsoft — a conta é a única credencial, nenhuma senha é guardada). A instância é
+**vanilla**, sem projeto.
+
+**Bedrock**: a seção **diz a verdade** em vez de oferecer um botão que não pode funcionar — é
+publicada como pacote UWP da Microsoft Store e exige Windows. O motivo, as plataformas e o link
+oficial estão no cartão, e um teste de render fixa que **nenhum botão de download de Bedrock
+aparece lá**. Na mesma seção: os atalhos para shaders/packs de textura e a Marketplace
+(modpacks e mods), que já existiam mas não eram alcançáveis do launcher.
+
+### H. Estado verificado
+
+| Verificação | Resultado |
+|---|---|
+| `pnpm typecheck` / `pnpm lint` | 0 |
+| `pnpm test:unit` | **408 passaram**, 1 pulado (era 362 na §82) |
+| `cargo test` | **146 passaram**, 19 ignorados (E2E) |
+| catálogo de versões (E2E real) | manifest oficial responde, 500+ versões, 1.20.1 como release |
+| servidor do dono | ativo, datapack recarrega sem erro, mundo reconstruído e limpo |
+| capa/descrição | ping SLP real devolve o ícone 64×64 e as 2 linhas |
+| encantamentos | comprovados no item (`lvl: 4b`) |
+| Chain | preço, emissão proporcional e painel de admin comprovados |
+| release | tag `v0.36.0` publicada (macOS x2, Ubuntu, Windows) |
+
+### I. Pendências honestas
+
+1. **O app instalado do dono ainda é a v0.35.1** — ele precisa instalar o `.deb`/AppImage da
+   **v0.36.0** (a tag está publicada; o build leva ~20 min).
+2. **Prints do NerdZone**: eu não tiro screenshot dentro do jogo. Os dados que usei estão em
+   §A; as imagens têm que vir dele.
+3. **Spawners + terrenos evoluindo com o rank** e **mercado/leilão entre jogadores** (as outras
+   áreas que ele escolheu) seguem pendentes — esta sessão fez os encantamentos, o livro, a
+   Chain e o launcher.
+4. A sonda de teste entrou **com o nome do dono** para provar o tag de admin; os placares que
+   ela mexeu (10 blocos minerados, 15 MineCoin) foram devolvidos a zero e o preço voltou a
+   100000.
+5. Ely.by ao vivo, `nexus_marketplace`, domínio + host próprio: decisões do dono.
