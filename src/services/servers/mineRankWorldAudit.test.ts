@@ -26,9 +26,11 @@ import {
   MINE_RANK_POND,
   MINE_RANK_TERRA_MINE,
   MINE_RANK_AREIA_MINE,
+  MINE_RANK_MINE_RESET_BLOCKS,
   MINE_RANK_MNC_PICKAXE_PRICE,
   MINE_RANK_MINE_RESET_COST,
   generateMineRankFiles,
+  manualBook,
   mineRankPlotCenter,
 } from "./mineRankServer";
 
@@ -303,5 +305,83 @@ describe("the MineCoin economy closes", () => {
     expect(everything).toContain(
       `scoreboard players remove @s mr_coins ${1000}`,
     );
+  });
+});
+describe("the manual book and the menus are clickable and honest", () => {
+  it("gives a written book whose pages are valid JSON", () => {
+    const pickaxe = functionSource.get("cmd_pickaxe") ?? "";
+    // the book is one item in the give command
+    const match = pickaxe.match(/give @s (minecraft:written_book\{.*?\}) 1/);
+    expect(match, "cmd_pickaxe must hand over the manual book").toBeTruthy();
+    const payload = match![1];
+    // every page is a JSON string — a broken page would render as a blank book
+    const pages = [...payload.matchAll(/'(\{.*?\})'/g)].map((entry) => entry[1]);
+    expect(pages.length).toBeGreaterThanOrEqual(5);
+    for (const page of pages) {
+      const parsed = JSON.parse(page) as { extra?: unknown[] };
+      expect(parsed.extra, "a page must carry at least one line").toBeTruthy();
+    }
+  });
+
+  it("escapes the backslashes the command parser would eat", () => {
+    // A page lives inside a quoted string in the command, and the parser
+    // treats a backslash as an escape: the JSON's own `\n` would arrive as
+    // an INVALID escape sequence and the whole function would fail to load
+    // (measured live — the pickaxe stopped arriving too).
+    const book = manualBook();
+    const pages = [...book.matchAll(/'([^']*)'/g)].map((m) => m[1]);
+    expect(pages.length).toBeGreaterThanOrEqual(5);
+    for (const page of pages) {
+      // uma barra simples só pode aparecer como parte de `\\` (escape duplo)
+      const singles = page.match(/(?<!\\)\\(?!\\)/g);
+      expect(singles, `a lone backslash would break the parser: ${page.slice(0, 60)}`).toBeNull();
+      // e o JSON da página continua válido depois de desfazer o escape duplo
+      expect(() => JSON.parse(page.replace(/\\\\/g, "\\"))).not.toThrow();
+    }
+    // and no raw newline may reach the command file either
+    expect(book).not.toContain("\n".replace("\n", String.fromCharCode(10)));
+  });
+
+  it("clicks only triggers that really exist", () => {
+    const pickaxe = functionSource.get("cmd_pickaxe") ?? "";
+    const triggers = [...pickaxe.matchAll(/\/trigger (mr_t_\w+) set (\d+)/g)].map((m) => m[1]);
+    expect(triggers.length).toBeGreaterThanOrEqual(10);
+    const declared = new Set(MINE_RANK_COMMANDS.map((command) => command.trigger));
+    for (const trigger of triggers) {
+      expect(
+        declared.has(trigger),
+        `the manual book runs ${trigger}, which is not in the manifest`,
+      ).toBe(true);
+    }
+  });
+
+  it("opens every area of the world from the mine menu", () => {
+    const menu = functionSource.get("menu_mine") ?? "";
+    for (const [label, trigger] of [
+      ["a private mine", "mr_t_mine"],
+      ["the restore", "mr_t_mine"],
+      ["the Terra mine", "mr_t_terra_mine"],
+      ["the Areia mine", "mr_t_areia_mine"],
+      ["the hub", "mr_t_spawn"],
+    ] as const) {
+      expect(menu, `the mine menu must open ${label}`).toContain(trigger);
+    }
+  });
+
+  it("shows the player's own numbers in the book (score components)", () => {
+    const pickaxe = functionSource.get("cmd_pickaxe") ?? "";
+    const book = manualBook();
+    // the book reads the player's real state — a static book would lie the
+    // moment the player mines one block
+    expect(pickaxe).toContain('"objective":"mr_enc_eff"');
+    expect(pickaxe).toContain('"objective":"mr_mnc"');
+    expect(pickaxe).toContain('"objective":"mr_level"');
+    // and the page text carries the REAL mine numbers, derived
+    expect(pickaxe).toContain(`${MINE_RANK_ORE_LAYERS.length} camadas`);
+    expect(book, "the book names the REAL reset threshold").toContain(
+      `${MINE_RANK_MINE_RESET_BLOCKS} blocos`,
+    );
+    // and the book itself is the same payload the command gives
+    expect(pickaxe).toContain(manualBook().slice(0, 60));
   });
 });

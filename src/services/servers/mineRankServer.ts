@@ -362,6 +362,149 @@ export const MINE_RANK_PICKAXE_BASE_LEVEL: Record<string, number> = {
  * the menu promises can never drift apart.
  */
 /**
+ * The MANUAL BOOK the player receives with the pickaxe.
+ *
+ * Vanilla 1.20.1 gives a player exactly ONE command: `/trigger <objective>`
+ * (Caminho A). The owner asked for `/mina`, `/picareta`, `/encantos` — a
+ * root command like that cannot exist in a datapack, so the book gives the
+ * same experience honestly: every line is a CLICKABLE command that runs the
+ * real trigger, and the tooltip says what it does. A player who types the
+ * trigger by hand is told the same thing.
+ */
+export const MINE_RANK_MANUAL_TITLE = "Manual do Mine Rank";
+
+/** One clickable command inside the manual book. */
+function bookCommand(label: string, trigger: string, value: number, hover: string): ChatPart {
+  return {
+    text: ` ${label}\n`,
+    color: "#a78bfa",
+    clickEvent: { action: "run_command", value: `/trigger ${trigger} set ${value}` },
+    hoverEvent: { action: "show_text", value: { text: hover } },
+  };
+}
+
+/**
+ * The pages of the manual book — the readable surface of the whole system.
+ *
+ * Each page is a single chat component (a book page is one component tree),
+ * so every line goes into `extra`. The numbers come from the module: a page
+ * that says "5 camadas" is generated, never written by hand.
+ */
+function manualPages(): string[] {
+  const page1 = {
+    text: "",
+    extra: [
+      { text: "MINE RANK\n", color: "#fbbf24", bold: true },
+      { text: "Rankup 100% vanilla 1.20.1\n", color: "gray" },
+      { text: "sem plugin, sem mods\n\n", color: "dark_gray" },
+      { text: "O que fazer primeiro\n", color: "#22d3ee", bold: true },
+      { text: "1. Minere na SUA mina\n", color: "gray" },
+      { text: "2. Cada bloco paga coin e level\n", color: "gray" },
+      { text: "3. No rank 200, encante a picareta com MineCoin\n\n", color: "gray" },
+      { text: "Clique em qualquer comando desta página — ele executa sozinho.\n", color: "dark_gray" },
+    ],
+  };
+
+  const page2 = {
+    text: "",
+    extra: [
+      { text: "COMANDOS\n", color: "#fbbf24", bold: true },
+      bookCommand("mina", "mr_t_mine", 1, "Sua mina: ir, restaurar e os locais"),
+      bookCommand("picareta", "mr_t_pickaxe", 1, "Uma picareta nova (com este livro)"),
+      bookCommand("encantos", "mr_t_enchants", 1, "Encantamentos da picareta em MineCoin"),
+      bookCommand("prestigio", "mr_t_prestige", 1, "Prestígio: zera o level, ganha bônus"),
+      bookCommand("resumo", "mr_t_summary", 1, "Seu resumo: blocos, coins, níveis"),
+      bookCommand("terreno", "mr_t_plot_auto", 1, "Pega um terreno com mina privada"),
+      bookCommand("moedas", "mr_t_mnc", 1, "MineCoin: saldo, conversão e mercado"),
+      bookCommand("regras", "mr_t_help", 1, "As regras do servidor"),
+    ],
+  };
+
+  const page3 = {
+    text: "",
+    extra: [
+      { text: "PARA ONDE IR\n", color: "#fbbf24", bold: true },
+      bookCommand("hub", "mr_t_spawn", 1, "Volta ao spawn (hub)"),
+      bookCommand("mina da Terra", "mr_t_terra_mine", 1, "Mina de dirt do Pré-Rank"),
+      bookCommand("mina da Areia", "mr_t_areia_mine", 1, "Mina de areia do Pré-Rank"),
+      bookCommand("pesca", "mr_t_fishing", 1, "Lago de pesca"),
+      bookCommand("arena", "mr_t_raid", 1, "Arena de raids"),
+      { text: "\nCada mapa tem o seu preço em blocos — o menu mostra.\n", color: "dark_gray" },
+    ],
+  };
+
+  const page4 = {
+    text: "",
+    extra: [
+      { text: "SUA PICARETA\n", color: "#fbbf24", bold: true },
+      { text: "Níveis atuais (o livro não muda sozinho):\n", color: "gray" },
+      ...MINE_RANK_PICKAXE_ENCHANTS.map((enchant) => ({
+        text: ` ${enchant.label}: `,
+        color: "gray",
+        extra: [
+          { score: { objective: enchant.objective, name: "@s" }, color: "#a78bfa" },
+          { text: `/${enchant.maxLevel}\n`, color: "dark_gray" },
+        ],
+      })),
+      { text: "\nMineCoin:\n ", color: "#fbbf24" },
+      { score: { objective: "mr_mnc", name: "@s" }, color: "#fbbf24" },
+      { text: " MNC · ", color: "gray" },
+      { score: { objective: "mr_tokens", name: "@s" }, color: "#22d3ee" },
+      { text: " tokens\n", color: "gray" },
+      { text: "Level: ", color: "gray" },
+      { score: { objective: "mr_level", name: "@s" }, color: "#a78bfa" },
+      { text: " · Rank: ", color: "gray" },
+      { score: { objective: "mr_rank", name: "@s" }, color: "#a78bfa" },
+      { text: " · Prestígio: ", color: "gray" },
+      { score: { objective: "mr_prestige", name: "@s" }, color: "#a78bfa" },
+      { text: `\n\nA mina tem ${MINE_RANK_ORE_LAYERS.length} camadas e restaura a cada ${MINE_RANK_MINE_RESET_BLOCKS} blocos.\n`, color: "dark_gray" },
+      { text: "Use /encantos para evoluir a picareta.\n", color: "dark_gray" },
+    ],
+  };
+
+  // página 5: a tabela de preços dos encantamentos ( derivada, nunca à mão)
+  const page5 = {
+    text: "",
+    extra: [
+      { text: "ENCANTAMENTOS (MINE COIN)\n", color: "#fbbf24", bold: true },
+      { text: "Só a Picareta de Mineração encanta, a partir do rank 200.\n\n", color: "gray" },
+      ...MINE_RANK_PICKAXE_ENCHANTS.map((enchant) => ({
+        text: ` ${enchant.label} `,
+        color: "gray",
+        extra: [
+          { text: `(nível ${MINE_RANK_PICKAXE_BASE_LEVEL[enchant.objective] ?? 0}→${enchant.maxLevel}): `, color: "dark_gray" },
+          {
+            text: `${mineRankEnchantPrice(enchant, (MINE_RANK_PICKAXE_BASE_LEVEL[enchant.objective] ?? 0) + 1)} MNC`,
+            color: "#fbbf24",
+          },
+          { text: enchant.step > 0 ? ` (+${enchant.step} por nível)\n` : " (preço único)\n", color: "dark_gray" },
+        ],
+      })),
+    ],
+  };
+
+  return [page1, page2, page3, page4, page5].map((page) => JSON.stringify(page));
+}
+
+/**
+ * The manual book as a `/give` payload (a written book is one item).
+ *
+ * The escape rule that the LIVE E2E caught: a page lives INSIDE a quoted
+ * string in the command (`pages:['{...}']`), and the command parser eats a
+ * backslash as an escape — so the JSON's own `\n` reaches it as an
+ * INVALID escape sequence and the WHOLE function fails to load
+ * ("Failed to load function nexus_rank:cmd_pickaxe"), taking the pickaxe
+ * down with it. Every backslash is therefore doubled here: the parser turns
+ * `\\` into `\`, and the JSON inside sees a proper `\n`.
+ */
+export function manualBook(): string {
+  const pages = manualPages()
+    .map((page) => `'${page.replace(/\\/g, "\\\\")}'`)
+    .join(",");
+  return `minecraft:written_book{pages:[${pages}],title:"${MINE_RANK_MANUAL_TITLE}",author:"Mine Rank"}`;
+}
+
+/**
  * The hidden work barrel inside the hub deck.
  *
  * VANILLA TRUTH (measured on the live server): a command cannot write a
@@ -679,7 +822,7 @@ export const MINE_RANK_COMMANDS: MineRankCommand[] = [
     trigger: "mr_t_pickaxe",
     family: "progressao",
     surface: "action",
-    description: "Pega uma picareta nova (eficiência e unbreaking III).",
+    description: "Pega uma picareta nova e o Manual do Mine Rank (livro com os comandos).",
     fn: "cmd_pickaxe",
   },
   {
@@ -688,8 +831,7 @@ export const MINE_RANK_COMMANDS: MineRankCommand[] = [
     trigger: "mr_t_enchants",
     family: "progressao",
     surface: "menu",
-    description:
-      "Abre o menu de encantamentos da picareta (pagamento em tokens).",
+    description: `Abre o menu de encantamentos da picareta (só MineCoin, a partir do rank ${MINE_RANK_ENCHANT_MIN_LEVEL}).`,
     fn: "cmd_enchants",
   },
   // one buy command per enchantment: vanilla menus must run `/trigger`,
@@ -1541,23 +1683,53 @@ function commandFunctions(): Record<string, string[]> {
   ];
 
   map.menu_mine = [
-    tell([tag(), { text: "Sua mina", color: "#22d3ee", bold: true }]),
+    tell([tag(), { text: "Minas — para onde você quer ir?", color: "#22d3ee", bold: true }]),
     tell([
       option(
-        " 1. Ir para a mina",
+        " 1. A minha mina",
         "mr_t_mine",
         2,
         "#a78bfa",
-        "Teleporta para o seu veio de mineração",
+        "O seu veio privado, com as minério do seu rank",
       ),
     ]),
     tell([
       option(
-        ` 2. Restaurar os blocos (${MINE_RANK_MINE_RESET_COST} coins)`,
+        ` 2. Restaurar a minha mina (${MINE_RANK_MINE_RESET_COST} coins)`,
         "mr_t_mine",
         3,
         "#a78bfa",
-        "Repõe os blocos da sua mina",
+        "Repõe os blocos sem esperar a restauração automática",
+      ),
+    ]),
+    tell([
+      { text: " ── outras minas ──", color: "dark_gray" },
+    ]),
+    tell([
+      option(
+        " 3. Mina da Terra (Pré-Rank)",
+        "mr_t_terra_mine",
+        1,
+        "#fbbf24",
+        "Mina de dirt — o primeiro passo da escada",
+      ),
+    ]),
+    tell([
+      option(
+        " 4. Mina da Areia (Pré-Rank)",
+        "mr_t_areia_mine",
+        1,
+        "#fbbf24",
+        "Mina de areia — o segundo passo",
+      ),
+    ]),
+    tell([
+      option(
+        " 5. Voltar ao hub (spawn)",
+        "mr_t_spawn",
+        1,
+        "#22d3ee",
+        "O spawn, com o placar e as warps",
       ),
     ]),
   ];
@@ -1604,9 +1776,12 @@ function commandFunctions(): Record<string, string[]> {
     `execute unless data entity @s {SelectedItem:{}} unless data entity @s {SelectedItem:{id:"minecraft:diamond_pickaxe"}} run give @s ${MINE_RANK_PICKAXE_ITEM} 1`,
     "# the levels the player BUILT go back onto the new pickaxe",
     `function ${MINE_RANK_NS}:apply_enchants`,
+    "# and the MANUAL BOOK: the readable surface of the whole system, with every",
+    "# command clickable (a book click runs the real /trigger)",
+    `give @s ${manualBook()} 1`,
     tell([
       tag(),
-      { text: "Você recebeu uma picareta nova (eficiência III + unbreaking III).", color: "#22d3ee" },
+      { text: "Picareta nova + o Manual — clique nos comandos do livro para usá-los.", color: "#22d3ee" },
     ]),
     "scoreboard players set @s mr_t_pickaxe 0",
   ];
