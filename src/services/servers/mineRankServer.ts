@@ -152,7 +152,7 @@ export const MINE_RANK_HYPE_STEP = 1000;
  * It is asserted against the real generator output by the unit test — never a
  * hand-written number that can drift when a function is added.
  */
-export const MINE_RANK_DATAPACK_FILE_COUNT = 311;
+export const MINE_RANK_DATAPACK_FILE_COUNT = 312;
 
 // ---------------------------------------------------------------------------
 // Pre-ranks Terra and Areia — the economic ladder before Bronze
@@ -2924,6 +2924,21 @@ for (const enchant of MINE_RANK_PICKAXE_ENCHANTS) {
   // refusal says WHY (a silent refusal is how a player concludes the server
   // is broken).
 
+  map.chain_board = [
+    `bossbar set nexus_rank:chain name {"text":"MINE COIN (CHAIN)  R$ ","color":"yellow","bold":true,"extra":[{"score":{"objective":"mr_chain","name":"#chain"},"color":"gold"},{"text":" (centavos)  ·  emissão ","color":"gray"},{"score":{"objective":"mr_supply","name":"#chain"},"color":"aqua"},{"text":" MNC  ·  online ","color":"gray"},{"score":{"objective":"mr_online","name":"#mr_online"},"color":"green"}]}`,
+    "# the spawn placar: the same numbers on the action bar, near the hub",
+    "execute as @a[x=0,y=100,z=0,distance=..40] run title @s actionbar " +
+      JSON.stringify([
+        { text: "MINE COIN ", color: "#fbbf24", bold: true },
+        { text: "R$ ", color: "gold" },
+        { score: { objective: "mr_chain", name: "#chain" }, color: "gold" },
+        { text: " · emissão ", color: "gray" },
+        { score: { objective: "mr_supply", name: "#chain" }, color: "#22d3ee" },
+        { text: " MNC · online ", color: "gray" },
+        { score: { objective: "mr_online", name: "#mr_online" }, color: "#4ade80" },
+      ]),
+  ];
+
   map.cmd_chain = [
     `execute if entity @s[tag=mr_admin] run function ${MINE_RANK_NS}:chain_admin_panel`,
     `execute unless entity @s[tag=mr_admin] run function ${MINE_RANK_NS}:chain_public`,
@@ -4076,11 +4091,16 @@ function loadLines(): string[] {
     'scoreboard objectives add mr_issue dummy "Mine Coin — emissão atual"',
     'scoreboard objectives add mr_total dummy "Mine Rank — total minerado"',
     'scoreboard objectives add mr_step dummy "Mine Rank — passo do preço"',
+    'scoreboard objectives add mr_tick dummy "Mine Rank — tick counter"',
     'scoreboard objectives add mr_pct dummy "Mine Rank — porcentagem"',
     "# the price starts where the owner agreed: R$1000 (in centavos)",
     `scoreboard players set #chain mr_step ${MINE_RANK_CHAIN_STEP_PCT}`,
     "scoreboard players set #chain mr_pct 100",
-    "scoreboard players set #chain mr_supply 0",
+    "# the supply and the price SURVIVE a reload — only a fresh machine starts",
+    "# them at zero / at R$1000. A reload that wiped the supply would erase the",
+    "# emission history the boss bar shows, and the owner would lose the market",
+    "# he built by restarting the server.",
+    "execute unless score #chain mr_supply matches 0.. run scoreboard players set #chain mr_supply 0",
     `execute unless score #chain mr_chain matches 0.. run scoreboard players set #chain mr_chain ${MINE_RANK_CHAIN_INITIAL_PRICE}`,
     "# the spawn board: a boss bar the owner (and only him) can read at a glance",
     'bossbar add nexus_rank:chain {"text":"MINE COIN (CHAIN)","color":"yellow","bold":true}',
@@ -4122,19 +4142,13 @@ function tickLines(): string[] {
     "# the Chain board: the price, the supply and the online players, with the",
     "# price drawn as a gauge between the floor and the ceiling",
     `execute store result bossbar nexus_rank:chain value run scoreboard players get #chain mr_chain`,
-    `bossbar set nexus_rank:chain name {"text":"MINE COIN (CHAIN)  R$ ","color":"yellow","bold":true,"extra":[{"score":{"objective":"mr_chain","name":"#chain"},"color":"gold"},{"text":" (centavos)  ·  emissão ","color":"gray"},{"score":{"objective":"mr_supply","name":"#chain"},"color":"aqua"},{"text":" MNC  ·  online ","color":"gray"},{"score":{"objective":"mr_online","name":"#mr_online"},"color":"green"}]}`,
+    "# the board is re-drawn once a SECOND, not every tick: a boss name with",
+    "# score components is a component parse, and 20 of them per second per",
+    "# player is a tick the owner can feel",
+    "scoreboard players add #chain mr_tick 1",
+    `execute if score #chain mr_tick matches 20.. run scoreboard players set #chain mr_tick 0`,
+    `execute if score #chain mr_tick matches 1 run function ${MINE_RANK_NS}:chain_board`,
     "bossbar set nexus_rank:chain players @a",
-    "# the spawn placar: the same numbers on the action bar, near the hub",
-    "execute as @a[x=0,y=100,z=0,distance=..40] run title @s actionbar " +
-      JSON.stringify([
-        { text: "MINE COIN ", color: "#fbbf24", bold: true },
-        { text: "R$ ", color: "gold" },
-        { score: { objective: "mr_chain", name: "#chain" }, color: "gold" },
-        { text: " · emissão ", color: "gray" },
-        { score: { objective: "mr_supply", name: "#chain" }, color: "#22d3ee" },
-        { text: " MNC · online ", color: "gray" },
-        { score: { objective: "mr_online", name: "#mr_online" }, color: "#4ade80" },
-      ]),
     "# an admin who joins later is an admin from the first tick",
     ...MINE_RANK_ADMIN_NAMES.map((name) => `tag @a[name=${name}] add mr_admin`),
     "# enable the player commands",

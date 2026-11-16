@@ -403,6 +403,12 @@ describe("the Chain — the market the admin controls", () => {
     );
     // and the board is a real boss bar, created at setup
     expect(load).toContain("bossbar add nexus_rank:chain");
+    // the supply and the price SURVIVE a reload: only a fresh machine starts
+    // them. A reload that wiped the supply would erase the emission history
+    // the boss bar shows, and the owner would lose his market on a restart.
+    expect(load).toContain(
+      "execute unless score #chain mr_supply matches 0.. run scoreboard players set #chain mr_supply 0",
+    );
     expect(load).toContain("bossbar set nexus_rank:chain players @a");
   });
 
@@ -481,12 +487,34 @@ describe("the Chain — the market the admin controls", () => {
 
   it("keeps the board in front of the player at spawn", () => {
     const tick = functionSource.get("tick") ?? "";
-    // the boss bar carries the price, the supply and the online count
-    expect(tick).toContain("bossbar set nexus_rank:chain name");
-    expect(tick).toContain('"objective":"mr_chain","name":"#chain"');
-    expect(tick).toContain('"objective":"mr_supply","name":"#chain"');
+    const board = functionSource.get("chain_board") ?? "";
+    // the boss bar carries the price, the supply and the online count,
+    // re-drawn once a SECOND (a component parse per tick per player is a
+    // tick the owner can feel)
+    expect(board).toContain("bossbar set nexus_rank:chain name");
+    expect(tick).toContain(
+      "execute if score #chain mr_tick matches 1 run function nexus_rank:chain_board",
+    );
+    expect(tick).toContain("scoreboard players add #chain mr_tick 1");
+    // o nome do placar é um componente de chat: um JSON inválido faria a
+    // função INTEIRA falhar ao carregar e o placar ficaria mudo (foi assim
+    // que um typo de aspa passou no teste de conteúdo e foi pego só no
+    // servidor real)
+    const nameLine = board
+      .split("\n")
+      .find((line) => line.startsWith("bossbar set nexus_rank:chain name"));
+    expect(nameLine, "the board must set its name").toBeTruthy();
+    const json = nameLine!.replace("bossbar set nexus_rank:chain name ", "");
+    expect(() => JSON.parse(json)).not.toThrow();
+    const parsed = JSON.parse(json) as { extra?: Array<Record<string, unknown>> };
+    // e cada parte tem cor — um componente sem cor cai no branco padrão
+    for (const part of parsed.extra ?? []) {
+      expect(part.color, `a board part without a colour: ${JSON.stringify(part)}`).toBeTruthy();
+    }
+    expect(board).toContain('"objective":"mr_chain","name":"#chain"');
+    expect(board).toContain('"objective":"mr_supply","name":"#chain"');
     // and the action bar repeats it near the hub
-    expect(tick).toContain("execute as @a[x=0,y=100,z=0,distance=..40] run title @s actionbar");
+    expect(board).toContain("execute as @a[x=0,y=100,z=0,distance=..40] run title @s actionbar");
     // the admin tag is re-applied every tick, so a late join is an admin
     expect(tick).toContain("tag @a[name=Verifier] add mr_admin");
   });
