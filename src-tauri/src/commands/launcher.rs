@@ -426,11 +426,29 @@ pub fn launcher_install_loader(
         std::fs::write(&jar, bytes).map_err(|e| format!("installer write: {e}"))?;
     }
 
+    // The installer is the vanilla launcher's installer: it REFUSES to run
+    // without a launcher_profiles.json in its target ("There is no Minecraft
+    // launcher profile ... you need to run the launcher first!" — measured),
+    // and it writes <target>/versions/<id> + <target>/libraries. Our shared
+    // cache lives in `minecraft/`, so THAT is the target and the profile is
+    // ours to create.
+    let game_dir = base.join("minecraft");
+    std::fs::create_dir_all(game_dir.join("versions")).map_err(|e| format!("{e}"))?;
+    let profiles = game_dir.join("launcher_profiles.json");
+    if !profiles.exists() {
+        let now = "1970-01-01T00:00:00.000Z";
+        let body = format!(
+            r#"{{"profiles":{{"VOXEL":{{"name":"VOXEL","type":"custom","created":"{now}","lastUsed":"{now}","lastVersionId":"{mc_version}","gameDir":"{}"}}}},"version":3,"selectedProfile":"VOXEL"}}"#,
+            game_dir.to_string_lossy().replace('\\', "\\\\")
+        );
+        std::fs::write(&profiles, body).map_err(|e| format!("{e}"))?;
+    }
+
     let output = std::process::Command::new(&java)
         .arg("-jar")
         .arg(&jar)
         .arg("--installClient")
-        .arg(&base)
+        .arg(&game_dir)
         .output()
         .map_err(|e| format!("installer run: {e}"))?;
     if !output.status.success() {
@@ -460,6 +478,49 @@ pub fn launcher_install_loader(
     for dir in ["mods", "saves", "config", "resourcepacks", "shaderpacks", "natives"] {
         std::fs::create_dir_all(instance.join(dir)).map_err(|e| format!("{e}"))?;
     }
+
+    // ---- normalise what the installer left behind ----
+    // The Forge/NeoForge installer writes <id>.json (NOT version.json), no
+    // client jar of its own, and an asset-index-less version json that leans
+    // on the vanilla one. Measured on the live Forge 1.20.1 install.
+    let loader_dir = base.join("minecraft/versions").join(&target);
+    if let Ok(entries) = std::fs::read_dir(&loader_dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.ends_with(".json") && name != "version.json" && name != "fabric-profile.json" {
+                let to = loader_dir.join("version.json");
+                if !to.exists() {
+                    let _ = std::fs::copy(entry.path(), &to);
+                }
+            }
+        }
+    }
+    // the game jar: the installer leaves the PARENT's jar (renamed) and the
+    // launcher reads <version>/client.jar, so link/copy it once
+    let loader_client = loader_dir.join("client.jar");
+    if !loader_client.exists() {
+        let parent = base
+            .join("minecraft/versions")
+            .join(&mc_version)
+            .join("client.jar");
+        if parent.is_file() {
+            let _ = std::fs::copy(parent, &loader_client);
+        } else {
+            let renamed = base
+                .join("minecraft/versions")
+                .join(&mc_version)
+                .join(format!("{mc_version}.jar"));
+            let _ = std::fs::copy(renamed, &loader_client);
+        }
+    }
+
+    // record the PARENT Minecraft version next to the loader's own: the
+    // launch merges the vanilla json (asset index, asset id, the
+    // `--assetIndex/--uuid` game args and the natives path) from it, and
+    // reading the loader's own json as the "vanilla" would merge it with
+    // itself.
+    std::fs::write(loader_dir.join("parent.txt"), &mc_version)
+        .map_err(|e| format!("{e}"))?;
 
     Ok(LoaderInstallResult {
         instance_slug: slug,
@@ -1441,6 +1502,41 @@ fn build_launch_plan(
     )
     .map_err(|e| format!("version.json parse: {e}"))?;
 
+    // A Forge/NeoForge version json carries ONLY the loader's own delta
+    // (libraries, main class, arguments): the asset index and the asset id
+    // live in the VANILLA json of the same Minecraft version, and that is
+    // what the real launchers merge in. Measured on a live Forge 1.20.1
+    // install: its json has no `assetIndex`, so `--assetIndex` would be
+    // missing and the game would boot with no textures.
+    let version = if version.asset_index.is_none() {
+        // the parent Minecraft version of a loader install (Forge/NeoForge),
+        // recorded at install time; a vanilla version is its own parent
+        let parent = std::fs::read_to_string(version_dir.join("parent.txt"))
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| mc_version.to_string());
+        let vanilla_dir = mc_versions_dir(&base).join(parent);
+        let vanilla_bytes = read_json(vanilla_dir.join("version.json"), "vanilla version.json")?;
+        let mut vanilla: VersionJson = serde_json::from_slice(
+            vanilla_bytes
+                .strip_prefix(&[0xEF, 0xBB, 0xBF][..])
+                .unwrap_or(&vanilla_bytes),
+        )
+        .map_err(|e| format!("vanilla version.json parse: {e}"))?;
+        vanilla.main_class = version.main_class;
+        // o json do loader carrega SÓ a própria diferença: os argumentos de
+        // jogo com `--assetIndex`, `--uuid`, `--accessToken` e o
+        // `-Djava.library.path` dos nativos são do VANILLA. Concatenar (o
+        // vanilla primeiro, o loader depois) é o que os launhers reais fazem.
+        vanilla.arguments.jvm.extend(version.arguments.jvm.into_iter());
+        vanilla.arguments.game.extend(version.arguments.game.into_iter());
+        vanilla.libraries.extend(version.libraries.into_iter());
+        vanilla
+    } else {
+        version
+    };
+
     // The Fabric profile is only part of a fabric launch. A vanilla launch
     // (datapack project) must NOT require it — that was the reason the game
     // never started for the owner.
@@ -1511,10 +1607,13 @@ fn build_launch_plan(
     vars.insert("assets_index_name".into(), asset_index_name);
     vars.insert("natives_directory".into(), natives.to_string_lossy().to_string());
     vars.insert("library_directory".into(), libs_root.to_string_lossy().to_string());
+    // Forge/NeoForge put `${classpath_separator}` INSIDE an argument (their
+    // module path), not only between classpath entries
     vars.insert(
         "classpath".into(),
         classpath.join(&classpath_separator().to_string()),
     );
+    vars.insert("classpath_separator".into(), classpath_separator().to_string());
 
     let render = |text: &str| -> String {
         let mut out = text.to_string();
@@ -1911,6 +2010,117 @@ mod launcher_loader_tests {
             uuid: "00000000-0000-0000-0000-000000000000".to_string(),
             access_token: "token".to_string(),
         }
+    }
+
+
+    /// The launch plan of an INSTALLED Forge: the asset index and the asset
+    /// args come from the vanilla json (the loader json carries only its own
+    /// delta), the entry point is the loader's, and no `${placeholder}` leaks.
+    /// This is the step that makes "baixar e jogar" actually work.
+    #[test]
+    #[ignore = "e2e: installs Forge and builds its launch plan"]
+    fn e2e_a_forge_launch_plan_is_complete() {
+        let base = std::env::temp_dir().join(format!("voxel-forge-launch-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let installed = launcher_install_loader(
+            base.to_string_lossy().to_string(),
+            "1.20.1".to_string(),
+            "Forge".to_string(),
+            "47.4.28".to_string(),
+            None,
+        )
+        .expect("the official Forge installer must run");
+        // a vanilla runtime precisa existir para o merge (asset index)
+        prepare_core(
+            base.to_string_lossy().as_ref(),
+            "voxel-forge-test",
+            "1.20.1",
+            "vanilla",
+            "",
+            &|_, _, _| {},
+        )
+        .expect("the vanilla runtime must be downloaded");
+        let plan = build_launch_plan(
+            base.to_string_lossy().as_ref(),
+            "voxel-forge-test",
+            &installed.target_version,
+            "vanilla",
+            &fake_account(),
+            None,
+            None,
+        )
+        .expect("the Forge launch plan must build");
+        let args = plan.args.join(" ");
+        // o índice de assets e os argumentos de assets vieram do merge
+        assert!(args.contains("--assetIndex"), "{args}");
+        assert!(args.contains("--uuid"), "{args}");
+        // a entrada é a do Forge, não a do vanilla
+        assert!(
+            plan.args.iter().any(|arg| arg.contains("bootstraplauncher")),
+            "the Forge entry point must be on the command line: {args}"
+        );
+        // e nenhum placeholder vaza para a linha de comando
+        assert!(!args.contains("${"), "{args}");
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+
+    /// The Forge/NeoForge version json carries ONLY the loader's own delta.
+    /// Merging it must PREPEND the vanilla game arguments (the
+    /// `--assetIndex/--uuid/--accessToken/--gameDir` block) and the JVM ones
+    /// (the natives `-Djava.library.path`), because without them the game
+    /// boots with no assets and no user. Measured against a live Forge
+    /// 1.20.1 install and replayed here without the network.
+    #[test]
+    fn a_loader_version_json_merges_the_vanilla_arguments_in() {
+        let base = std::env::temp_dir().join(format!("voxel-forge-merge-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let vanilla = base.join("minecraft/versions/1.20.1");
+        let forge = base.join("minecraft/versions/1.20.1-forge-47.4.28");
+        std::fs::create_dir_all(&vanilla).unwrap();
+        std::fs::create_dir_all(&forge).unwrap();
+        std::fs::write(
+            vanilla.join("version.json"),
+            r#"{"id":"1.20.1","assets":"1.20","mainClass":"net.minecraft.client.main.Main",
+                "assetIndex":{"id":"1.20","url":"https://x/1.20.json","sha1":"00"},
+                "downloads":{"client":{"url":"https://x/client.jar","sha1":"00"}},
+                "libraries":[],
+                "arguments":{"game":["--username","${auth_player_name}","--uuid","${auth_uuid}","--assetIndex","${assets_index_name}"],"jvm":["-Djava.library.path=${natives_directory}"]}}"#,
+        )
+        .unwrap();
+        std::fs::write(forge.join("parent.txt"), "1.20.1").unwrap();
+        std::fs::write(
+            forge.join("version.json"),
+            r#"{"id":"1.20.1-forge-47.4.28","mainClass":"cpw.mods.bootstraplauncher.BootstrapLauncher",
+                "libraries":[],
+                "arguments":{"game":["--launchTarget","forgeclient"],"jvm":["-DmergeModules=jna.jar"]}}"#,
+        )
+        .unwrap();
+
+        let plan = build_launch_plan(
+            base.to_string_lossy().as_ref(),
+            "voxel-forge-test",
+            "1.20.1-forge-47.4.28",
+            "vanilla",
+            &fake_account(),
+            None,
+            None,
+        )
+        .expect("the plan must build from the merged version");
+        let args = plan.args.join(" ");
+        // os argumentos do vanilla (usuário, assets, bibliotecas nativas)
+        assert!(args.contains("--uuid"), "{args}");
+        assert!(args.contains("--assetIndex"), "{args}");
+        assert!(args.contains("java.library.path"), "{args}");
+        // e os do loader, depois
+        assert!(args.contains("--launchTarget"), "{args}");
+        assert!(args.contains("forgeclient"), "{args}");
+        // a entrada é a do Forge
+        assert!(
+            plan.args.iter().any(|arg| arg == "cpw.mods.bootstraplauncher.BootstrapLauncher"),
+            "{args}"
+        );
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     /// The owner's bug, proven in a unit test: a vanilla launch must not
@@ -2615,5 +2825,43 @@ mod loader_catalog_tests {
             launcher_install_loader_url("NeoForge", "1.20.4", "20.4.253"),
             "https://maven.neoforged.net/releases/net/neoforged/neoforge/20.4.253/neoforge-20.4.253-installer.jar",
         );
+    }
+}
+
+#[cfg(test)]
+mod forge_install_tests {
+    use super::*;
+
+    /// The Forge/NeoForge installer refuses to run without a launcher profile
+    /// in its target — and it writes <target>/versions/<id>. The command
+    /// therefore installs into `minecraft/` and creates the profile first.
+    #[test]
+    #[ignore = "e2e: downloads and runs the official Forge installer"]
+    fn e2e_forge_installs_into_the_shared_cache() {
+        let base = std::env::temp_dir().join(format!("voxel-forge-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let result = launcher_install_loader(
+            base.to_string_lossy().to_string(),
+            "1.20.1".to_string(),
+            "Forge".to_string(),
+            "47.4.28".to_string(),
+            None,
+        )
+        .expect("the official Forge installer must run");
+        // the version the INSTALLER named — that is what the game launches with
+        assert!(
+            result.target_version.contains("1.20.1") && result.target_version.contains("forge"),
+            "the installer named the version: {}",
+            result.target_version
+        );
+        // and it landed in the shared cache the launcher already uses
+        assert!(
+            base.join("minecraft/versions")
+                .join(&result.target_version)
+                .join("version.json")
+                .is_file(),
+            "the version json must be in minecraft/versions"
+        );
+        let _ = std::fs::remove_dir_all(&base);
     }
 }
