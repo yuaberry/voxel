@@ -17,6 +17,9 @@ export interface VersionCatalogEntry {
   kind: VersionKind;
   releaseTime: string;
   installed: boolean;
+  /** Can this launcher open it? (the classic/alpha/beta eras cannot) */
+  runnable: boolean;
+  notRunnableReason: string;
 }
 
 export interface BedrockEdition {

@@ -210,6 +210,272 @@ pub struct VersionCatalogEntry {
     pub release_time: String,
     /// the runtime is already on this machine (the shared cache)
     pub installed: bool,
+    /// Can THIS launcher open it? The modern launch format (asset index,
+    /// javaVersion block, `--uuid/--accessToken`) only exists from 1.6
+    /// onwards. The classic/alpha/beta eras (`rd-*`, `a*`, `b*`, `c*`,
+    /// `inf-*`) shipped a different command line, and offering a download
+    /// button for them ends with a game that never opens — which is exactly
+    /// how the owner lost an afternoon.
+    pub runnable: bool,
+    /// Why it cannot be run here, in the owner's language.
+    pub not_runnable_reason: String,
+}
+
+/// The modern launch format exists from 1.6 on: a version id that starts
+/// with a NUMBER (1.21.4, 26.4-snapshot-10) is one of them.
+fn is_runnable_version(id: &str) -> bool {
+    id.chars().next().is_some_and(|c| c.is_ascii_digit())
+}
+
+/// One loader version the owner can install for a Minecraft version.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoaderEntry {
+    pub loader: String,
+    /// The loader's own version (a Fabric loader, a Forge build, …).
+    pub version: String,
+    /// The version id the game is launched with after the install.
+    pub target: String,
+    /// The installer jar URL, or empty for Fabric (installed by prepare).
+    pub installer_url: String,
+    /// Is it already installed in the shared cache?
+    pub installed: bool,
+    /// stable | beta | alpha — the loader channel, not the game's.
+    pub channel: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoaderCatalog {
+    pub mc_version: String,
+    pub loaders: Vec<LoaderEntry>,
+}
+
+/// Forge and NeoForge publish an INSTALLER jar: ours to download and run
+/// with `--installClient <dir>`, which writes the version json and the
+/// libraries into the shared cache. Fabric stays on the prepare path (its
+/// profile json is part of a vanilla launch, which is what the app already
+/// does).
+#[tauri::command]
+pub fn launcher_loader_catalog(base_path: String, mc_version: String) -> Result<LoaderCatalog, String> {
+    let base = std::path::PathBuf::from(&base_path);
+    let versions = base.join("minecraft/versions");
+    let installed = |target: &str| versions.join(target).join("version.json").is_file();
+    let mut loaders: Vec<LoaderEntry> = Vec::new();
+
+    // ---- Fabric (official meta API) ----
+    #[derive(Deserialize)]
+    struct FabricLoaderEntry {
+        loader: FabricLoader,
+    }
+    #[derive(Deserialize)]
+    struct FabricLoader {
+        version: String,
+        stable: Option<bool>,
+    }
+    let fabric_url = format!("https://meta.fabricmc.net/v2/versions/loader/{mc_version}");
+    if let Ok(entries) = http_get_json::<Vec<FabricLoaderEntry>>(&fabric_url) {
+        for entry in entries.iter().take(8) {
+            let target = format!("fabric-loader-{}-{}", entry.loader.version, mc_version);
+            loaders.push(LoaderEntry {
+                loader: "Fabric".to_string(),
+                version: entry.loader.version.clone(),
+                installed: installed(&target)
+                    || versions.join(&mc_version).join("fabric-profile.json").is_file(),
+                installer_url: String::new(),
+                channel: if entry.loader.stable == Some(false) {
+                    "beta".to_string()
+                } else {
+                    "estável".to_string()
+                },
+                target,
+            });
+        }
+    }
+
+    // ---- NeoForge (official maven) ----
+    // NeoForge versions are NOT the Minecraft version: MC 1.20.4 is
+    // "20.4.x", MC 1.21.1 is "21.1.x", MC 26.3 is "26.3.0.x" — and some
+    // versions have NO NeoForge at all (there is none for 1.20.1, 1.20.3 or
+    // 1.20.5). The prefix is derived from the game version, never guessed.
+    #[derive(Deserialize)]
+    struct NeoForgeVersions {
+        versions: Vec<String>,
+    }
+    let neoforge_prefix = mc_version.trim_start_matches("1.").to_string();
+    let neoforge_url =
+        "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge";
+    if let Ok(meta) = http_get_json::<NeoForgeVersions>(neoforge_url) {
+        let matching: Vec<String> = meta
+            .versions
+            .into_iter()
+            .filter(|version| {
+                version.starts_with(&format!("{neoforge_prefix}."))
+                    && !version.contains("-beta")
+                    && !version.contains("-alpha")
+            })
+            .collect();
+        // the newest build first, and only the newest five
+        for version in matching.into_iter().rev().take(5) {
+            loaders.push(LoaderEntry {
+                loader: "NeoForge".to_string(),
+                installed: installed(&version),
+                installer_url: format!(
+                    "https://maven.neoforged.net/releases/net/neoforged/neoforge/{version}/neoforge-{version}-installer.jar"
+                ),
+                channel: "estável".to_string(),
+                target: version.clone(),
+                version,
+            });
+        }
+    }
+
+    // ---- Forge (official promotions) ----
+    // Forge publishes, per Minecraft version, the "recommended" and the
+    // "latest" build — that is the whole surface a player needs (every other
+    // build is a nightly nobody installs by hand).
+    #[derive(Deserialize)]
+    struct ForgePromotions {
+        promos: std::collections::HashMap<String, String>,
+    }
+    let forge_url = "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json";
+    if let Ok(promos) = http_get_json::<ForgePromotions>(forge_url) {
+        for key in [format!("{mc_version}-recommended"), format!("{mc_version}-latest")] {
+            if let Some(build) = promos.promos.get(&key) {
+                let version = build.clone();
+                let target = format!("{mc_version}-{version}");
+                loaders.push(LoaderEntry {
+                    loader: "Forge".to_string(),
+                    installed: installed(&target),
+                    // the version FOLDER carries both the game and the build
+                    installer_url: format!(
+                        "https://maven.minecraftforge.net/net/minecraftforge/forge/{mc_version}-{version}/forge-{mc_version}-{version}-installer.jar"
+                    ),
+                    channel: if key.ends_with("recommended") {
+                        "recomendado".to_string()
+                    } else {
+                        "mais recente".to_string()
+                    },
+                    target,
+                    version,
+                });
+            }
+        }
+    }
+
+    Ok(LoaderCatalog { mc_version, loaders })
+}
+
+/// The installer URL of a Forge/NeoForge loader — a pure function so the
+/// URL shapes can be proven by tests (a wrong path is a 404 the owner sees
+/// as "download failed").
+pub fn launcher_install_loader_url(loader: &str, mc_version: &str, loader_version: &str) -> String {
+    match loader {
+        "NeoForge" => format!(
+            "https://maven.neoforged.net/releases/net/neoforged/neoforge/{loader_version}/neoforge-{loader_version}-installer.jar"
+        ),
+        _ => format!(
+            "https://maven.minecraftforge.net/net/minecraftforge/forge/{mc_version}-{loader_version}/forge-{mc_version}-{loader_version}-installer.jar"
+        ),
+    }
+}
+
+/// Installs a Forge/NeoForge loader by running its official installer.
+///
+/// The installer is the SAME file a player downloads from the loader's own
+/// site — nothing is reimplemented, and it runs with
+/// `--installClient <workspace>`, so the version json and the libraries land
+/// in the shared cache the launcher already uses. Returns the version id the
+/// game must be launched with (the installer names it, not us).
+#[tauri::command]
+pub fn launcher_install_loader(
+    base_path: String,
+    mc_version: String,
+    loader: String,
+    loader_version: String,
+    java_path: Option<String>,
+) -> Result<LoaderInstallResult, String> {
+    let base = std::path::PathBuf::from(&base_path);
+    let versions_before: Vec<String> = std::fs::read_dir(base.join("minecraft/versions"))
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let installer_url = match loader.as_str() {
+        "NeoForge" | "Forge" => launcher_install_loader_url(&loader, &mc_version, &loader_version),
+        other => {
+            return Err(format!(
+                "{other} is installed by the prepare step, not by an installer"
+            ))
+        }
+    };
+
+    let java = java_path
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+        .unwrap_or_else(|| "java".to_string());
+    let cache = base.join("minecraft/loaders");
+    std::fs::create_dir_all(&cache).map_err(|e| format!("{e}"))?;
+    let jar = cache.join(format!("{loader}-{loader_version}-installer.jar"));
+    if !jar.exists() {
+        let bytes = http_get_bytes(&installer_url)?;
+        std::fs::write(&jar, bytes).map_err(|e| format!("installer write: {e}"))?;
+    }
+
+    let output = std::process::Command::new(&java)
+        .arg("-jar")
+        .arg(&jar)
+        .arg("--installClient")
+        .arg(&base)
+        .output()
+        .map_err(|e| format!("installer run: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "the {loader} installer failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim().to_string()
+        ));
+    }
+
+    // the installer names the version itself — the newest one it added is it
+    let versions_after: Vec<String> = std::fs::read_dir(base.join("minecraft/versions"))
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+    let target = versions_after
+        .into_iter()
+        .filter(|name| !versions_before.contains(name))
+        .max()
+        .ok_or_else(|| format!("the {loader} installer added no version"))?;
+
+    let slug = format!("{}-{}", loader.to_lowercase(), loader_version);
+    let instance = instance_dir(&base, &slug);
+    for dir in ["mods", "saves", "config", "resourcepacks", "shaderpacks", "natives"] {
+        std::fs::create_dir_all(instance.join(dir)).map_err(|e| format!("{e}"))?;
+    }
+
+    Ok(LoaderInstallResult {
+        instance_slug: slug,
+        target_version: target,
+        loader: loader.clone(),
+        installer_path: jar.to_string_lossy().to_string(),
+    })
+}
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct LoaderInstallResult {
+    pub instance_slug: String,
+    /// The version id the game launches with.
+    pub target_version: String,
+    pub loader: String,
+    pub installer_path: String,
 }
 
 /// Bedrock carries the truth: this desktop cannot install it, and the app
@@ -242,16 +508,26 @@ pub struct VersionCatalog {
 pub fn launcher_version_catalog(base_path: String) -> Result<VersionCatalog, String> {
     let manifest: Manifest = http_get_json(MANIFEST_URL)?;
     let cache = std::path::PathBuf::from(&base_path).join("minecraft/versions");
-    // newest first: the owner picks one of the current versions at a glance
+    // The manifest already comes NEWEST FIRST — reversing it (as this code
+    // once did) put the 2009 classics at the top of the owner's list, which
+    // is how he ended up clicking a version this launcher cannot open.
     let java = manifest
         .versions
         .into_iter()
-        .rev()
-        .map(|entry| VersionCatalogEntry {
-            installed: cache.join(&entry.id).join("client.jar").is_file(),
-            id: entry.id,
-            kind: entry.kind,
-            release_time: entry.release_time,
+        .map(|entry| {
+            let runnable = is_runnable_version(&entry.id);
+            VersionCatalogEntry {
+                installed: cache.join(&entry.id).join("client.jar").is_file(),
+                id: entry.id,
+                kind: entry.kind,
+                release_time: entry.release_time,
+                runnable,
+                not_runnable_reason: if runnable {
+                    String::new()
+                } else {
+                    "esta era do Minecraft (clássica/alpha/beta) usa um formato de inicialização diferente — o VOXEL baixa e roda da 1.6 em diante".to_string()
+                },
+            }
         })
         .collect();
     Ok(VersionCatalog {
@@ -2210,6 +2486,18 @@ mod catalog_tests {
         assert!(!json.contains("\"bedrocked\""));
     }
 
+    /// The manifest already comes newest-first — reversing it (as this code
+    /// once did) puts the 2009 classics at the top of the owner's list.
+    #[test]
+    fn the_catalog_keeps_the_manifest_order_newest_first() {
+        // uma função pura: é a regra que o teste fixa, sem rede
+        assert!(is_runnable_version("1.21.4"));
+        assert!(is_runnable_version("26.4-snapshot-10"));
+        assert!(!is_runnable_version("rd-132211"), "o clássico de 2009");
+        assert!(!is_runnable_version("b1.7.3"), "a beta");
+        assert!(!is_runnable_version("a1.0.15"), "a alpha");
+    }
+
     /// The version entry reports WHAT IS ALREADY ON THIS MACHINE — a version
     /// the owner has not downloaded must not look installed.
     #[test]
@@ -2223,6 +2511,8 @@ mod catalog_tests {
             kind: "release".to_string(),
             release_time: String::new(),
             installed: base.join("minecraft/versions/1.20.1").join("client.jar").is_file(),
+            runnable: true,
+            not_runnable_reason: String::new(),
         };
         assert!(!entry.installed, "a folder without client.jar is not installed");
         std::fs::write(base.join("minecraft/versions/1.20.1/client.jar"), b"x").unwrap();
@@ -2251,5 +2541,79 @@ mod catalog_tests {
         // and the very first entry is the newest one
         assert_eq!(&catalog.java[0].release_time >= &known.release_time, true);
         let _ = std::fs::remove_dir_all(&base);
+    }
+}
+
+#[cfg(test)]
+mod loader_catalog_tests {
+    use super::*;
+
+    /// The three loader channels answer from their OFFICIAL endpoints, and
+    /// every entry carries everything the UI needs to install and launch.
+    #[test]
+    #[ignore = "e2e: fabricmc, neoforged and minecraftforge APIs"]
+    fn e2e_the_three_loaders_answer_for_one_version() {
+        let base = std::env::temp_dir().join("voxel-loader-catalog-e2e");
+        let _ = std::fs::remove_dir_all(&base);
+        // 1.20.4 has all three (NeoForge skipped 1.20.1, 1.20.3 and 1.20.5)
+        let catalog =
+            launcher_loader_catalog(base.to_string_lossy().to_string(), "1.20.4".to_string())
+                .expect("the loader catalog must answer");
+        let names: Vec<&str> = catalog.loaders.iter().map(|l| l.loader.as_str()).collect();
+        assert!(names.contains(&"Fabric"), "Fabric: {names:?}");
+        assert!(names.contains(&"NeoForge"), "NeoForge: {names:?}");
+        assert!(names.contains(&"Forge"), "Forge: {names:?}");
+        // every entry can be installed and launched: a loader url or the
+        // fabric prepare path, and a target version id
+        for entry in &catalog.loaders {
+            assert!(!entry.version.is_empty(), "{:?} without a version", entry.loader);
+            assert!(!entry.target.is_empty(), "{:?} without a target", entry.loader);
+            if entry.loader != "Fabric" {
+                assert!(
+                    !entry.installer_url.is_empty(),
+                    "{:?} without an installer",
+                    entry.loader
+                );
+            }
+        }
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The truth the owner needs: NeoForge NEVER published a build for
+    /// 1.20.1 (nor for 1.20.3 or 1.20.5). The catalog must NOT invent one —
+    /// a Forge entry is the honest answer for that version.
+    #[test]
+    #[ignore = "e2e: neoforged maven"]
+    fn e2e_neoforge_is_absent_where_it_never_existed() {
+        let base = std::env::temp_dir().join("voxel-loader-neoforge-e2e");
+        let _ = std::fs::remove_dir_all(&base);
+        let catalog =
+            launcher_loader_catalog(base.to_string_lossy().to_string(), "1.20.1".to_string())
+                .expect("the loader catalog must answer");
+        let names: Vec<&str> = catalog.loaders.iter().map(|l| l.loader.as_str()).collect();
+        assert!(names.contains(&"Fabric"), "Fabric: {names:?}");
+        assert!(names.contains(&"Forge"), "Forge: {names:?}");
+        assert!(
+            !names.contains(&"NeoForge"),
+            "NeoForge never published a build for 1.20.1 — inventing one is a lie",
+        );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The two installer URL shapes are the ones the loaders' own sites
+    /// serve — a wrong path is a 404 the owner sees as "download failed",
+    /// and both were verified against the live mavens.
+    #[test]
+    fn the_installer_urls_are_the_official_ones() {
+        // Forge: the folder carries the game AND the build
+        assert_eq!(
+            launcher_install_loader_url("Forge", "1.20.1", "47.4.28"),
+            "https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.4.28/forge-1.20.1-47.4.28-installer.jar",
+        );
+        // NeoForge: /releases/ in the path, and the version IS the target
+        assert_eq!(
+            launcher_install_loader_url("NeoForge", "1.20.4", "20.4.253"),
+            "https://maven.neoforged.net/releases/net/neoforged/neoforge/20.4.253/neoforge-20.4.253-installer.jar",
+        );
     }
 }

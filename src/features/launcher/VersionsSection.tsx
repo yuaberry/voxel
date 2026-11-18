@@ -29,15 +29,26 @@ import {
   type VersionCatalogEntry,
 } from "@/services/launcher/versionsService";
 import { getStoredAccount } from "@/services/launcher/accountService";
+import { LoaderPicker } from "@/features/launcher/LoaderPicker";
 
 /** How many versions the list shows before a search narrows it. */
 const VISIBLE_WITHOUT_SEARCH = 24;
+
+/** A short label for the era of a version — what the owner reads first. */
+function versionTitle(id: string): string {
+  if (id.startsWith("rd-")) return "Minecraft Clássico";
+  if (id.startsWith("a") || id.startsWith("inf-")) return "Minecraft Alpha";
+  if (id.startsWith("b")) return "Minecraft Beta";
+  return `Minecraft Java`;
+}
 
 export function VersionsSection() {
   const basePath = useSettingsStore((s) => s.settings.storage.basePath);
   const [catalog, setCatalog] = useState<Awaited<ReturnType<typeof listVersionCatalog>> | null>(null);
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** the version whose loaders the owner is looking at */
+  const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
     if (!basePath) return;
@@ -127,29 +138,46 @@ export function VersionsSection() {
         {versions.map((entry) => (
           <div
             key={entry.id}
-            className="flex items-center justify-between gap-2 rounded-md border border-border/40 bg-card/40 px-2.5 py-1.5"
+            onClick={() => entry.runnable && setSelected(entry.id === selected ? null : entry.id)}
+            className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border px-2.5 py-2 ${
+              selected === entry.id
+                ? "border-primary/60 bg-primary/5"
+                : entry.runnable
+                  ? "border-border/40 bg-card/40"
+                  : "border-border/25 bg-card/20 opacity-70"
+            }`}
           >
             <div className="min-w-0">
-              <p className="flex items-center gap-1.5 text-[11px] font-medium">
+              <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
                 <MonitorPlay className="h-3 w-3 text-muted-foreground" />
-                Minecraft {entry.id}
-                <Badge variant={entry.kind === "release" ? "success" : "secondary"} className="text-[9px]">
+                {/* the version id first: what the owner searches for */}
+                <span className="font-mono text-[11px]">Minecraft {entry.id}</span>
+                <Badge
+                  variant={entry.kind === "release" ? "success" : "secondary"}
+                  className="text-[9px]"
+                >
                   {versionKindLabel(entry.kind)}
                 </Badge>
+                <span className="text-[10px] font-normal text-muted-foreground">
+                  {versionTitle(entry.id)} · {versionReleased(entry.releaseTime)}
+                </span>
                 {entry.installed ? (
                   <Badge variant="outline" className="text-[9px]">
-                    baixado
+                    já baixado
                   </Badge>
                 ) : null}
               </p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                Java Edition · {versionReleased(entry.releaseTime)}
-              </p>
+              {!entry.runnable ? (
+                <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                  {entry.notRunnableReason}
+                </p>
+              ) : null}
             </div>
             <Button
               size="sm"
               variant={entry.installed ? "outline" : "gradient"}
-              disabled={busyId !== null}
+              disabled={busyId !== null || !entry.runnable}
+              title={entry.runnable ? undefined : entry.notRunnableReason}
               onClick={() => void downloadAndPlay(entry)}
             >
               {busyId === entry.id ? (
@@ -167,6 +195,13 @@ export function VersionsSection() {
           <p className="p-3 text-xs text-muted-foreground">Nenhuma versão corresponde à busca.</p>
         ) : null}
       </div>
+
+      {selected ? (
+        <>
+          <Separator />
+          <LoaderPicker mcVersion={selected} />
+        </>
+      ) : null}
 
       <Separator />
 
