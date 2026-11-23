@@ -2123,6 +2123,43 @@ mod launcher_loader_tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 
+
+    /// Writes the REAL command a launch would run, so the shell can run it
+    /// against the live display and prove the game actually opens.
+    #[test]
+    #[ignore = "e2e: emits the launch command for a manual run"]
+    fn e2e_emit_a_real_launch_command() {
+        let base = "/home/llinux/Voxel";
+        let plan = build_launch_plan(
+            base,
+            "mine-rank",
+            "1.20.1",
+            "vanilla",
+            &fake_account(),
+            None,
+            None,
+        )
+        .expect("the plan must build");
+        let mut out = format!("{}", plan.java);
+        for arg in &plan.args {
+            out.push(' ');
+            out.push_str(&shell_escape(arg));
+        }
+        let len = out.len();
+        std::fs::write("/tmp/opencode/launch-cmd.txt", out).expect("write the command");
+        eprintln!("COMMAND_LEN={len}");
+    }
+
+    /// Escapes an argument for a POSIX shell (single quotes inside).
+    fn shell_escape(text: &str) -> String {
+        let plain = |c: char| c.is_ascii_alphanumeric() || "._-/=:%@+,^".contains(c);
+        if !text.is_empty() && text.chars().all(plain) {
+            return text.to_string();
+        }
+        let quoted = text.replace('\'', "'\\''");
+        format!("'{quoted}'")
+    }
+
     /// The owner's bug, proven in a unit test: a vanilla launch must not
     /// need the Fabric profile, must use the Mojang entry point and must
     /// not leak a single `${placeholder}` into the command line.

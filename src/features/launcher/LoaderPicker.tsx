@@ -142,7 +142,13 @@ export function LoaderPicker({ mcVersion }: { mcVersion: string }) {
   return (
     <div className="space-y-2">
       <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        <Blocks className="h-3 w-3" /> Inicializadores — mods, shaders e modpacks
+        <Blocks className="h-3 w-3" /> Jogar COM MODS — inicializadores, shaders e modpacks
+      </p>
+      <p className="text-[10px] leading-relaxed text-muted-foreground">
+        Abra a mesma versão <span className="text-foreground">sem mods</span> pelo botão da
+        lista acima (vanilla puro), ou <span className="text-foreground">com mods</span> por
+        aqui — o loader instalado lê a pasta <code className="font-mono">mods/</code> da
+        instância.
       </p>
       {rows.length === 0 && loaders ? (
         <p className="rounded-lg border border-border/50 bg-card/40 p-3 text-[11px] text-muted-foreground">
@@ -182,7 +188,7 @@ export function LoaderPicker({ mcVersion }: { mcVersion: string }) {
               ) : (
                 <Package className="h-3.5 w-3.5" />
               )}
-              {entry.installed ? "Jogar" : "Instalar"}
+              {entry.installed ? "Jogar com mods" : "Instalar"}
             </Button>
           </div>
         ))}
